@@ -454,6 +454,7 @@
           <option value="rect">▬ Rectangular</option>
           <option value="oval">⬭ Oval</option>
           <option value="round">● Round</option>
+          <option value="spiral">◎ Spiral Round</option>
         </select>
         <div class="duct-dims" id="ductDimsRect">
           <label>Width × Height (inches)</label>
@@ -2306,7 +2307,7 @@ function showDuctPopup(meas) {
 window.onDuctTypeChange = function() {
   const val = document.getElementById('ductTypeSelect').value;
   document.getElementById('ductDimsRect').classList.toggle('show', val === 'rect' || val === 'oval');
-  document.getElementById('ductDimsRound').classList.toggle('show', val === 'round');
+  document.getElementById('ductDimsRound').classList.toggle('show', val === 'round' || val === 'spiral');
 };
 
 window.finishDuct = function(save) {
@@ -2321,10 +2322,10 @@ window.finishDuct = function(save) {
         let dims = '';
         if (type === 'rect' || type === 'oval') {
           dims = document.getElementById('ductRectDims').value.trim();
-        } else if (type === 'round') {
+        } else if (type === 'round' || type === 'spiral') {
           dims = document.getElementById('ductRoundDiam').value.trim();
         }
-        const symbols = { rect: '▬', oval: '⬭', round: '●' };
+        const symbols = { rect: '▬', oval: '⬭', round: '●', spiral: '◎' };
         meas.duct = { type, dims, symbol: symbols[type] };
       }
     }
@@ -2397,6 +2398,81 @@ function drawSimpleLine(points, color) {
   }
 }
 
+function drawSpiralDuct(points, duct, color) {
+  // Parse diameter to get pixel width for the duct representation
+  const diam = parseFloat(duct.dims) || 14;
+  // Scale duct width: use a visual width proportional to canvas (not real-world scale)
+  // At baseScale=2, 72px = 1 inch on paper. Use a reasonable visual width.
+  const ductHalfWidth = Math.max(4, Math.min(30, diam * 0.7)) * (baseScale / 2);
+  
+  for (let i = 1; i < points.length; i++) {
+    const ax = points[i-1].x, ay = points[i-1].y;
+    const bx = points[i].x, by = points[i].y;
+    const dx = bx - ax, dy = by - ay;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 1) continue;
+    
+    // Normal vector (perpendicular)
+    const nx = -dy / len * ductHalfWidth;
+    const ny = dx / len * ductHalfWidth;
+    
+    // Two parallel lines (outer walls of duct)
+    mCtx.strokeStyle = color;
+    mCtx.lineWidth = 1.5;
+    mCtx.globalAlpha = 0.7;
+    mCtx.setLineDash([]);
+    
+    mCtx.beginPath();
+    mCtx.moveTo(ax + nx, ay + ny);
+    mCtx.lineTo(bx + nx, by + ny);
+    mCtx.stroke();
+    
+    mCtx.beginPath();
+    mCtx.moveTo(ax - nx, ay - ny);
+    mCtx.lineTo(bx - nx, by - ny);
+    mCtx.stroke();
+    
+    // Spiral seam hatch marks (diagonal lines across the duct)
+    const spacing = ductHalfWidth * 2.5; // space between hash marks
+    const numHatches = Math.floor(len / spacing);
+    mCtx.lineWidth = 1;
+    mCtx.globalAlpha = 0.4;
+    for (let h = 1; h <= numHatches; h++) {
+      const t = h / (numHatches + 1);
+      const cx = ax + dx * t;
+      const cy = ay + dy * t;
+      // Angled hatch (30 degrees offset from perpendicular)
+      const hatchAngle = 0.5; // ~30 degrees in radians
+      const cos = Math.cos(hatchAngle), sin = Math.sin(hatchAngle);
+      const hnx = (nx * cos - ny * sin);
+      const hny = (nx * sin + ny * cos);
+      mCtx.beginPath();
+      mCtx.moveTo(cx + hnx, cy + hny);
+      mCtx.lineTo(cx - hnx, cy - hny);
+      mCtx.stroke();
+    }
+    
+    mCtx.globalAlpha = 1.0;
+    
+    // End caps (small arcs at start and end)
+    mCtx.lineWidth = 1.5;
+    mCtx.globalAlpha = 0.7;
+    if (i === 1) {
+      mCtx.beginPath();
+      mCtx.moveTo(ax + nx, ay + ny);
+      mCtx.lineTo(ax - nx, ay - ny);
+      mCtx.stroke();
+    }
+    if (i === points.length - 1) {
+      mCtx.beginPath();
+      mCtx.moveTo(bx + nx, by + ny);
+      mCtx.lineTo(bx - nx, by - ny);
+      mCtx.stroke();
+    }
+    mCtx.globalAlpha = 1.0;
+  }
+}
+
 function drawMeasurementLine(points, label, duct, color, isDashed) {
   if (points.length < 2) {
     if (points.length === 1) {
@@ -2431,6 +2507,11 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
     mCtx.stroke();
   }
   
+  // Draw spiral duct representation if applicable
+  if (duct && duct.type === 'spiral' && points.length >= 2) {
+    drawSpiralDuct(points, duct, color);
+  }
+
   const midIdx = Math.floor(points.length / 2);
   const p1 = points[midIdx - 1] || points[0];
   const p2 = points[midIdx] || points[points.length - 1];
