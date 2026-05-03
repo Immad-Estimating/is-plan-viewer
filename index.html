@@ -2673,90 +2673,77 @@ function getElbowCLRPx(duct) {
 }
 
 function drawFitting(points, fit, duct, color) {
+  // Revit-style elbow: duct walls curve continuously through the turn
+  // No separate fitting symbol — just inner/outer arcs connecting the wall lines
   if (fit.pointIdx < 1 || fit.pointIdx >= points.length - 1) return;
-  const V = points[fit.pointIdx];     // vertex (turn point)
-  const A = points[fit.pointIdx - 1]; // incoming from
-  const B = points[fit.pointIdx + 1]; // outgoing to
+  const V = points[fit.pointIdx];
+  const A = points[fit.pointIdx - 1];
+  const B = points[fit.pointIdx + 1];
   if (!A || !B) return;
 
   const halfW = getDuctHalfWidthPx(duct);
   const CLR = getElbowCLRPx(duct);
-  const clrPx = Math.max(halfW * 1.5, Math.min(CLR, 200));
+  const clrPx = Math.max(halfW * 1.2, Math.min(CLR, 200));
   const innerR = Math.max(2, clrPx - halfW);
   const outerR = clrPx + halfW;
 
-  // Unit vectors: incoming direction (A→V) and outgoing direction (V→B)
-  const dAV = { x: V.x - A.x, y: V.y - A.y };
-  const lenAV = Math.sqrt(dAV.x*dAV.x + dAV.y*dAV.y) || 1;
-  const uIn = { x: dAV.x/lenAV, y: dAV.y/lenAV };
+  // Unit vectors along each leg
+  const dIn = { x: V.x - A.x, y: V.y - A.y };
+  const lIn = Math.sqrt(dIn.x*dIn.x + dIn.y*dIn.y) || 1;
+  const uIn = { x: dIn.x/lIn, y: dIn.y/lIn };
+  const dOut = { x: B.x - V.x, y: B.y - V.y };
+  const lOut = Math.sqrt(dOut.x*dOut.x + dOut.y*dOut.y) || 1;
+  const uOut = { x: dOut.x/lOut, y: dOut.y/lOut };
 
-  const dVB = { x: B.x - V.x, y: B.y - V.y };
-  const lenVB = Math.sqrt(dVB.x*dVB.x + dVB.y*dVB.y) || 1;
-  const uOut = { x: dVB.x/lenVB, y: dVB.y/lenVB };
-
-  // Turn angle: angle between the two direction vectors
-  // dot = cos(angle), cross = sin(angle)
-  const dot = uIn.x * uOut.x + uIn.y * uOut.y;
+  // Cross product to determine turn side
   const cross = uIn.x * uOut.y - uIn.y * uOut.x;
-  const turnAngle = Math.acos(Math.max(-1, Math.min(1, dot))); // 0..PI, the deflection
-  if (turnAngle < 0.05) return; // nearly straight, skip
-  const sweep = Math.PI - turnAngle; // elbow sweep = supplement of the deflection
-  if (sweep < 0.05) return;
+  if (Math.abs(cross) < 0.01) return; // nearly straight
 
-  // Turn direction: cross > 0 means left turn (CCW), cross < 0 means right turn (CW)
-  const turnLeft = cross > 0;
+  // Normal vectors pointing to the INSIDE of the turn
+  // If cross > 0 (left turn), inside is to the right of incoming = (uIn.y, -uIn.x)
+  // If cross < 0 (right turn), inside is to the left = (-uIn.y, uIn.x)
+  const nIn = cross > 0 
+    ? { x: uIn.y, y: -uIn.x }   // right side of incoming
+    : { x: -uIn.y, y: uIn.x };  // left side of incoming
+  const nOut = cross > 0
+    ? { x: uOut.y, y: -uOut.x }
+    : { x: -uOut.y, y: uOut.x };
 
-  // Bisector of the turn: direction from vertex toward the arc center
-  // The arc center lies on the angle bisector, on the INSIDE of the turn
-  const bisX = -(uIn.x + uOut.x); // points inward (opposite to the average of in+out)
-  const bisY = -(uIn.y + uOut.y);
-  const bisLen = Math.sqrt(bisX*bisX + bisY*bisY) || 1;
-  const bisUx = bisX / bisLen;
-  const bisUy = bisY / bisLen;
+  // Arc center: offset from vertex along the inside normal by clrPx
+  // Use average of the two normals (bisector direction) for positioning
+  const bisNx = nIn.x + nOut.x;
+  const bisNy = nIn.y + nOut.y;
+  const bisNlen = Math.sqrt(bisNx*bisNx + bisNy*bisNy) || 1;
+  
+  // Half-angle of the turn
+  const dot = uIn.x*uOut.x + uIn.y*uOut.y;
+  const halfAngle = Math.acos(Math.max(-1, Math.min(1, dot))) / 2;
+  const sinHA = Math.sin(halfAngle);
+  if (sinHA < 0.01) return;
+  
+  // Center distance from vertex
+  const cDist = clrPx / sinHA;
+  const cx = V.x + (bisNx/bisNlen) * cDist;
+  const cy = V.y + (bisNy/bisNlen) * cDist;
 
-  // The correct side: if turning left, center is to the right of incoming, and vice versa
-  // Check if bisector points to the correct side using cross product with incoming
-  const bisCross = uIn.x * bisUy - uIn.y * bisUx;
-  const flipBis = (turnLeft && bisCross < 0) || (!turnLeft && bisCross > 0);
-  const centerDirX = flipBis ? -bisUx : bisUx;
-  const centerDirY = flipBis ? -bisUy : bisUy;
+  // Tangent points: perpendicular from center onto each leg
+  // Incoming tangent: foot of perpendicular from C onto line through A→V
+  const dotCI = (cx - A.x)*uIn.x + (cy - A.y)*uIn.y;
+  const tInX = A.x + uIn.x * dotCI;
+  const tInY = A.y + uIn.y * dotCI;
+  // Outgoing tangent: foot of perpendicular from C onto line through V→B  
+  const dotCO = (cx - V.x)*uOut.x + (cy - V.y)*uOut.y;
+  const tOutX = V.x + uOut.x * dotCO;
+  const tOutY = V.y + uOut.y * dotCO;
 
-  // Distance from vertex to arc center along bisector
-  // Using: sin(sweep/2) = clrPx * sin(sweep/2) ... no.
-  // The center is at distance clrPx / sin(half_deflection) from vertex along bisector
-  // where half_deflection = turnAngle/2
-  const halfDeflect = turnAngle / 2;
-  const sinHD = Math.sin(halfDeflect);
-  if (sinHD < 0.01) return;
-  const centerDist = clrPx / sinHD;
-
-  const cx = V.x + centerDirX * centerDist;
-  const cy = V.y + centerDirY * centerDist;
-
-  // Tangent points: project from center perpendicular back to each leg
-  // Inlet tangent: closest point on line A→V to center C, at distance clrPx from C
-  // = V minus some distance along uIn
-  // tanIn = C + clrPx * normalTowardIncomingLeg
-  // Simpler: tanIn is the foot of perpendicular from C onto line A→V
-  const tInProj = (cx - V.x) * (-uIn.x) + (cy - V.y) * (-uIn.y); // project C-V onto -uIn
-  const tanInX = V.x - uIn.x * tInProj;
-  const tanInY = V.y - uIn.y * tInProj;
-
-  const tOutProj = (cx - V.x) * uOut.x + (cy - V.y) * uOut.y;
-  const tanOutX = V.x + uOut.x * tOutProj;
-  const tanOutY = V.y + uOut.y * tOutProj;
-
-  // Arc angles from center
-  const arcStartAngle = Math.atan2(tanInY - cy, tanInX - cx);
-  const arcEndAngle = Math.atan2(tanOutY - cy, tanOutX - cx);
-
-  // Determine arc direction: we need to go the SHORT way around
-  // Test: which direction from arcStart to arcEnd is shorter?
-  let cwDelta = arcStartAngle - arcEndAngle;
-  while (cwDelta < 0) cwDelta += 2*Math.PI;
-  let ccwDelta = arcEndAngle - arcStartAngle;
-  while (ccwDelta < 0) ccwDelta += 2*Math.PI;
-  const arcCCW = ccwDelta < cwDelta;
+  // Arc angles
+  const aStart = Math.atan2(tInY - cy, tInX - cx);
+  const aEnd = Math.atan2(tOutY - cy, tOutX - cx);
+  
+  // Determine short-way arc direction
+  let cw = aStart - aEnd; while (cw < 0) cw += 2*Math.PI;
+  let ccw = aEnd - aStart; while (ccw < 0) ccw += 2*Math.PI;
+  const goCounterCW = ccw < cw;
 
   mCtx.save();
   mCtx.strokeStyle = color;
@@ -2764,68 +2751,40 @@ function drawFitting(points, fit, duct, color) {
   mCtx.setLineDash([]);
   mCtx.globalAlpha = 1.0;
 
-  // Inner throat arc
+  // Inner wall arc (throat)
   mCtx.beginPath();
-  mCtx.arc(cx, cy, innerR, arcStartAngle, arcEndAngle, arcCCW);
+  mCtx.arc(cx, cy, innerR, aStart, aEnd, goCounterCW);
   mCtx.stroke();
 
-  // Outer heel arc
+  // Outer wall arc (heel)
   mCtx.beginPath();
-  mCtx.arc(cx, cy, outerR, arcStartAngle, arcEndAngle, arcCCW);
+  mCtx.arc(cx, cy, outerR, aStart, aEnd, goCounterCW);
   mCtx.stroke();
 
-  // Tangent connection lines at inlet and outlet
-  const iIx = cx + Math.cos(arcStartAngle) * innerR;
-  const iIy = cy + Math.sin(arcStartAngle) * innerR;
-  const iOx = cx + Math.cos(arcStartAngle) * outerR;
-  const iOy = cy + Math.sin(arcStartAngle) * outerR;
-  mCtx.beginPath(); mCtx.moveTo(iIx, iIy); mCtx.lineTo(iOx, iOy); mCtx.stroke();
-
-  const oIx = cx + Math.cos(arcEndAngle) * innerR;
-  const oIy = cy + Math.sin(arcEndAngle) * innerR;
-  const oOx = cx + Math.cos(arcEndAngle) * outerR;
-  const oOy = cy + Math.sin(arcEndAngle) * outerR;
-  mCtx.beginPath(); mCtx.moveTo(oIx, oIy); mCtx.lineTo(oOx, oOy); mCtx.stroke();
-
-  // Nodal connection dots at inlet and outlet centerline tangent points
-  mCtx.fillStyle = color;
-  mCtx.beginPath(); mCtx.arc(tanInX, tanInY, 3.5, 0, Math.PI*2); mCtx.fill();
-  mCtx.beginPath(); mCtx.arc(tanOutX, tanOutY, 3.5, 0, Math.PI*2); mCtx.fill();
-
-  // Fitting label positioned outside the outer arc at midpoint
+  // Fitting label — small, near the outside of the bend
   const effSize = (_currentRenderMeas && _currentRenderMeas.labelSize != null) ? _currentRenderMeas.labelSize : annoSize;
   const effTextOp = (_currentRenderMeas && _currentRenderMeas.labelTextOpacity != null) ? _currentRenderMeas.labelTextOpacity : annoTextOpacity;
   const effFillOp = (_currentRenderMeas && _currentRenderMeas.labelFillOpacity != null) ? _currentRenderMeas.labelFillOpacity : annoFillOpacity;
-  const labelSz = effSize * 0.7 * baseScale;
+  const labelSz = effSize * 0.65 * baseScale;
   const renderSz = Math.max(28, labelSz);
   const lsc = labelSz / renderSz;
   mCtx.font = `bold ${renderSz}px -apple-system, BlinkMacSystemFont, sans-serif`;
   const ftLabel = getFittingLabel(fit.type);
   const tw = mCtx.measureText(ftLabel).width;
-  // Midpoint of arc: angle halfway between start and end (going the short way)
-  let midAngle;
-  if (arcCCW) {
-    let d = arcEndAngle - arcStartAngle; while (d < 0) d += 2*Math.PI;
-    midAngle = arcStartAngle + d/2;
-  } else {
-    let d = arcStartAngle - arcEndAngle; while (d < 0) d += 2*Math.PI;
-    midAngle = arcStartAngle - d/2;
-  }
-  const labelR = outerR + 12 / lsc;
-  const lx = cx + Math.cos(midAngle) * labelR;
-  const ly = cy + Math.sin(midAngle) * labelR;
+  // Mid-arc angle
+  let midA;
+  if (goCounterCW) { let d = aEnd - aStart; while (d < 0) d += 2*Math.PI; midA = aStart + d/2; }
+  else { let d = aStart - aEnd; while (d < 0) d += 2*Math.PI; midA = aStart - d/2; }
+  const lblR = outerR + 10 / lsc;
+  const lx = cx + Math.cos(midA) * lblR;
+  const ly = cy + Math.sin(midA) * lblR;
   mCtx.save();
-  mCtx.translate(lx, ly);
-  mCtx.scale(lsc, lsc);
+  mCtx.translate(lx, ly); mCtx.scale(lsc, lsc);
   mCtx.globalAlpha = effFillOp;
   mCtx.fillStyle = 'rgba(22, 33, 62, 0.9)';
-  const pad = 3;
-  mCtx.beginPath();
-  mCtx.roundRect(-tw/2 - pad, -renderSz/2 - pad, tw + pad*2, renderSz + pad*2, 3);
-  mCtx.fill();
+  mCtx.beginPath(); mCtx.roundRect(-tw/2-3, -renderSz/2-3, tw+6, renderSz+6, 3); mCtx.fill();
   mCtx.globalAlpha = effTextOp;
-  mCtx.fillStyle = '#00ff88';
-  mCtx.textAlign = 'center'; mCtx.textBaseline = 'middle';
+  mCtx.fillStyle = '#00ff88'; mCtx.textAlign = 'center'; mCtx.textBaseline = 'middle';
   mCtx.fillText(ftLabel, 0, 0);
   mCtx.restore();
 
