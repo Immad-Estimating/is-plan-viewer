@@ -663,6 +663,7 @@ let currentRoute = { view: 'dashboard', projectId: null, drawingId: null };
 function navigateTo(hash) {
   window.location.hash = hash;
 }
+window.navigateTo = navigateTo;
 
 function parseRoute() {
   const hash = window.location.hash || '#/';
