@@ -1,0 +1,4951 @@
+[
+  {
+    "id": 347,
+    "name": "(AZS3C) EOS 303 & Cactus",
+    "client": "Fairbank's Contracting & Development, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 560,
+    "name": "(TOKA) Tohono O'odham Ki Association",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 940,
+    "name": "10 Chandler Building 6",
+    "client": "RSG Builders LLC",
+    "builder": "RSG Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 298,
+    "name": "100 Willetta",
+    "client": "E3 Builders",
+    "builder": "Evolution 3.0 LLC/E3",
+    "stage": "No Bid"
+  },
+  {
+    "id": 979,
+    "name": "10037 E Fillaree Ln - 111 Mountain Skyline",
+    "client": "Mortensen ",
+    "builder": "Mortensen Signature Homes ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 973,
+    "name": "11044 N Sundown Dr",
+    "client": "Sticks and Bricks",
+    "builder": "Sticks and Bricks Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 917,
+    "name": "1116 W Vista Ave",
+    "client": "Tiara Sun",
+    "builder": "Tiara Sun Development, LLC",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 895,
+    "name": "11430 N 68th St",
+    "client": "Trinity Homes",
+    "builder": "Trinity Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 384,
+    "name": "12th Street & Greenway Apartments - Phoenix, AZ",
+    "client": "Embrey Builders, LLC.",
+    "builder": "",
+    "stage": "Award"
+  },
+  {
+    "id": 715,
+    "name": "131 Gambel Quail",
+    "client": "KAM Designs & Mortensen Signature Homes",
+    "builder": "KAM Designs & Mortensen Signature Homes",
+    "stage": "Award"
+  },
+  {
+    "id": 416,
+    "name": "19th & Mononu",
+    "client": "Chasse Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 367,
+    "name": "19th & Mononu ",
+    "client": "Chasse Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 425,
+    "name": "19th & Willetta",
+    "client": "Evolution 3.0 LLC/E3",
+    "builder": "Evolution 3.0 LLC/E3",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 355,
+    "name": "1st St Townhomes",
+    "client": "Pono Construction LLC",
+    "builder": "Pono Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 919,
+    "name": "204 W Palmaire",
+    "client": "Starion",
+    "builder": "Starion Custom Residences",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 403,
+    "name": "23-266  AZ, Gilbert, Germann Rd. The Gilmore",
+    "client": "Thompson Thrift Construction, Inc.",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 894,
+    "name": "275 W El Alba Way - Tkack Residence",
+    "client": "Trinity Homes",
+    "builder": "Trinity Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 963,
+    "name": "303 Logistics Bldgs 3 & 4",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 719,
+    "name": "32nd Place",
+    "client": "Jay Wright Consulting",
+    "builder": "Jay Wright Consulting",
+    "stage": "No Bid"
+  },
+  {
+    "id": 980,
+    "name": "38105 N 98th Way - 204 Gambel Quail",
+    "client": "Mortensen ",
+    "builder": "Mortensen Signature Homes ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 911,
+    "name": "3840 E Mariposa St",
+    "client": "Sella Homes",
+    "builder": "Sella Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 700,
+    "name": "4015 E Glenrosa Ave",
+    "client": "Ella Lee Homes",
+    "builder": "Ella Lee Homes",
+    "stage": "Award"
+  },
+  {
+    "id": 918,
+    "name": "4116 N 62nd Pl - Lipson",
+    "client": "McIntyre",
+    "builder": "McIntyre Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 976,
+    "name": "4211 N 66th St - Rees Residence",
+    "client": "Rafterhouse",
+    "builder": "Rafterhouse",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 812,
+    "name": "4502 Parking Structure",
+    "client": "Chasse",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 912,
+    "name": "4507 N 38th St",
+    "client": "Sella Homes",
+    "builder": "Sella Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 913,
+    "name": "4510 E Calle Tuberia",
+    "client": "Sella Homes",
+    "builder": "Sella Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 971,
+    "name": "4602 E Quartz Mountain Rd",
+    "client": "Temac",
+    "builder": "Temac Development ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 907,
+    "name": "4615 N 49th Pl",
+    "client": "Ella Lee Homes",
+    "builder": "Ella Lee Homes",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 977,
+    "name": "4616 N Arcadia Dr - Seidelmann Residence",
+    "client": "Rafterhouse",
+    "builder": "Rafterhouse",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 916,
+    "name": "4730 N 56th St",
+    "client": "Tiara Sun",
+    "builder": "Tiara Sun Development, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 978,
+    "name": "4817 E Doubletree Ranch Rd",
+    "client": "Bedbrock ",
+    "builder": "Bedbrock Developers",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 898,
+    "name": "4835 E Orchid Lane",
+    "client": "LuxEstate",
+    "builder": "LuxEstate Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 859,
+    "name": "4th Street Residences",
+    "client": "Hawk Builders",
+    "builder": "Hawk Builders",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 969,
+    "name": "5005 E Crestview Rd - Stage 2",
+    "client": "Starion",
+    "builder": "Starion Custom Residences",
+    "stage": "Award Probability = 75%"
+  },
+  {
+    "id": 787,
+    "name": "5101 E Arcadia Lane",
+    "client": "Gather Projects",
+    "builder": "Gather Projects",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 882,
+    "name": "52nd Street Apartments ",
+    "client": "Kirk Harmon",
+    "builder": "Kirk Harmon ",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 664,
+    "name": "52nd Street Townhomes",
+    "client": "Kirk Harmon",
+    "builder": "Kirk Harmon ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 915,
+    "name": "5320 N Casa Blanca",
+    "client": "Tiara Sun",
+    "builder": "Tiara Sun Development, LLC",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 972,
+    "name": "5331 E McDonald Dr",
+    "client": "Bink Development",
+    "builder": "Bink Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 896,
+    "name": "5531 E Orchid Ln",
+    "client": "Trinity Homes",
+    "builder": "Trinity Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 831,
+    "name": "5616 E Argyle Dr",
+    "client": "Imagine Homes",
+    "builder": "Imagine Homes",
+    "stage": "Lost"
+  },
+  {
+    "id": 548,
+    "name": "56th And Camelback Lot 1",
+    "client": "Sonora West Development",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 588,
+    "name": "56th And Camelback Lot 2",
+    "client": "Sonora West Development",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 905,
+    "name": "5890 N Saguaro",
+    "client": "Bedbrock ",
+    "builder": "Bedbrock Developers",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 860,
+    "name": "5th and Goldwater",
+    "client": "Wood Partners",
+    "builder": "Wood Partners",
+    "stage": "Final Bid Review"
+  },
+  {
+    "id": 900,
+    "name": "6014 E Caron Cir",
+    "client": "Arcadia Custom Builders",
+    "builder": "Arcadia Custom Builders",
+    "stage": "Award"
+  },
+  {
+    "id": 899,
+    "name": "6137 E Ironwood Dr - Manley Residence",
+    "client": "Arcadia Custom Builders",
+    "builder": "Arcadia Custom Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 609,
+    "name": "615 University Modern",
+    "client": "Brookstone Venture Capital",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 968,
+    "name": "6215 N Kachina Ln",
+    "client": "Norton Luxury ",
+    "builder": "Norton Luxury",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 694,
+    "name": "6223 E Berneil",
+    "client": "SAM Construction Group LLC",
+    "builder": "SAM Construction Group LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 906,
+    "name": "6336 N 48th Pl",
+    "client": "Ella Lee Homes",
+    "builder": "Ella Lee Homes",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 532,
+    "name": "63rd Residence",
+    "client": "Bink Development",
+    "builder": "Bink Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 902,
+    "name": "6613 E Bluebird Ln - Rosenfield-Nash Residence",
+    "client": "Arcadia Custom Builders",
+    "builder": "Arcadia Custom Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 903,
+    "name": "6742 N 11th Ave",
+    "client": "Alex Pina",
+    "builder": "Alex Pina",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 893,
+    "name": "6744 N 63rd Pl",
+    "client": "Bink Development",
+    "builder": "Bink Development",
+    "stage": "Award"
+  },
+  {
+    "id": 901,
+    "name": "6763 E Hummingbird Ln - Mockingbird Lot 2",
+    "client": "Arcadia Custom Builders",
+    "builder": "Arcadia Custom Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 908,
+    "name": "6800 E Exeter Blvd",
+    "client": "Ella Lee Homes",
+    "builder": "Ella Lee Homes",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 675,
+    "name": "7078 E Horseshoe",
+    "client": "Yonker Construction",
+    "builder": "Yonker Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 674,
+    "name": "71st St",
+    "client": "MN Custom Homes",
+    "builder": "MN Custom Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 975,
+    "name": "7432 Continental Mountain Estates Dr",
+    "client": "Bedbrock ",
+    "builder": "Bedbrock Developers",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 970,
+    "name": "7475 E Gainey Ranch Rd #3 - Coleman Residence",
+    "client": "Temac",
+    "builder": "Temac Development ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 910,
+    "name": "7DM30",
+    "client": "Cullum Homes",
+    "builder": "Cullum Homes Design & Build",
+    "stage": "Award"
+  },
+  {
+    "id": 788,
+    "name": "7DM30 - The Sonoran",
+    "client": "Cullum Homes",
+    "builder": "Cullum Homes Design & Build",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 904,
+    "name": "8009 N Ironwood Dr",
+    "client": "A Finer Touch",
+    "builder": "A Finer Touch",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 920,
+    "name": "8015 N 74th Pl",
+    "client": "Tinker Development",
+    "builder": "Tinker Development",
+    "stage": "Ready for Bid"
+  },
+  {
+    "id": 897,
+    "name": "8300 E Dixileta Lot 265",
+    "client": "Trinity Homes",
+    "builder": "Trinity Homes",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 891,
+    "name": "8637 E Appaloosa Trl",
+    "client": "Bink Development",
+    "builder": "Bink Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 914,
+    "name": "9321 N 75th St - McDade",
+    "client": "Tiara Sun",
+    "builder": "Tiara Sun Development, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 879,
+    "name": "Achen-Gardner Construction Office",
+    "client": " High Point Development",
+    "builder": "High Point Development",
+    "stage": "Lost"
+  },
+  {
+    "id": 878,
+    "name": "Achen-Gardner Construction Office",
+    "client": " High Point Development",
+    "builder": "High Point Development",
+    "stage": "Lost"
+  },
+  {
+    "id": 785,
+    "name": "Adobe Luxury Villlas",
+    "client": "Builders Vision LLC",
+    "builder": "Builders Vision LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 395,
+    "name": "Adobe Mountain Villas (HUD Project)",
+    "client": "EOS Builders LLC",
+    "builder": "EOS Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 436,
+    "name": "ADOT Administrative Building Annex Renovation (T.I.)",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 400,
+    "name": "ADOT Administrative Building Annex Renovation (T.I.)",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 574,
+    "name": "Aerie - Gilbert, AZ",
+    "client": "Healy Construction Services, Inc",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 636,
+    "name": "Aerie Offline - Scottsdale, AZ",
+    "client": "Healy Construction Services, Inc",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 527,
+    "name": "Ahsan Residence",
+    "client": "Salcito Construction",
+    "builder": "",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 441,
+    "name": "AJ's Fine Foods - Camelback Village Center",
+    "client": "BSM Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 520,
+    "name": "Allasso Ranch BTR Community ",
+    "client": "WEIS Builders ",
+    "builder": "Weis Builders, Inc.",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 611,
+    "name": "AloYoga Scottsdale AZ",
+    "client": "Elder-Jones, Inc.",
+    "builder": "Elder-Jones Inc",
+    "stage": "No Bid"
+  },
+  {
+    "id": 765,
+    "name": "Alta One Scottsdale",
+    "client": "Wood Partners",
+    "builder": "Wood Partners",
+    "stage": "Track - High Value Opportunity"
+  },
+  {
+    "id": 642,
+    "name": "Amazing Lash - Mesa, AZ",
+    "client": "Kramer Construction And Management, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 478,
+    "name": "AMC Mesa - Phoenix, AZ",
+    "client": "Leopardo Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 621,
+    "name": "AMC Superstition 12 Dolby",
+    "client": "Petrie Construction LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 459,
+    "name": "America First Credit Union - Surprise Branch",
+    "client": "Bleuwave",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 503,
+    "name": "American Wealth Advisors",
+    "client": "RSG Builders LLC.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 501,
+    "name": "American Wealth Advisors",
+    "client": "RSG Builders LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 796,
+    "name": "AndAZ Scottsdale Resort Expansion",
+    "client": "PWI Construction",
+    "builder": "PWI Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 890,
+    "name": "Ansari Residence",
+    "client": "Bent Nails",
+    "builder": "Bent Nails",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 960,
+    "name": "Anthem Library",
+    "client": "Canyon Building & Design",
+    "builder": "Canyon Building & Design, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 692,
+    "name": "Apache Junction Operations & Maintenance Building",
+    "client": "Danson Construction",
+    "builder": "Danson Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 663,
+    "name": "Apache Junction Operations & Maintenance Building",
+    "client": "Hunter Contracting Co.",
+    "builder": "Hunter Contracting Co.",
+    "stage": "No Bid"
+  },
+  {
+    "id": 510,
+    "name": "Arbor Therapy Mesa",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 1006,
+    "name": "Arcadia Crossing - Shell renovation",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 648,
+    "name": "Arizona Financial Credit Union - Biltmore",
+    "client": "DBSI, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 460,
+    "name": "Arizona Lutheran Academy",
+    "client": "Catalyst Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 351,
+    "name": "Artesia ",
+    "client": "Streetlights Residential ",
+    "builder": "Streetlights Residential ",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 411,
+    "name": "Artesia - SLR",
+    "client": "Streetlights Residential",
+    "builder": "Streetlights Residential ",
+    "stage": "Award Probability = 25%"
+  },
+  {
+    "id": 476,
+    "name": "Aruba's Cafe - Peoria AZ",
+    "client": "Zen Builders LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 570,
+    "name": "Asbury Larry H Miller CRDJ of Avondale",
+    "client": "Brinkmann Constructors",
+    "builder": "Brinkmann Constructors ",
+    "stage": "Lost"
+  },
+  {
+    "id": 566,
+    "name": "Asbury Larry H Miller CRDJ of Avondale",
+    "client": "ARCO/Murray",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 571,
+    "name": "Ascent @ Phoenician - C3 BLDGs A&B - 2nd City Submittal",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 383,
+    "name": "Ascent @ Phoenician - C3 BLDGs A&B - Construction Bid Set",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 430,
+    "name": "Ascent at Phoenician - C3 BLDG's A&B",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 633,
+    "name": "ASU - Dreamcatchers Coffee",
+    "client": "Rycon Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 589,
+    "name": "Atavia Scottsdale",
+    "client": "Maris Construction ",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 424,
+    "name": "Atavia Scottsdale",
+    "client": "Maris Construction of AZ, LLC",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 753,
+    "name": "Atavia Scottsdale Phase 2",
+    "client": "Maris Construction",
+    "builder": "Maris Construction of AZ, LLC",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 467,
+    "name": "ATI Physical Therapy - Buckeye",
+    "client": "Loberg Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 909,
+    "name": "ATP 13",
+    "client": "Cullum Homes",
+    "builder": "Cullum Homes Design & Build",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 581,
+    "name": "AutoZone AZ9369 - Goodyear AZ",
+    "client": "Rycon Construction Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 572,
+    "name": "AutoZone AZ9369 - Goodyear AZ",
+    "client": "Triad Retail Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 952,
+    "name": "Avenir Behavioral Health Center",
+    "client": "Avenir",
+    "builder": "Avenir Behavioral Health Center ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 370,
+    "name": "Avila University TI - Suite 209",
+    "client": "RSG Builders LLC.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 432,
+    "name": "Avondale Apartments Ameris",
+    "client": "Ameris Construction",
+    "builder": "Ameris Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 685,
+    "name": "Avondale Bridge Housing",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "Canyon Building & Design, LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 678,
+    "name": "Avondale Bridge Housing",
+    "client": "Straight Arrow Contracting",
+    "builder": "Straight Arrow Contracting",
+    "stage": "No Bid"
+  },
+  {
+    "id": 354,
+    "name": "Avondale Station",
+    "client": "TruVista Development, LLC",
+    "builder": "TruVista",
+    "stage": "No Bid"
+  },
+  {
+    "id": 513,
+    "name": "Axiom Church Classrooms",
+    "client": "Temac Development, Inc.",
+    "builder": "Temac Development ",
+    "stage": "Lost"
+  },
+  {
+    "id": 404,
+    "name": "Azola Desert Ridge",
+    "client": "CSI Construction Company",
+    "builder": "CSI Construction Company ",
+    "stage": "Lost"
+  },
+  {
+    "id": 1001,
+    "name": "Azure & Hazel",
+    "client": "Layton",
+    "builder": "Layton Construction",
+    "stage": "Track - High Value Opportunity"
+  },
+  {
+    "id": 328,
+    "name": "Barros Pizza TI",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "Lost"
+  },
+  {
+    "id": 442,
+    "name": "Basis Schools TI - Chandler (100% CD's)",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 382,
+    "name": "Basis Schools TI - Chandler (50% CD's)",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 995,
+    "name": "Bath & Body Works #5074 Superstition Gateway",
+    "client": "Elite Retail Services",
+    "builder": "Elite Retail Services",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 994,
+    "name": "Bath & Body Works #5074 Superstition Gateway",
+    "client": "Elite Retail Services",
+    "builder": "Elite Retail Services",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 720,
+    "name": "Bath & Body Works - Gateway Pavilions - Avondale, AZ",
+    "client": "Construction One Inc.",
+    "builder": "Construction One Inc",
+    "stage": "No Bid"
+  },
+  {
+    "id": 569,
+    "name": "Bath and Body Works #2138 Dana Park",
+    "client": "Elite Retail Services",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 312,
+    "name": "Bella Vista Storage Buildings",
+    "client": "Willmeng",
+    "builder": "Willmeng Construction ",
+    "stage": "Lost"
+  },
+  {
+    "id": 540,
+    "name": "Benevilla Assisted Living & Memory Care",
+    "client": "W.E. O\u2019Neil Construction",
+    "builder": "W.E. O'Neil",
+    "stage": "Lost"
+  },
+  {
+    "id": 632,
+    "name": "Bezos Academy - Glendale, AZ (Sahuaro Glen)",
+    "client": "Construction One Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 506,
+    "name": "Big O Tire Indian School",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 310,
+    "name": "Big O Tires",
+    "client": "Madewell Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 477,
+    "name": "Biltmore Chevron Remodel",
+    "client": "AAA Facility Services",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 793,
+    "name": "Bitney/Koch Residence",
+    "client": "Regency Custom Homes",
+    "builder": "Regency Custom Homes",
+    "stage": "Lost"
+  },
+  {
+    "id": 578,
+    "name": "Block 7000 - Cosanti Commons IGMP Set",
+    "client": "Brinkmann Constructors",
+    "builder": "Brinkmann Constructors ",
+    "stage": "Lost"
+  },
+  {
+    "id": 989,
+    "name": "Block B2 Goodyear",
+    "client": "A.T. Meridian Construction",
+    "builder": "A.T Meridian Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 645,
+    "name": "BofA Tucson Retail Interior Rest",
+    "client": "Reliance Build Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 981,
+    "name": "Bourgate Highschool New Vocational Building",
+    "client": "Apex Refrigeration",
+    "builder": "Apex Refrigeration",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 586,
+    "name": "Bowers Residence",
+    "client": "Creativ Design + Build",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 584,
+    "name": "Bowers Residence",
+    "client": "Creativ Design + Build",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 433,
+    "name": "Boys & Girls Club - Tonalea DD Set",
+    "client": "CHASSE Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "No Bid"
+  },
+  {
+    "id": 536,
+    "name": "Boys & Girls Club - Tonalea First City Submittal Set (Contract Pricing)",
+    "client": "Chasse Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 706,
+    "name": "Brightmont Academy - Chandler, AZ (Remodel)",
+    "client": "Global Power & Construction Inc",
+    "builder": "Global Power & Construction Inc",
+    "stage": "No Bid"
+  },
+  {
+    "id": 434,
+    "name": "Broadway Farms At Hurley Station",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 348,
+    "name": "Burlington Mesa",
+    "client": "Bayley Construction",
+    "builder": "Bayley Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 730,
+    "name": "Burton Library College Depot",
+    "client": "Holdsworth Construction Incorporated",
+    "builder": "Holdsworth Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 509,
+    "name": "Butterfield Commons (Maricopa, AZ)",
+    "client": "Tofel Dent Construction",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 991,
+    "name": "Cabana Bell formerly The Lanai",
+    "client": "Greenlight Construction, LLC",
+    "builder": "Greenlight Construction",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 435,
+    "name": "Cabana Mesa Drive",
+    "client": "Greenlight Construction",
+    "builder": "Greenlight Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 363,
+    "name": "CADILLAC- EARNHARDT",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "No Bid"
+  },
+  {
+    "id": 493,
+    "name": "Caliber Collision",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 764,
+    "name": "Cambria Hotel - at East Gate Plaza - Mesa",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "Canyon Building & Design, LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 650,
+    "name": "Camelback Lot 3",
+    "client": "Sonora West Development",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 631,
+    "name": "Camelback Lot 3",
+    "client": "Sonora West Development",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 651,
+    "name": "Camelback Lot 4",
+    "client": "Sonora West Development",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 634,
+    "name": "Camelback Lot 4",
+    "client": "Sonora West Development",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 545,
+    "name": "Camelback Manor",
+    "client": "Creativ Design build",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 983,
+    "name": "Cantabrica",
+    "client": "Hawk Builders",
+    "builder": "Hawk Builders",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 613,
+    "name": "CarMax - Phoenix, AZ",
+    "client": "Bogart Construction, Inc",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 943,
+    "name": "Carniceria Sonora - Queen Creek",
+    "client": "AZKitchenVent",
+    "builder": "AZKitchenVent",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 927,
+    "name": "Carro Northern Commons",
+    "client": "Big D Construction",
+    "builder": "Big-D Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 933,
+    "name": "Casa Grande Apartments",
+    "client": "Gorman & Company",
+    "builder": "Gorman ",
+    "stage": "Sent to Vendors"
+  },
+  {
+    "id": 565,
+    "name": "Casa Grande SKI TI",
+    "client": "CKZ Design-Build",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 452,
+    "name": "Castle Steel Ground Up",
+    "client": "Straight Arrow Contracting",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 673,
+    "name": "Catalano Residence",
+    "client": "Forte Homes",
+    "builder": "Forte Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 408,
+    "name": "Cedar Room Cigar Lounge - Cave Creek, AZ",
+    "client": "New Path Construction and Consulting",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 492,
+    "name": "Chandler Airpark BLDG D Spec Suites 5 & 6",
+    "client": "LGE Design Build",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 858,
+    "name": "Chandler Bay",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 447,
+    "name": "Chandler Heights Shell Building Project",
+    "client": "Overton Builders",
+    "builder": "Overton Builders LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 498,
+    "name": "Chapman Palo Verde Fleet Center",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 624,
+    "name": "Chapman Volkswagon - New Service Bay & Parking Garage 75% plans",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 1004,
+    "name": "Charles Schwab, New Branch - Sun City, AZ",
+    "client": "Torcom",
+    "builder": "Torcom",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 440,
+    "name": "Chase Bank - Gilbert, AZ (Elliot & Power)",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 390,
+    "name": "Chase Bank - Gilbert, AZ (Elliot & Power)",
+    "client": "JM Stitt Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 752,
+    "name": "Chastain Bath Remodel",
+    "client": "Carlson Homes",
+    "builder": "Carlson Homes",
+    "stage": "Award Probability = 25%"
+  },
+  {
+    "id": 468,
+    "name": "Chewy Vetcare",
+    "client": "Horizon Retail Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 448,
+    "name": "Chewy Vetcare",
+    "client": "Fleming Complete",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 444,
+    "name": "Chewy Vetcare - Chandler, AZ",
+    "client": "Loberg Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 365,
+    "name": "Chick-fil-A Gilbert Gateway Town Center FSU (Mesa, AZ) - Remodel",
+    "client": "Stansell Properties & Development, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 873,
+    "name": "Children's Museum of Phoenix - Package 1",
+    "client": "Chasse",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 861,
+    "name": "Choice Hotels - Everhome Suites Buckeye",
+    "client": "Path Construction",
+    "builder": "Path Construction",
+    "stage": "Sent to Vendors"
+  },
+  {
+    "id": 923,
+    "name": "Christ's Church of the Valley Buckeye Campus",
+    "client": "Chasse",
+    "builder": "Chasse Building Team",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 535,
+    "name": "Cielo Vista Medical Commons",
+    "client": "RSG Builders LLC.",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 773,
+    "name": "City Hall Mezzanine Improvements",
+    "client": "Chasse",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 462,
+    "name": "City of Chandler Chandler Boys and Girls Club Renovation",
+    "client": "CHASSE Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "No Bid"
+  },
+  {
+    "id": 558,
+    "name": "City Of Kingman Complex Remodel Project",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 582,
+    "name": "Clearwater",
+    "client": "Blink Development",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 810,
+    "name": "Clive Concepts Bathrooms",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 777,
+    "name": "Clive Concepts Bathrooms",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 809,
+    "name": "Clive Concepts Kitchen",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 778,
+    "name": "Clive Concepts Kitchen",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 808,
+    "name": "Clive Concepts LoveCall",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 779,
+    "name": "Clive Concepts LoveCall",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 811,
+    "name": "Clive Concepts Stoddard",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 776,
+    "name": "Clive Concepts Stoddard",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 345,
+    "name": "College And 7th - FH Tempe LLC",
+    "client": "Brinkmann Constructors Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 869,
+    "name": "Colter Reserve",
+    "client": "EOS Builders LLC",
+    "builder": "EOS Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 488,
+    "name": "Concentra Build-out",
+    "client": "Chenoweth Group, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 790,
+    "name": "Conway Remodel",
+    "client": "The Boos Group",
+    "builder": "The Boos Group",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 647,
+    "name": "Corvel Phoenix TI",
+    "client": "Reliance Build Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 483,
+    "name": "Costco - Dove Valley Rd, Phoenix AZ Fuel Station - Budget",
+    "client": "Jones Covey Group, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 469,
+    "name": "Crispy Cones - Glendale, AZ",
+    "client": "BCI National Construction & Facilities",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 502,
+    "name": "Crust TI at Trailhead Pad 3",
+    "client": "Frontera Building Company, LLC",
+    "builder": "Frontera Building Company",
+    "stage": "No Bid"
+  },
+  {
+    "id": 380,
+    "name": "Crystal Cove Apartments",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "Project On Hold - Debt/Equity"
+  },
+  {
+    "id": 925,
+    "name": "CTC New Pharmacy",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Award"
+  },
+  {
+    "id": 639,
+    "name": "CTOS (Phase 2) - Casa Grande, AZ",
+    "client": "Monomoy Construction Services",
+    "builder": "Monomoy Construction Services",
+    "stage": "No Bid"
+  },
+  {
+    "id": 751,
+    "name": "Cyber Technology Group TI Phase 2",
+    "client": "Salcito Custom Homes",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award Probability = 75%"
+  },
+  {
+    "id": 672,
+    "name": "David Rizzi",
+    "client": "David Rizzi",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 833,
+    "name": "Deer Valley Industrial",
+    "client": "ROI Properties",
+    "builder": "ROI Properties",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 770,
+    "name": "Degree Wellness Gilbert",
+    "client": "FX Construction",
+    "builder": "FX Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 769,
+    "name": "Degree Wellness Scottsdale",
+    "client": "FX Construction",
+    "builder": "FX Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 974,
+    "name": "Desert Highlands Lot 922",
+    "client": "Nick Bauer",
+    "builder": "Nick Bauer",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 931,
+    "name": "DESERT HIGHLANDS- LOWER LEVEL PHASE 2- MEN'S GRILL/LOCKER ROOM",
+    "client": "True North Builders",
+    "builder": "True North Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 930,
+    "name": "DESERT HIGHLANDS- LOWER LEVEL PHASE 2- MEN'S GRILL/LOCKER ROOM",
+    "client": "True North Builders",
+    "builder": "True North Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 828,
+    "name": "Diamond View at Ballpark Village",
+    "client": "Catamount Constructors Inc",
+    "builder": "Catamount Constructors",
+    "stage": "Lost"
+  },
+  {
+    "id": 742,
+    "name": "Dibble",
+    "client": "RSG Builders LLC",
+    "builder": "RSG Builders",
+    "stage": "No Bid"
+  },
+  {
+    "id": 709,
+    "name": "Dicks Sporting Goods - Mesa, AZ",
+    "client": "VCC",
+    "builder": "VCC Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 865,
+    "name": "Donna Lane",
+    "client": "Sam Construction LLC",
+    "builder": "SAM Construction Group LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 886,
+    "name": "Dorsey Station",
+    "client": "PacifiCap",
+    "builder": "Pacificap Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 937,
+    "name": "Dugan Residence",
+    "client": "Zen Builders",
+    "builder": "Zen Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 335,
+    "name": "DXL 9966 Scottsdale AZ",
+    "client": "Horizon Retail Construction",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 726,
+    "name": "Eastmarket - Shops A, B, C, and Sprouts Project",
+    "client": "CHASSE Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "No Bid"
+  },
+  {
+    "id": 681,
+    "name": "Echo Suites - Chandler",
+    "client": "Integrated Construction LLC",
+    "builder": "Integrated Construction LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 679,
+    "name": "Echo Suites - Chandler",
+    "client": "Parkway Construction",
+    "builder": "Parkway Construction ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 677,
+    "name": "Echo Suites - Chandler",
+    "client": "Path Construction",
+    "builder": "Path Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 848,
+    "name": "Eduard Jones TI",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 847,
+    "name": "Eduard Jones TI",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 326,
+    "name": "El Mirage Housing",
+    "client": "Near-Cal Corp.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 732,
+    "name": "Elanto Clubhouse at Queen Creek",
+    "client": "Parkway Construction",
+    "builder": "Parkway Construction ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 422,
+    "name": "Encanto Estates",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "Project On Hold - Debt/Equity"
+  },
+  {
+    "id": 305,
+    "name": "Encanto Storage Buckete",
+    "client": "Canyon",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 322,
+    "name": "EoS Fitness",
+    "client": "Bergman KPRS, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 959,
+    "name": "EOS Fitness (Power & Broadway)",
+    "client": "Gray West Construction Inc.",
+    "builder": "Gray West Construction Inc.",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 375,
+    "name": "Eos Fitness - San Tan Valley (AZSGH)",
+    "client": "KPRS Construction Services, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 667,
+    "name": "EquipmentShare - Buckeye, AZ",
+    "client": "The Delventhal Company",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 606,
+    "name": "Escapology at Talking Stick",
+    "client": "Armstrong Construction Group",
+    "builder": "Armstrong Construction Group",
+    "stage": "No Bid"
+  },
+  {
+    "id": 485,
+    "name": "Estrella Self Storage - Goodyear",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 573,
+    "name": "EV 6th Van Buren Hotel",
+    "client": "TB Penick & Sons, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 580,
+    "name": "Everhome Suites",
+    "client": "Builders United",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 544,
+    "name": "Everhome Suites",
+    "client": "EBCO General Contractor",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 542,
+    "name": "Everhome Suites",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 538,
+    "name": "Everhome Suites",
+    "client": "Parkway Construction",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 825,
+    "name": "Everhome Suites Buckeye AZ",
+    "client": "Parkway Construction",
+    "builder": "Parkway Construction ",
+    "stage": "Sent to Vendors"
+  },
+  {
+    "id": 534,
+    "name": "Exeter BLVD. Residence",
+    "client": "Bink Development",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 519,
+    "name": "Exeter Residence",
+    "client": "R.L. Reimers",
+    "builder": "R.L. Reimers Co",
+    "stage": "Lost"
+  },
+  {
+    "id": 618,
+    "name": "Exeter Residence - Wright Residence Phoenix",
+    "client": "Salcito Custom Homes",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award"
+  },
+  {
+    "id": 399,
+    "name": "Extended Stay Occotillo Chandler",
+    "client": "Patch Construction ",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 317,
+    "name": "Extended Stay Occotillo Chandler",
+    "client": "EOS Builders",
+    "builder": "EOS Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 398,
+    "name": "Extended Stay Occotillo Chandler ",
+    "client": "Ironmark Builders ",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 841,
+    "name": "Fairway Dental",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 516,
+    "name": "FedEx Ground Security Building Tempe AZ",
+    "client": "Frost Construction Company Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 761,
+    "name": "fGMP - 3rd & Flower - Phoenix, AZ",
+    "client": "TDC Builders",
+    "builder": "TDC Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 358,
+    "name": "Filiberto's 16th and Southern",
+    "client": "A.T. Meridian Construction",
+    "builder": "A.T Meridian Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 505,
+    "name": "Fire Station 15-Go Bond",
+    "client": "Hunter Contracting Co.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 504,
+    "name": "Fire Station 15-Go Bond",
+    "client": "Haydon",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 499,
+    "name": "Fire Station 15-Go Bond",
+    "client": "Builders United",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 486,
+    "name": "Fire Station 15-Go Bond",
+    "client": "Danson Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 781,
+    "name": "Firebird Goodyear",
+    "client": "Ideal Company Inc.",
+    "builder": "Ideal Company Inc",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 716,
+    "name": "First Choice Medical Center - Prescott",
+    "client": "Reliance Build Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 759,
+    "name": "First Watch - Phoenix, AZ",
+    "client": "Falcon Construction",
+    "builder": "Falcon Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 864,
+    "name": "First Watch Gilbert",
+    "client": "Falcon Construction",
+    "builder": "Falcon Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 863,
+    "name": "First Watch Gilbert",
+    "client": "Falcon Construction",
+    "builder": "Falcon Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 668,
+    "name": "First Watch Restaurant - Goodyear",
+    "client": "Global Building Corp",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 646,
+    "name": "First Watch Restaurant - Goodyear",
+    "client": "Falcon Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 316,
+    "name": "FKC Biltmore",
+    "client": "BSM Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 733,
+    "name": "FOGO DE CHAO - Gilbert AZ",
+    "client": "Empire Construction",
+    "builder": "Empire Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 723,
+    "name": "FOGO DE CHAO - Gilbert AZ",
+    "client": "Bleuwave General Contracting",
+    "builder": "Bleuwave General Contracting",
+    "stage": "No Bid"
+  },
+  {
+    "id": 695,
+    "name": "Foothill Residence",
+    "client": "Jay Wright Consulting",
+    "builder": "Jay Wright Consulting",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 743,
+    "name": "Foothills - CC1 - Suite 100 TI",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "Lost"
+  },
+  {
+    "id": 736,
+    "name": "Foothills - CC1 - Suite 100 TI",
+    "client": "RSG Builders LLC",
+    "builder": "RSG Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 953,
+    "name": "Foothills Upper Canyon",
+    "client": "D.R. Horton Inc",
+    "builder": "DR Horton American's Builder",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 407,
+    "name": "Formation Park 17",
+    "client": "MYCON General Contractors",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 641,
+    "name": "Fortitude Performance Chiro",
+    "client": "Loberg Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 656,
+    "name": "Franklin Residence",
+    "client": "Fort\u00e9 Homes",
+    "builder": "Forte Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 591,
+    "name": "Franklin Residence",
+    "client": "Fort\u00e9 Homes",
+    "builder": "Forte Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 630,
+    "name": "Fresenius Kidney Care (FKC - N - Phoenix)",
+    "client": "BSM Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 939,
+    "name": "Gambel Quail 204",
+    "client": "KAM Designs & Mortensen Signature Homes",
+    "builder": "KAM Designs & Mortensen Signature Homes",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 1003,
+    "name": "Gap Factory Store (GFS) 6503 - Buckeye, AZ - Verrado Marketplace",
+    "client": "Weekes Construction",
+    "builder": "Weekes Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 1002,
+    "name": "Gap Factory Store (GFS) 6503 - Buckeye, AZ - Verrado Marketplace",
+    "client": "Weekes Construction",
+    "builder": "Weekes Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 1009,
+    "name": "Gap Factory Store 5565 - Desert Ridge Marketplace",
+    "client": "Weekes Construction",
+    "builder": "Weekes Construction",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 762,
+    "name": "Gateway East - SpringHill Suites",
+    "client": "Stout",
+    "builder": "Stout",
+    "stage": "No Bid"
+  },
+  {
+    "id": 745,
+    "name": "Gateway East - SpringHill Suites",
+    "client": "EMJ Corporation",
+    "builder": "EMJ Corporation",
+    "stage": "No Bid"
+  },
+  {
+    "id": 744,
+    "name": "Gateway East - SpringHill Suites",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 396,
+    "name": "GCC STEAM Building",
+    "client": "CG Schmidt, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 763,
+    "name": "Gila River Housing",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "Canyon Building & Design, LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 362,
+    "name": "Gilbert Spectrum Building 8",
+    "client": "OS Construction Services",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 360,
+    "name": "Gilbert Spectrum Building 8",
+    "client": "Brinkmann Constructors",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 528,
+    "name": "Gittelman",
+    "client": "Madison-Couturier Custom Homes",
+    "builder": "",
+    "stage": "Award Probability = 25%"
+  },
+  {
+    "id": 379,
+    "name": "Glendale Community College STEAM Building",
+    "client": "IronMark Building Company",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 378,
+    "name": "Glendale Community College STEAM Building",
+    "client": "Pono Construction LLC",
+    "builder": "Pono Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 377,
+    "name": "Glendale Community College STEAM Center",
+    "client": "Holdsworth Construction Incorporated",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 342,
+    "name": "Glendale Community College STEAM Center",
+    "client": "Builders United",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 421,
+    "name": "Glendale Senior Living Apartments",
+    "client": "W.E. O'Neil",
+    "builder": "W.E. O'Neil",
+    "stage": "Lost"
+  },
+  {
+    "id": 401,
+    "name": "GMP - Sterling Tempe (ASU), Tempe, AZ",
+    "client": "TDC Builders",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 487,
+    "name": "Godfather's Pizza- TI",
+    "client": "Near-Cal Corp.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 428,
+    "name": "Gold Dust",
+    "client": "WESPAC Residential",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 657,
+    "name": "Goldberg Residence",
+    "client": "A Finer Touch Construction, LLC",
+    "builder": "A Finer Touch",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 644,
+    "name": "Goldberg Residence",
+    "client": "A Finer Touch Construction, LLC",
+    "builder": "A Finer Touch",
+    "stage": "No Bid"
+  },
+  {
+    "id": 385,
+    "name": "Golden Camel @ Arbor",
+    "client": "RSG Builders, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 800,
+    "name": "Goldwater Brewery Gilbert",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "Lost"
+  },
+  {
+    "id": 710,
+    "name": "Goodvets - Glendale, AZ",
+    "client": "Loberg Construction",
+    "builder": "Loberg Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 877,
+    "name": "Goodyear Square",
+    "client": "W.E. O\u2019Neil Construction",
+    "builder": "W.E. O'Neil",
+    "stage": "Lost"
+  },
+  {
+    "id": 649,
+    "name": "GP Two Zero Anthem",
+    "client": "Knipp Contracting",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 849,
+    "name": "Grako Residence",
+    "client": "Bink Development",
+    "builder": "Bink Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 687,
+    "name": "Great Hearts Lincoln Prep",
+    "client": "Near-Cal Corp.",
+    "builder": "Near-Cal Corp ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 748,
+    "name": "Great Hearts Lincoln Prep Phase 2",
+    "client": "Near-Cal Corp.",
+    "builder": "Near-Cal Corp ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 832,
+    "name": "Gulbrandsen Residence",
+    "client": "ALE Devolpment",
+    "builder": "ALE Devolpment",
+    "stage": "Lost"
+  },
+  {
+    "id": 820,
+    "name": "H&B Builders T.I at Litchfield Square",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 562,
+    "name": "Hampton Inn & Suites - Winslow",
+    "client": "Overland Construction",
+    "builder": "Overland Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 729,
+    "name": "Hampton Inn Casa Grande",
+    "client": "Ganem Construction",
+    "builder": "Ganem Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 806,
+    "name": "Harkins Verado",
+    "client": "Twin Shores",
+    "builder": "Twin Shores Management",
+    "stage": "Lost"
+  },
+  {
+    "id": 590,
+    "name": "Harris Mallory Homestead",
+    "client": "A Finer Touch Construction, LLC",
+    "builder": "A Finer Touch",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 597,
+    "name": "Harrison Townhomes",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 885,
+    "name": "Haven at Apache",
+    "client": "Ascendant Estimating",
+    "builder": "Ascendant Construction Services LLC",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 876,
+    "name": "Haven at Washington",
+    "client": "Ascendant Estimating",
+    "builder": "Ascendant Construction Services LLC",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 814,
+    "name": "Haven Lot 36",
+    "client": "Salcito Custom Homes",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award Probability = 75%"
+  },
+  {
+    "id": 815,
+    "name": "Haven Plan B1-3-H",
+    "client": "Salcito Custom Homes",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award Probability = 75%"
+  },
+  {
+    "id": 767,
+    "name": "Haven Plan C1",
+    "client": "Salcito Custom Homes",
+    "builder": "Salcito Custom Homes",
+    "stage": "Sent to Vendors"
+  },
+  {
+    "id": 766,
+    "name": "Haven Plan C1",
+    "client": "Salcito Custom Homes",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award Probability = 75%"
+  },
+  {
+    "id": 747,
+    "name": "Haven Villa #1",
+    "client": "Salcito Custom Homes",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award Probability = 75%"
+  },
+  {
+    "id": 682,
+    "name": "Hawes Crossing",
+    "client": "Fore Construction LLC",
+    "builder": "Fore Construction LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 826,
+    "name": "Hayden Townhomes",
+    "client": "PacifiCap",
+    "builder": "Pacificap Construction",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 928,
+    "name": "Hayes Residence",
+    "client": "Blackhawk Building",
+    "builder": "Blackhawk Building Company",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 456,
+    "name": "Heartland Dental",
+    "client": "DBSI, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 446,
+    "name": "Heartland Dental",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 782,
+    "name": "Helen Drake Village",
+    "client": "TofelDent Construction",
+    "builder": "Tofel Construction LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 774,
+    "name": "Helen Drake Village",
+    "client": "BFL Construction Company, Inc.",
+    "builder": "Tofel Construction LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 760,
+    "name": "Helen Drake Village",
+    "client": "BFL Construction Company, Inc.",
+    "builder": "BFL Construction Company Inc. ",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 757,
+    "name": "Helen Drake Village",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "Canyon Building & Design, LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 755,
+    "name": "Helen Drake Village",
+    "client": "EOS Builders LLC",
+    "builder": "EOS Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 754,
+    "name": "Helen Drake Village",
+    "client": "Holdsworth Construction Incorporated",
+    "builder": "Holdsworth Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 313,
+    "name": "Heritage North",
+    "client": "Chasse Buidling Team ",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 490,
+    "name": "Heritage North - ITB",
+    "client": "CSI Construction Company",
+    "builder": "CSI Construction Company ",
+    "stage": "Lost"
+  },
+  {
+    "id": 596,
+    "name": "Heritage Town Square - Queen Creek, AZ",
+    "client": "Capitol Construction Solutions, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 555,
+    "name": "Hilton - Sedona AZ",
+    "client": "Interserv LP",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 563,
+    "name": "Himmel Park Library Renovation and Expansion",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 295,
+    "name": "Hippo Vet Clinic",
+    "client": "LGE ",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 857,
+    "name": "Hive Fit Club Expansion Building A",
+    "client": "Beaumont Builders",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 856,
+    "name": "Hive Fit Club Expansion Building A",
+    "client": "Beaumont Builders",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 999,
+    "name": "Holiday Inn Express",
+    "client": "Ameris Construction",
+    "builder": "Ameris Construction",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 561,
+    "name": "Home At Happy Valley - Phase 1",
+    "client": "SAM Construction Group LLC",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 735,
+    "name": "HonorHealth Mountainside Physical Therapy",
+    "client": "RSG Builders LLC.",
+    "builder": "RSG Builders",
+    "stage": "No Bid"
+  },
+  {
+    "id": 307,
+    "name": "Horizon On Villa",
+    "client": "Gorman",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 393,
+    "name": "Horizon on Villa Phase 1",
+    "client": "Gorman & Company",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 394,
+    "name": "Horizon on Villa Phase 2",
+    "client": "Gorman & Company",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 990,
+    "name": "Horne Hyundai",
+    "client": "Dempsey Construction",
+    "builder": "Dempsey Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 552,
+    "name": "Horseshoe Canyon Lot 2410",
+    "client": "American First Builders",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 308,
+    "name": "HOV Historic Phase 2",
+    "client": "Gorman",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 600,
+    "name": "Hoyt Residence - Lot 18 Starlight Gardens",
+    "client": "Tiara Sun Development",
+    "builder": "Tiara Sun Development, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 438,
+    "name": "HTeaO - Glendale, AZ",
+    "client": "JACO - General Contractor",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 479,
+    "name": "HTeaO - Sun Tan Valley, AZ",
+    "client": "JACO - General Contractor",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 823,
+    "name": "Hyatt Place Hotel @ Talking Stick",
+    "client": "Layton",
+    "builder": "Layton Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 517,
+    "name": "ICRYO Desert Ridge AZ",
+    "client": "Frost Construction Company Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 332,
+    "name": "IKEA Scottsdale, AZ",
+    "client": "Graves Construction Group Services Inc",
+    "builder": "Graves Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 337,
+    "name": "Ikea XS PaOP Store - Scottsdale, AZ",
+    "client": "Gray West Construction Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 967,
+    "name": "Ikonic ",
+    "client": "Gilbane",
+    "builder": "Gilbane",
+    "stage": "Award"
+  },
+  {
+    "id": 844,
+    "name": "Ikonic ",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 843,
+    "name": "Ikonic ",
+    "client": "Brinkmann Constructors",
+    "builder": "Brinkmann Constructors ",
+    "stage": "Lost"
+  },
+  {
+    "id": 842,
+    "name": "Ikonic ",
+    "client": "TB Penick",
+    "builder": "TB Penick & Sons, Inc.",
+    "stage": "Lost"
+  },
+  {
+    "id": 449,
+    "name": "Indian School and Goldwater DD",
+    "client": "Wood Partners",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 948,
+    "name": "Infinity Nails Spa and Retail Building",
+    "client": "E3 Built",
+    "builder": "Evolution 3.0 LLC/E3",
+    "stage": "Lost"
+  },
+  {
+    "id": 938,
+    "name": "Infinity Nails Spa and Retail Building",
+    "client": "E3 Built",
+    "builder": "Evolution 3.0 LLC/E3",
+    "stage": "Lost"
+  },
+  {
+    "id": 304,
+    "name": "Insomnia Cookie Scottsdale",
+    "client": "Benchmark ",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 514,
+    "name": "IS Clinical T.I 1st City Submittal - Mesa AZ",
+    "client": "LGE Design Build",
+    "builder": "LGE Design Build",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 622,
+    "name": "iSmash TI",
+    "client": "Knipp Contracting",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 602,
+    "name": "Isola at 202 and Elliot",
+    "client": "TruVista Development, LLC",
+    "builder": "TruVista",
+    "stage": "No Bid"
+  },
+  {
+    "id": 473,
+    "name": "ITB - Costco - Chandler, AZ - Ground-up",
+    "client": "Jones Covey Group, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 958,
+    "name": "J.Alexander",
+    "client": "EBS Construction Services Inc",
+    "builder": "EBS Construction Services Inc ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 957,
+    "name": "J.Alexander",
+    "client": "EBS Construction Services Inc",
+    "builder": "EBS Construction Services Inc ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 954,
+    "name": "J.Alexander",
+    "client": "PWI Construction",
+    "builder": "PWI Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 993,
+    "name": "James Motorsports",
+    "client": "Overton Builders",
+    "builder": "Overton Builders LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 992,
+    "name": "James Motorsports",
+    "client": "Overton Builders",
+    "builder": "Overton Builders LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 934,
+    "name": "Jared Avondale",
+    "client": "R.E Crawford",
+    "builder": "R.E. Crawford construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 314,
+    "name": "JD Sports ",
+    "client": "Marco Contractors",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 387,
+    "name": "JD Sports #1454 - Tempe, AZ",
+    "client": "Elder-Jones, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 985,
+    "name": "Jimmy Johns Scottsdale TI",
+    "client": "Rafael Construction",
+    "builder": " Rafael Construction Inc",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 961,
+    "name": "Jimmy Johns Scottsdale TI",
+    "client": "Rafael Construction",
+    "builder": " Rafael Construction Inc",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 942,
+    "name": "JINYA Ramen Bar - Queen Creek",
+    "client": "Banyan Construction Services",
+    "builder": "Banyan Construction Services",
+    "stage": "No Bid"
+  },
+  {
+    "id": 550,
+    "name": "John & Dawn 8401 El Maro Circle",
+    "client": "American First Builders",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 880,
+    "name": "JW Marriot Phoenix Desert Ridge - 6th Floor & Spa",
+    "client": "PWI Construction",
+    "builder": "PWI Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 666,
+    "name": "Kate Spade - Glendale, AZ",
+    "client": "Horizon Retail Construction",
+    "builder": "Horizon Retail Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 665,
+    "name": "Kate Spade - Glendale, AZ",
+    "client": "Construction One Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 524,
+    "name": "Kia of Avondale",
+    "client": "United Contractors, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 415,
+    "name": "Kierland 11 Story D/B",
+    "client": "Streetlights Residential",
+    "builder": "Streetlights Residential ",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 465,
+    "name": "Kierland 11 Story Tower",
+    "client": "Streetlights",
+    "builder": "Streetlights Residential ",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 529,
+    "name": "Kimbrell Residence",
+    "client": "Santoyo Construction",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 324,
+    "name": "Komatsu Facility - Updated Bid Set",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 922,
+    "name": "Koppen Palo Verde",
+    "client": "Community DevCo",
+    "builder": "Community Development LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 807,
+    "name": "Kuchulis Residence",
+    "client": "Blue Water Construction",
+    "builder": "Blue Water Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 794,
+    "name": "Kuchulis Residence",
+    "client": "Blue Water Construction",
+    "builder": "Blue Water Construction",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 801,
+    "name": "Kuza Scottsdale",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 750,
+    "name": "LAC The Flats & Diamond View at Ballpark Village",
+    "client": "Catamount Constructors, Inc",
+    "builder": "Catamount Constructors",
+    "stage": "No Bid"
+  },
+  {
+    "id": 615,
+    "name": "Lake Pleasant Parkway Storage",
+    "client": "Willmeng Construction",
+    "builder": "Willmeng Construction ",
+    "stage": "Lost"
+  },
+  {
+    "id": 533,
+    "name": "Lakeside Tiffany Residence",
+    "client": "Bink Development",
+    "builder": "Bink Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 471,
+    "name": "Lamassu Shops & Potbelly TI",
+    "client": "Hynes Built Construction LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 327,
+    "name": "Lams Market",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "No Bid"
+  },
+  {
+    "id": 829,
+    "name": "Laveen commons",
+    "client": "Big D Construction",
+    "builder": "Big-D Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 731,
+    "name": "Lavelle 2916 Renovations",
+    "client": "Salcito Custom Homes",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award"
+  },
+  {
+    "id": 481,
+    "name": "LEED Chase Tempe Elliot & Kyrene Relocation",
+    "client": "T.J. Nisbet Construction, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 480,
+    "name": "LEED Chase Tempe Elliot & Kyrene Relocation",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 475,
+    "name": "Legacy Square",
+    "client": "Westates Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 336,
+    "name": "LEGO Scottsdale Quarter",
+    "client": "PLANiT Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 784,
+    "name": "Leo ",
+    "client": "Layton",
+    "builder": "Layton Construction",
+    "stage": "Track - High Value Opportunity"
+  },
+  {
+    "id": 819,
+    "name": "Lexington Woolf Logistics 420 - Building D",
+    "client": "Layton",
+    "builder": "Layton Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 392,
+    "name": "LHM Ford Mesa Pro Elite",
+    "client": "Brinkmann Constructors Inc.",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 511,
+    "name": "LIfe Skills - Zeal Development LSAA Of Phoenix",
+    "client": "Frontera Building Company",
+    "builder": "Frontera Building Company",
+    "stage": "No Bid"
+  },
+  {
+    "id": 620,
+    "name": "Life Storage",
+    "client": "Knipp Contracting",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 592,
+    "name": "Litchfield Park Library",
+    "client": "Haydon",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 323,
+    "name": "Little Caesers",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "No Bid"
+  },
+  {
+    "id": 577,
+    "name": "LivAway Suites Mesa",
+    "client": "Wasatch DC Builders NW",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 889,
+    "name": "Loeb Resiedence",
+    "client": "Regal American",
+    "builder": "Azoulay Builders",
+    "stage": "Award Probability = 75%"
+  },
+  {
+    "id": 887,
+    "name": "Loeb Resiedence",
+    "client": "Regal American",
+    "builder": "Azoulay Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 840,
+    "name": "Lot 111 Mountain Syline",
+    "client": "KAM Designs & Mortensen Signature Homes",
+    "builder": "KAM Designs & Mortensen Signature Homes",
+    "stage": "Award"
+  },
+  {
+    "id": 701,
+    "name": "Lot 12 At Jokake Estates",
+    "client": "Ella Lee Homes",
+    "builder": "Ella Lee Homes",
+    "stage": "No Bid"
+  },
+  {
+    "id": 818,
+    "name": "Lot 1720 Guest House Addition",
+    "client": "Salcito",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award Probability = 75%"
+  },
+  {
+    "id": 526,
+    "name": "Lot 1887 - Carr Residence",
+    "client": "Salcito Construction",
+    "builder": "",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 530,
+    "name": "Lot 3642 - Gray Residence",
+    "client": "",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 583,
+    "name": "Lot 3721",
+    "client": "Creativ Design + Build",
+    "builder": "Creativ Design Build",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 531,
+    "name": "Lot 4420",
+    "client": "",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 371,
+    "name": "Lot 5B - Paseo Lindo Shopping Center",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "Lost"
+  },
+  {
+    "id": 331,
+    "name": "Lovisa Tempe Market Place",
+    "client": "PLANiT Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 319,
+    "name": "LSAA Central Ave Phoenix",
+    "client": "Jerrie Hansen",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 464,
+    "name": "Luke AFB Dinning Facility Flight Kitchen Renovation",
+    "client": "E Corp",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 714,
+    "name": "Lund Addition",
+    "client": "Carlson Homes",
+    "builder": "Carlson Homes",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 718,
+    "name": "Madison Apartments",
+    "client": "Jay Wright Consulting",
+    "builder": "Jay Wright Consulting",
+    "stage": "No Bid"
+  },
+  {
+    "id": 525,
+    "name": "Madison at Biltmore",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "No Bid"
+  },
+  {
+    "id": 727,
+    "name": "Main Street Commons Bathroom Building and Concessions Building",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "Canyon Building & Design, LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 944,
+    "name": "Manley Residence",
+    "client": "Arcadia Custom Builders",
+    "builder": "Arcadia Custom Builders",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 349,
+    "name": "Manzana Apartments",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "No Bid"
+  },
+  {
+    "id": 579,
+    "name": "Manzana Apartments Rebid",
+    "client": "Beaumont Builders",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Award Probability = 25%"
+  },
+  {
+    "id": 846,
+    "name": "Maricopa BUD Building Rennovation",
+    "client": "Chasse",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 629,
+    "name": "Maricopa County Library District Distribution Center",
+    "client": "Holdsworth Construction Incorporated",
+    "builder": "",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 457,
+    "name": "Marriott StudioRes - Pinnacle Peak",
+    "client": "Parkway Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 455,
+    "name": "Marriott StudioRes - Pinnacle Peak",
+    "client": "Overland Construction",
+    "builder": "Overland Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 454,
+    "name": "Marriott StudioRes - Pinnacle Peak",
+    "client": "Path Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 998,
+    "name": "Mary T Apartments Phase 1",
+    "client": "Ganem Construction",
+    "builder": "Ganem Construction",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 585,
+    "name": "Massman",
+    "client": "Tiara Sun Development",
+    "builder": "Tiara Sun Development, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 654,
+    "name": "MC Library Distribution Center",
+    "client": "Holdsworth Construction Incorporated",
+    "builder": "Holdsworth Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 653,
+    "name": "MC Library Distribution Center",
+    "client": "Builders United",
+    "builder": "Builders United",
+    "stage": "No Bid"
+  },
+  {
+    "id": 635,
+    "name": "MC Library Distribution Center",
+    "client": "Danson Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 628,
+    "name": "MC Library Distribution Center",
+    "client": "BFL Construction Company, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 623,
+    "name": "MC Library Distribution Center",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 982,
+    "name": "McDade Residence",
+    "client": "Tiara Sun Development",
+    "builder": "Tiara Sun Development, LLC",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 795,
+    "name": "Medivant Health TI",
+    "client": "Flemeng Complete",
+    "builder": "Fleming Complete",
+    "stage": "Lost"
+  },
+  {
+    "id": 373,
+    "name": "Merit Sky Harbor Business Park",
+    "client": "Willmeng Construction",
+    "builder": "Willmeng Construction ",
+    "stage": "Lost"
+  },
+  {
+    "id": 374,
+    "name": "Merit Sky Harbor Industrial Park",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 359,
+    "name": "Merit Sky Harbor Industrial Park",
+    "client": "Willmeng Construction",
+    "builder": "",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 340,
+    "name": "Merit Sky Harbor Industrial Park",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 338,
+    "name": "Merit Sky Harbor Industrial Park",
+    "client": "VCC",
+    "builder": "VCC Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 417,
+    "name": "Mesa Apartments",
+    "client": "Ganem Companies",
+    "builder": "Ganem Companies ",
+    "stage": "Project On Hold - Debt/Equity"
+  },
+  {
+    "id": 315,
+    "name": "Mesa My Favorite Muffin TI ",
+    "client": "Fleming Complete",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 405,
+    "name": "Mezzo Project",
+    "client": "CSI Construction Company",
+    "builder": "CSI Construction Company ",
+    "stage": "Lost"
+  },
+  {
+    "id": 518,
+    "name": "Micro Center- Arcadia Crossing- Phoenix, AZ",
+    "client": "Construction One Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 297,
+    "name": "Midway BLDG A Additional Spec Suite",
+    "client": "LGE ",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 741,
+    "name": "Midway BLDG C Spec Suite Buildout",
+    "client": "LGE Design Build",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 512,
+    "name": "Milkshake Factory Gilbert",
+    "client": "Fairbank's Contracting & Development, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 321,
+    "name": "Miller Marketplace",
+    "client": "Irwin Construction Company",
+    "builder": "Irwin Construction Company",
+    "stage": "No Bid"
+  },
+  {
+    "id": 792,
+    "name": "Mindy Gordon Sewer Replacement",
+    "client": "Carlson Homes",
+    "builder": "Carlson Homes",
+    "stage": "Award Probability = 25%"
+  },
+  {
+    "id": 547,
+    "name": "Miner Residence",
+    "client": "Forte Homes Construction",
+    "builder": "Forte Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 500,
+    "name": "Mission Manor Park Pool Renovation and Splash Pad Addition",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 594,
+    "name": "MockingBird 1 Estates",
+    "client": "Arcadia Custom Builders",
+    "builder": "Arcadia Custom Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 553,
+    "name": "Mockingbird Lot 1",
+    "client": "Arcadia Custom Builders",
+    "builder": "Arcadia Custom Builders",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 658,
+    "name": "Modera Paradise Valley",
+    "client": "Mill Creek Residential",
+    "builder": "Millcreek",
+    "stage": "No Bid"
+  },
+  {
+    "id": 850,
+    "name": "Modern Hacienda",
+    "client": "Ghiz Devolpment",
+    "builder": "Ghiz Devolpment",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 738,
+    "name": "Montezuma Heights Apartment",
+    "client": "Ameris Construction",
+    "builder": "Ameris Construction",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 712,
+    "name": "Moreland Phase 1 & Garage Rebid",
+    "client": "EOS Builders LLC",
+    "builder": "EOS Builders",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 739,
+    "name": "Moreland Phase 2",
+    "client": "EOS Builders LLC",
+    "builder": "EOS Builders",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 474,
+    "name": "Morgan Stanley Phased Tenant Improvement",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 749,
+    "name": "Motel Conversion To Senior Affordable Housing",
+    "client": "Holdsworth Construction Incorporated",
+    "builder": "Holdsworth Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 737,
+    "name": "Motel Conversion To Senior Affordable Housing",
+    "client": "API General Contractors",
+    "builder": "API General Contractors",
+    "stage": "No Bid"
+  },
+  {
+    "id": 721,
+    "name": "Motel Conversion To Senior Affordable Housing",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "Canyon Building & Design, LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 489,
+    "name": "Mountain Mike's Pizza - Phoenix, AZ",
+    "client": "Falcon Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 926,
+    "name": "Mountain View",
+    "client": "Bink Development",
+    "builder": "Bink Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 350,
+    "name": "Mr. Shine Carwash",
+    "client": "A.T. Meridian Construction",
+    "builder": "A.T Meridian Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 775,
+    "name": "Nationwide/Cavasson 2 Story MOB/Retail",
+    "client": "Chasse",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 839,
+    "name": "Neal Family Remodel",
+    "client": "Blackhawk Building",
+    "builder": "Blackhawk Building Company",
+    "stage": "Award"
+  },
+  {
+    "id": 686,
+    "name": "New Beats Cardiology",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 388,
+    "name": "New Portillo's Restaurant For Portillo's Hot Dogs, LLC - Chandler, AZ",
+    "client": "Englewood Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 343,
+    "name": "Nexus (Ellliot & Hardy) Spec Suites",
+    "client": "LGE Design Build",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 780,
+    "name": "Northern Center",
+    "client": "Benson",
+    "builder": "Benson Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 756,
+    "name": "Nuuly Expansion TI",
+    "client": "Brinkmann Constructors",
+    "builder": "Brinkmann Constructors ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 406,
+    "name": "NVCA Early Childhood Development Center 100% DD",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 409,
+    "name": "Oakdale - The Core Mesa Apartments (Mesa, AZ) 260 Units",
+    "client": "TB Penick & Sons, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 660,
+    "name": "Oasis Cycle Scottsdale TI",
+    "client": "Near-Cal Corp.",
+    "builder": "Near-Cal Corp ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 437,
+    "name": "Office TI Build Out - MIP Site Bldg C4 Suite 101",
+    "client": "Bayley Construction",
+    "builder": "Bayley Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 659,
+    "name": "Old Navy Remodel - Market at Estrella Falls",
+    "client": "Gray West Construction Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 391,
+    "name": "One Scottsdale Lot 3",
+    "client": "Sparrow Partners",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 364,
+    "name": "Ono Hawaiian BBQ - Maricopa",
+    "client": "BSM Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 386,
+    "name": "OPP-48643 Bank of America - Mesa, AZ",
+    "client": "PowerHouse",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 698,
+    "name": "Osborn - 3405 N. 47th",
+    "client": "Ella Lee Homes",
+    "builder": "Ella Lee Homes",
+    "stage": "No Bid"
+  },
+  {
+    "id": 697,
+    "name": "Osborn - 3415 N. 47TH",
+    "client": "Ella Lee Homes",
+    "builder": "Ella Lee Homes",
+    "stage": "No Bid"
+  },
+  {
+    "id": 702,
+    "name": "Pacific Office Automation TI - Bluelines",
+    "client": "LGE Design Build",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 381,
+    "name": "Pad C Shell Building - Surprise, AZ",
+    "client": "EMJ Corporation",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 817,
+    "name": "Palm Skyline",
+    "client": "Hawk Builders",
+    "builder": "Hawk Builders",
+    "stage": "Sent to Vendors"
+  },
+  {
+    "id": 599,
+    "name": "Palm Valley Commerce Center - Spec Suites",
+    "client": "LGE Design Build",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 871,
+    "name": "Papago Office Building",
+    "client": "Ameris Construction",
+    "builder": "Ameris Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 870,
+    "name": "Papago Office Building",
+    "client": "Ameris Construction",
+    "builder": "Ameris Construction",
+    "stage": "Award Probability = 25%"
+  },
+  {
+    "id": 705,
+    "name": "Papago Village",
+    "client": "Bolte Homes",
+    "builder": "Bolte Homes",
+    "stage": "Track - High Value Opportunity"
+  },
+  {
+    "id": 892,
+    "name": "Papago Village ",
+    "client": "Bolte Homes ",
+    "builder": "Bolte Custom Homes",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 946,
+    "name": "Papago Village Clubhouse",
+    "client": "Ameris Construction",
+    "builder": "Ameris Construction",
+    "stage": "Award Probability = 25%"
+  },
+  {
+    "id": 713,
+    "name": "Paradise Valley DoubleTree Resort",
+    "client": "PWI Construction",
+    "builder": "PWI Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 303,
+    "name": "Park Algodon Spec Suites B, C, D, E ",
+    "client": "LGE",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 607,
+    "name": "Park Place at Gallery Park",
+    "client": "Trammel Crow Residential",
+    "builder": "Trammel Crow Residential",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 523,
+    "name": "Pavilion at Camelback For Construction",
+    "client": "Catamount Constructors, Inc.",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 556,
+    "name": "Pella Scottsdale Promenade",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 445,
+    "name": "PEM Fitness Center TI and Addition",
+    "client": "Mavin Development LLC ",
+    "builder": "Mavin Development LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 883,
+    "name": "Perry Custom Residence",
+    "client": "Diamond",
+    "builder": "Diamond Contractors, Inc",
+    "stage": "Lost"
+  },
+  {
+    "id": 771,
+    "name": "Pierce Exeter Residence Back House",
+    "client": "Salcito",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award"
+  },
+  {
+    "id": 690,
+    "name": "PizzaNista",
+    "client": "Beaumont Builders",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 884,
+    "name": "Plaza Del Parque Shell",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 496,
+    "name": "Plaza Del Rio Medical Center 1 Suite E-1",
+    "client": "Zen Builders LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 567,
+    "name": "PMB (ENT Clinic) Abrazo Litchfield Medical Building",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 568,
+    "name": "PMB - MedCure",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 627,
+    "name": "Pollo Campero - Phoenix, AZ",
+    "client": "DeLauter Development",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 734,
+    "name": "Porsche to Audi - Phase IV",
+    "client": "Fleming Complete",
+    "builder": "Fleming Complete",
+    "stage": "Lost"
+  },
+  {
+    "id": 603,
+    "name": "Port of Subs - Mesa, AZ",
+    "client": "Kramer Construction And Management, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 947,
+    "name": "Port of Subs Mesa",
+    "client": "Kramer Construction & Management Inc.",
+    "builder": "Kramer Construction & Management Inc.",
+    "stage": "Lost"
+  },
+  {
+    "id": 941,
+    "name": "Port of Subs Mesa",
+    "client": "Kramer Construction & Management Inc.",
+    "builder": "Kramer Construction & Management Inc.",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 987,
+    "name": "Porta Via Scottsdale",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 986,
+    "name": "Porta Via Scottsdale",
+    "client": "FRoberts Construction inc",
+    "builder": "F Roberts Construction Inc",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 318,
+    "name": "Pour Therapy Restaurant TI ",
+    "client": "Omega Contracting and Devlopment, LLC ",
+    "builder": "Omega Contracting and Development, LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 791,
+    "name": "Powell Residence",
+    "client": "Salcito Custom Homes",
+    "builder": "Salcito Custom Homes",
+    "stage": "Award Probability = 75%"
+  },
+  {
+    "id": 935,
+    "name": "Preserve at Cave Creek",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 614,
+    "name": "Priest & 3rd - Blueline Budget",
+    "client": "LGE Design Build",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 595,
+    "name": "Prime Self Storage Phoenix, AZ",
+    "client": "Mariottini Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 671,
+    "name": "Primrose Daycare Queen Creek AZ",
+    "client": "Stout",
+    "builder": "Stout",
+    "stage": "No Bid"
+  },
+  {
+    "id": 311,
+    "name": "Primrose School",
+    "client": "Stout",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 962,
+    "name": "Prologis Deer Valley 20 Industrial",
+    "client": "Chasse",
+    "builder": "Chasse Building Team",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 557,
+    "name": "Pvolve - Gilbert, AZ",
+    "client": "Loberg Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 936,
+    "name": "QOZ Multifamily Conversion",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 397,
+    "name": "QOZ Multifamily Conversion",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 508,
+    "name": "Queen Creek Assisted Living & Memory Care",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 689,
+    "name": "Queen Creek Logistics Facility & Maintenance Shop",
+    "client": "Haydon",
+    "builder": "Haydon",
+    "stage": "No Bid"
+  },
+  {
+    "id": 330,
+    "name": "QuikTrip - 1523 Chandler, AZ Ground-up",
+    "client": "Jones Covey Group, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 676,
+    "name": "QuikTrip 1413 - Surprise, AZ Ground-up",
+    "client": "Jones Covey Group, Inc.",
+    "builder": "Jones Covey Group, Inc.",
+    "stage": "No Bid"
+  },
+  {
+    "id": 724,
+    "name": "QuikTrip 480 - Scottsdale, AZ Ground Up",
+    "client": "Jones Covey Group, Inc.",
+    "builder": "Jones Covey Group, Inc.",
+    "stage": "No Bid"
+  },
+  {
+    "id": 827,
+    "name": "Ransil Residence",
+    "client": "Regency Custom Homes",
+    "builder": "Regency Custom Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 366,
+    "name": "Realty One Group - Suite 315 Rebid",
+    "client": "RSG Builders LLC.",
+    "builder": "RSG Builders",
+    "stage": "No Bid"
+  },
+  {
+    "id": 830,
+    "name": "Redesigned NVCA Early Childhood Development Center",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 703,
+    "name": "Reece #3013 (HVAC)",
+    "client": "Torcom",
+    "builder": "Torcom",
+    "stage": "No Bid"
+  },
+  {
+    "id": 789,
+    "name": "Render Norterra",
+    "client": "Crescent Communities",
+    "builder": "Crescent Communities",
+    "stage": "Lost"
+  },
+  {
+    "id": 997,
+    "name": "Reserve Desert Ridge",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 1008,
+    "name": "Rev'd Fitness TI",
+    "client": "Beaumont Builders, LLC",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 1007,
+    "name": "Rev'd Fitness TI",
+    "client": "Beaumont Builders, LLC",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 320,
+    "name": "Rivulon Commons Building C - TI",
+    "client": "McCarthy Nordburg",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 601,
+    "name": "Ryder Phoenix",
+    "client": "Near-Cal Corp.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 593,
+    "name": "Safeway 0370 Buckeye AZ",
+    "client": "Builders United",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 576,
+    "name": "Safeway 0370 Buckeye AZ",
+    "client": "VCC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 559,
+    "name": "Saguaro/Rosewood Logistics Center",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 824,
+    "name": "Salamanca Square",
+    "client": "TofelDent Construction",
+    "builder": "Tofel Construction LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 805,
+    "name": "Salamanca Square",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 652,
+    "name": "Sally Beauty #3571 Casa Grande, AZ",
+    "client": "Diamond Contractors, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 608,
+    "name": "Salt River Flats II",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 966,
+    "name": "Salvation Army Social Service Building",
+    "client": "Low Mountain Construction, Inc",
+    "builder": "Low Mountain Construction, Inc.",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 965,
+    "name": "Salvation Army Social Service Building",
+    "client": "Low Mountain Construction, Inc",
+    "builder": "Low Mountain Construction, Inc.",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 932,
+    "name": "Salvation Army Social Service Building",
+    "client": "Low Mountain Construction, Inc",
+    "builder": "Low Mountain Construction, Inc.",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 711,
+    "name": "SAM Homes - 60th Street",
+    "client": "SAM Construction Group LLC",
+    "builder": "SAM Construction Group LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 617,
+    "name": "Sanctuary House",
+    "client": "Creativ Design build",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 494,
+    "name": "Santa Margarita Ranch - Staff Gym",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 482,
+    "name": "Santa Margarita Ranch - Staff Gym",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 836,
+    "name": "Sarival & Indian School Rd Sherwin Williams",
+    "client": "Beaumont Builders",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 835,
+    "name": "Sarival & Indian School Rd Sherwin Williams",
+    "client": "Beaumont Builders",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 834,
+    "name": "Sarival & Indian School Rd Shops",
+    "client": "Beaumont Builders",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 683,
+    "name": "Scenthound - Scottsdale AZ",
+    "client": "Summit Properties & Development",
+    "builder": "Summit Properties & Development",
+    "stage": "No Bid"
+  },
+  {
+    "id": 862,
+    "name": "Scottsdale Townhomes",
+    "client": "Ameris Construction",
+    "builder": "Ameris Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 802,
+    "name": "Senita on Cave Creek",
+    "client": "W.E O'Neil Construction",
+    "builder": "W.E. O'Neil",
+    "stage": "No Bid"
+  },
+  {
+    "id": 816,
+    "name": "Seton Event Center",
+    "client": "Apex Refrigeration",
+    "builder": "Apex Refrigeration",
+    "stage": "Award Probability = 50%"
+  },
+  {
+    "id": 495,
+    "name": "Shake Shack (Happy Valley Rd, Phoenix)",
+    "client": "Torcom",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 325,
+    "name": "Shop and Casita Queen Creek",
+    "client": "Gridline Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 458,
+    "name": "Shops at Gainey Village Suite 302 Re-Demise",
+    "client": "Bayley Construction",
+    "builder": "Bayley Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 443,
+    "name": "Shops at Gainey Village Suite 302 Re-Demise",
+    "client": "BSM Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 637,
+    "name": "Sidney Village BTR",
+    "client": "Weis Builders",
+    "builder": "Weis Builders, Inc.",
+    "stage": "No Bid"
+  },
+  {
+    "id": 996,
+    "name": "Sierra Trading Desert Ridge Marketplace TI",
+    "client": "High Point Development",
+    "builder": "High Point Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 984,
+    "name": "Sierra Trading Desert Ridge Marketplace TI",
+    "client": "High Point Development",
+    "builder": "High Point Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 461,
+    "name": "SIHI Garden Apartments",
+    "client": "MT Builders",
+    "builder": "MT Builders",
+    "stage": "No Bid"
+  },
+  {
+    "id": 640,
+    "name": "SilverLeaf 1491",
+    "client": "Bedbrock Developers",
+    "builder": "Bedbrock Developers",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 551,
+    "name": "Silverleaf Lot 1490",
+    "client": "American First Builders",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 549,
+    "name": "Silverleaf Lot 1724",
+    "client": "American First Builders",
+    "builder": "American First Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 616,
+    "name": "Silverleaft Lot 3214",
+    "client": "Creativ Design build",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 466,
+    "name": "Skechers 547 Gilbert, AZ",
+    "client": "Horizon Retail Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 855,
+    "name": "Sky Harbor Logistics",
+    "client": "Brinkmann Constructors",
+    "builder": "Brinkmann Constructors ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 854,
+    "name": "Sky Harbor Logistics",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 728,
+    "name": "Smithgroup Cop Motel Conversion To Affordable Housing - Prevailing Wage Project",
+    "client": "EOS Builders",
+    "builder": "EOS Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 543,
+    "name": "Smoothie King - Interior Tenant Improvement",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 299,
+    "name": "Social Axe",
+    "client": "Waltz Construction",
+    "builder": "Waltz Construction ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 655,
+    "name": "Solara Vista Apartments",
+    "client": "Pono Construction LLC",
+    "builder": "Pono Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 357,
+    "name": "Sound Effects",
+    "client": "Fleming Complete",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 344,
+    "name": "Source Logistics Spec Suite",
+    "client": "LGE Design Build",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 419,
+    "name": "Southdale Apartments",
+    "client": "W.E. O'Neil",
+    "builder": "W.E. O'Neil",
+    "stage": "No Bid"
+  },
+  {
+    "id": 874,
+    "name": "Southwest Spas TI",
+    "client": "CKZ Design-Build",
+    "builder": "CKZ Design-Build",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 853,
+    "name": "St Joseph Coptic Orthodox Church Addition",
+    "client": "Zen Builders",
+    "builder": "Zen Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 852,
+    "name": "St Joseph Coptic Orthodox Church Addition",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "Canyon Building & Design, LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 356,
+    "name": "St. Joseph Coptic Orthodox Church (TI)",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 822,
+    "name": "Stanley Residence Remodel",
+    "client": "The Boos Group",
+    "builder": "The Boos Group",
+    "stage": "Award"
+  },
+  {
+    "id": 376,
+    "name": "Stella's Ice Cream - Ahwatukee, AZ",
+    "client": "C2C Construction Management",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 693,
+    "name": "Stellar Airpark Offices",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 521,
+    "name": "Steyaert Residence",
+    "client": "Brimley",
+    "builder": "Brimley Development",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 868,
+    "name": "Summerwell Ironwood Amenity",
+    "client": "Greystar ",
+    "builder": "Greystar Construction Co. ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 867,
+    "name": "Summerwell Ironwood Amenity",
+    "client": "Greystar ",
+    "builder": "Greystar Construction Co. ",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 804,
+    "name": "Sun Rise Apartments ",
+    "client": "Ironmark Builders ",
+    "builder": "Ironmark",
+    "stage": "No Bid"
+  },
+  {
+    "id": 352,
+    "name": "Superior Court Ceiling",
+    "client": "CHASSE Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "No Bid"
+  },
+  {
+    "id": 346,
+    "name": "Superior Court Ceiling",
+    "client": "CHASSE Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "No Bid"
+  },
+  {
+    "id": 803,
+    "name": "Superstition Multifamily ",
+    "client": "DR Horton ",
+    "builder": "DR Horton American's Builder",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 439,
+    "name": "Surgery Center of Arizona - Mesa AZ",
+    "client": "Invicta Construction Solutions",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 418,
+    "name": "Surprise Active Adult - Permit Set",
+    "client": "Greystar Construction Co.",
+    "builder": "Greystar Construction Co. ",
+    "stage": "Lost"
+  },
+  {
+    "id": 554,
+    "name": "SVDP Medical Clinic TI",
+    "client": "Build Strategic",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 522,
+    "name": "SVDP Medical Clinic TI",
+    "client": "Build Strategic",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 684,
+    "name": "Swig",
+    "client": "RCS Construction",
+    "builder": "RCS Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 301,
+    "name": "Sycamore Farms Shops A & B",
+    "client": "Bergman KPRS LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 300,
+    "name": "Sycamore Farms Shops A & B",
+    "client": "EMJ Corporation",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 680,
+    "name": "T-Mobile 695G Laveen Village, AZ - W Baseline Road",
+    "client": "Horizon Retail Construction",
+    "builder": "Horizon Retail Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 625,
+    "name": "T-Mobile Phoenix, AZ - W Peoria Ave",
+    "client": "Horizon Retail Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 619,
+    "name": "T-Mobile Phoenix, AZ - W Peoria Ave",
+    "client": "Healy Construction Services, Inc",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 515,
+    "name": "TAA Sound Insulation Program",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 329,
+    "name": "TED'S Hot Dogs",
+    "client": "Reliance Build, Inc",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 950,
+    "name": "Tempe Collision Center",
+    "client": "FX Construction",
+    "builder": "FX Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 949,
+    "name": "Tempe Collision Center",
+    "client": "FX Construction",
+    "builder": "FX Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 872,
+    "name": "Tempe Marketplace - Shops I Landlord Improvements",
+    "client": " High Point Development",
+    "builder": "High Point Development",
+    "stage": "Lost"
+  },
+  {
+    "id": 333,
+    "name": "Tenent Improvement Spec Suite 203",
+    "client": "RSG Builders",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 334,
+    "name": "Tenent Improvement Spec Suite 204",
+    "client": "RSG Builders",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 758,
+    "name": "The Bishop",
+    "client": "PARIO Land Development",
+    "builder": "PARIO Land Development",
+    "stage": "Sent to Vendors"
+  },
+  {
+    "id": 881,
+    "name": "The Craftsman on Elliot",
+    "client": "EOS Builders",
+    "builder": "EOS Builders",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 414,
+    "name": "The Craftsman on Elliot",
+    "client": "EOS Builders",
+    "builder": "EOS Builders",
+    "stage": "No Bid"
+  },
+  {
+    "id": 539,
+    "name": "The Craftsman on Elliot - 2nd City Submittal",
+    "client": "EOS Builders LLC",
+    "builder": "EOS Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 302,
+    "name": "The Goldwater ",
+    "client": "Ameris Construction ",
+    "builder": "Ameris Construction",
+    "stage": "Lost"
+  },
+  {
+    "id": 389,
+    "name": "The Grove Admire MD Clinic",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 610,
+    "name": "The Harmon",
+    "client": "Brookstone Venture Capital",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 472,
+    "name": "The Home Depot - New Store",
+    "client": "ESI Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 410,
+    "name": "THE LOOP - Princess & 101",
+    "client": "LGE Design Build",
+    "builder": "LGE Design Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 662,
+    "name": "The NOW Massage Gilbert",
+    "client": "STMCO Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 638,
+    "name": "The NOW Massage Gilbert",
+    "client": "Overton Builders",
+    "builder": "Overton Builders LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 851,
+    "name": "The Park at Virginia Circle ",
+    "client": "Lorne Wallace ",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 866,
+    "name": "The Ranch Building 1-6",
+    "client": "Chasse",
+    "builder": "Chasse Building Team",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 691,
+    "name": "The Roman",
+    "client": "Beaumont Builders",
+    "builder": "Beaumont Builders, LLC",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 372,
+    "name": "The Trailhead Pad 3 - Retail Shell",
+    "client": "Frontera Building Company",
+    "builder": "Frontera Building Company",
+    "stage": "No Bid"
+  },
+  {
+    "id": 924,
+    "name": "The Wave Pilates Studio - Mesa",
+    "client": "Hive Construction",
+    "builder": "HIVE Construction",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 845,
+    "name": "The Whitney",
+    "client": "Brinkmann Constructors",
+    "builder": "Brinkmann Constructors ",
+    "stage": "Lost"
+  },
+  {
+    "id": 1005,
+    "name": "The Youth Refuge Church Xtrata",
+    "client": "Centre Construction",
+    "builder": "",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 546,
+    "name": "Thomas Residence",
+    "client": "Forte Homes Construction",
+    "builder": "Forte Homes",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 717,
+    "name": "TI For AZ Benefits",
+    "client": "RSG Builders",
+    "builder": "RSG Builders",
+    "stage": "No Bid"
+  },
+  {
+    "id": 470,
+    "name": "Tiffany & Co Temp Store - Scottsdale Fashion Square",
+    "client": "PWI Construction",
+    "builder": "PWI Residential",
+    "stage": "No Bid"
+  },
+  {
+    "id": 888,
+    "name": "Tiffany Residence",
+    "client": "Bink Development",
+    "builder": "Bink Development",
+    "stage": "Award"
+  },
+  {
+    "id": 929,
+    "name": "Tillman Residence",
+    "client": "Rafter House",
+    "builder": "Rafterhouse",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 402,
+    "name": "Toastique TI",
+    "client": "Build Strategic",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 369,
+    "name": "Toll Bothers Uptown Chandler ",
+    "client": "Chasse Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "Project On Hold - Debt/Equity"
+  },
+  {
+    "id": 431,
+    "name": "Toll Brothers 50th Street",
+    "client": "Chasse Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 309,
+    "name": "Toll Brothers Chandler",
+    "client": "Sparrow Partners",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 427,
+    "name": "Toll Brothers Uptown",
+    "client": "Chasse Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "Duplicate Project Bid"
+  },
+  {
+    "id": 507,
+    "name": "Toll Maza",
+    "client": "CHASSE Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 564,
+    "name": "Townhomes On Tylor Lot 5",
+    "client": "E3's Building Team",
+    "builder": "Evolution 3.0 LLC/E3",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 964,
+    "name": "Townplace Maricopa Hotel",
+    "client": "Overland Construction",
+    "builder": "Overland Construction",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 670,
+    "name": "Tractor Supply - Goodyear, AZ",
+    "client": "Bogart Construction, Inc",
+    "builder": "Bogart Construction, Inc",
+    "stage": "No Bid"
+  },
+  {
+    "id": 669,
+    "name": "Tractor Supply - Goodyear, AZ",
+    "client": "ESI Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 722,
+    "name": "Trailhead Apartments",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "Track - High Value Opportunity"
+  },
+  {
+    "id": 587,
+    "name": "Tropical Smoothie",
+    "client": "CKZ Design-Build",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 541,
+    "name": "Tropical Smoothie",
+    "client": "CKZ Design-Build",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 783,
+    "name": "Two Tailed Brewery",
+    "client": "ICA LLC",
+    "builder": "ICA LLC",
+    "stage": "Lost"
+  },
+  {
+    "id": 661,
+    "name": "U-Haul Smart Mobility Center",
+    "client": "CHASSE Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "No Bid"
+  },
+  {
+    "id": 463,
+    "name": "Ulta Beauty #2009 - Paseo Lindo Shopping Center",
+    "client": "Elder-Jones, Inc",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 626,
+    "name": "Ulta Beauty-Tempe, AZ",
+    "client": "Healy Construction Services, Inc",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 945,
+    "name": "UMOM Halley HVAC Upgrade",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "LOI or Verbal"
+  },
+  {
+    "id": 951,
+    "name": "Underwood Residence",
+    "client": "WoodWorks",
+    "builder": "Wood Works Unlimited Inc",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 643,
+    "name": "United Defense Tactical Renovation",
+    "client": "Kline Rostocil Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 339,
+    "name": "United Rentals - Phoenix, AZ",
+    "client": "Censor Commercial Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 497,
+    "name": "University of Jamestown TI",
+    "client": "Reliance Build, Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 491,
+    "name": "UPS | Chandler, AZ",
+    "client": "Asa Carlton, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 798,
+    "name": "Urban Edge at Baseline",
+    "client": "SoDella Communities",
+    "builder": "SoDella Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 696,
+    "name": "Urman Residence",
+    "client": "Ella Lee Homes",
+    "builder": "Ella Lee Homes",
+    "stage": "No Bid"
+  },
+  {
+    "id": 451,
+    "name": "USD Warehouse",
+    "client": "Harris Associates",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 837,
+    "name": "Val Vista Self Storage",
+    "client": "Willmeng Construction",
+    "builder": "Willmeng Construction ",
+    "stage": "Lost"
+  },
+  {
+    "id": 426,
+    "name": "Vale Student Housing - Gilbane Co Bid",
+    "client": "Gilbane Building Company",
+    "builder": "",
+    "stage": "Lost"
+  },
+  {
+    "id": 772,
+    "name": "Van Buren Residences",
+    "client": "Sparrow Partners",
+    "builder": "Sparrow Partners ",
+    "stage": "No Bid"
+  },
+  {
+    "id": 423,
+    "name": "Verity @ Cooley Station - CS 22",
+    "client": "Alston Construction Company",
+    "builder": "Alston Construction Company",
+    "stage": "Lost"
+  },
+  {
+    "id": 420,
+    "name": "Verity @ Cooley Station - CS 24",
+    "client": "Alston Construction Company",
+    "builder": "Alston Construction Company",
+    "stage": "Lost"
+  },
+  {
+    "id": 296,
+    "name": "Verrado Marketplace Shops A, B, D, F",
+    "client": "Chasse Building Team",
+    "builder": "Chasse Building Team",
+    "stage": "Lost"
+  },
+  {
+    "id": 768,
+    "name": "Vet Clinic - Avondale, AZ",
+    "client": "CAM Development Group",
+    "builder": "CAM Development Group",
+    "stage": "No Bid"
+  },
+  {
+    "id": 605,
+    "name": "Veterinary Emergency Group - Arrowhead",
+    "client": "Hilbers Inc.",
+    "builder": "Hilbers inc",
+    "stage": "No Bid"
+  },
+  {
+    "id": 604,
+    "name": "Veterinary Emergency Group - Arrowhead",
+    "client": "Loberg Construction",
+    "builder": "Loberg Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 799,
+    "name": "Villas at Gin Complex",
+    "client": "Knipp Contracting",
+    "builder": "Knipp Contracting",
+    "stage": "No Bid"
+  },
+  {
+    "id": 813,
+    "name": "VT303 North",
+    "client": "Brinkmann Constructors",
+    "builder": "Brinkmann Constructors ",
+    "stage": "Lost"
+  },
+  {
+    "id": 838,
+    "name": "Walia Residence",
+    "client": "Dupre Development",
+    "builder": "Dupre Devolpment",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 1000,
+    "name": "Warm Grey Shell Building - Truman Ranch - Pad 2",
+    "client": "Torcom",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 988,
+    "name": "Warm Grey Shell Building - Truman Ranch - Pad 2",
+    "client": "Torcom",
+    "builder": "",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 725,
+    "name": "WESCAP Office Building",
+    "client": "Hoffman Luxury Homes",
+    "builder": "Hoffman Luxury Homes",
+    "stage": "No Bid"
+  },
+  {
+    "id": 598,
+    "name": "West Fillmore Highstreet",
+    "client": "Elevate Constructionist",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 956,
+    "name": "WFG National Title",
+    "client": "RSG Builders LLC",
+    "builder": "RSG Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 955,
+    "name": "WFG National Title",
+    "client": "RSG Builders LLC",
+    "builder": "RSG Builders",
+    "stage": "Sent to Client"
+  },
+  {
+    "id": 484,
+    "name": "Wingate-Hawthorn Suites Hotel @ SkyBridge",
+    "client": "Alston Construction Company, Inc.",
+    "builder": "Alston Construction Company",
+    "stage": "Lost"
+  },
+  {
+    "id": 708,
+    "name": "Wolf by Vanderpump",
+    "client": "Layton Construction",
+    "builder": "Layton Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 921,
+    "name": "Wood Residence",
+    "client": "American Commercial Contracting",
+    "builder": "American Commercial Contracting",
+    "stage": "Opportunity Created"
+  },
+  {
+    "id": 688,
+    "name": "Woodspring Suites",
+    "client": "Canyon Building & Design, LLC",
+    "builder": "Canyon Building & Design, LLC",
+    "stage": "No Bid"
+  },
+  {
+    "id": 575,
+    "name": "Woodspring Suites",
+    "client": "Parkway Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 612,
+    "name": "Woof Gang Bakery & Grooming - Scottsdale, AZ",
+    "client": "Censor Commercial Construction",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 341,
+    "name": "X Golf Scottsdale - TI",
+    "client": "Zen Builders LLC",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 450,
+    "name": "Yavapai Pharmacy",
+    "client": "CG Schmidt, Inc.",
+    "builder": "",
+    "stage": "No Bid"
+  },
+  {
+    "id": 786,
+    "name": "Yogurtini",
+    "client": "CKZ Design-Build",
+    "builder": "CKZ Design-Build",
+    "stage": "Lost"
+  },
+  {
+    "id": 740,
+    "name": "Yogurtini",
+    "client": "CKZ Design-Build",
+    "builder": "CKZ Design-Build",
+    "stage": "Lost"
+  },
+  {
+    "id": 412,
+    "name": "Youngtown Phase 1",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 413,
+    "name": "Youngtown Phase 2",
+    "client": "H&B Builders",
+    "builder": "H&B Builders",
+    "stage": "Lost"
+  },
+  {
+    "id": 361,
+    "name": "Z-24444 Honeywell - Glendale Small Clean Room",
+    "client": "Reliance Build Inc.",
+    "builder": "Reliance Build",
+    "stage": "No Bid"
+  },
+  {
+    "id": 707,
+    "name": "Zales - Chandler Fashion Center, AZ",
+    "client": "North American Commercial Construction",
+    "builder": "North American Commercial Construction",
+    "stage": "No Bid"
+  },
+  {
+    "id": 704,
+    "name": "Zales - Chandler, AZ",
+    "client": "RE Crawford",
+    "builder": "RE Crawford",
+    "stage": "No Bid"
+  },
+  {
+    "id": 699,
+    "name": "Zerbib Lot H3 - Phoenician",
+    "client": "Ella Lee Homes",
+    "builder": "Ella Lee Homes",
+    "stage": "No Bid"
+  },
+  {
+    "id": 797,
+    "name": "Zoe Apartments",
+    "client": "Knipp Contracting",
+    "builder": "Knipp Contracting",
+    "stage": "Sent to Vendors"
+  },
+  {
+    "id": 875,
+    "name": "Zom Maizon Biltmore",
+    "client": "EOS Builders LLC",
+    "builder": "EOS Builders",
+    "stage": "Opportunity Created"
+  }
+]
