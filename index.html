@@ -498,13 +498,18 @@
       <div class="anno-popover" id="annoPopover">
         <label>Label Size</label>
         <div class="slider-row">
-          <input type="range" id="annoSizeSlider" min="8" max="28" value="14" step="1" oninput="updateAnnoGlobals()">
+          <input type="range" id="annoSizeSlider" min="2" max="28" value="14" step="1" oninput="updateAnnoGlobals()">
           <span class="slider-val" id="annoSizeVal">14</span>
         </div>
-        <label>Label Opacity</label>
+        <label>Text Opacity</label>
         <div class="slider-row">
-          <input type="range" id="annoOpacitySlider" min="10" max="100" value="100" step="5" oninput="updateAnnoGlobals()">
-          <span class="slider-val" id="annoOpacityVal">100%</span>
+          <input type="range" id="annoTextOpacitySlider" min="10" max="100" value="100" step="5" oninput="updateAnnoGlobals()">
+          <span class="slider-val" id="annoTextOpacityVal">100%</span>
+        </div>
+        <label>Fill Opacity</label>
+        <div class="slider-row">
+          <input type="range" id="annoFillOpacitySlider" min="0" max="100" value="90" step="5" oninput="updateAnnoGlobals()">
+          <span class="slider-val" id="annoFillOpacityVal">90%</span>
         </div>
       </div>
     </div>
@@ -1735,8 +1740,9 @@ const pageMeasurements = {};
 const pageNames = {};
 
 // Global annotation defaults (per page)
-let annoSize = 14;   // font size in px (before baseScale)
-let annoOpacity = 1.0; // 0-1
+let annoSize = 14;        // font size in px (before baseScale)
+let annoTextOpacity = 1.0;  // text opacity 0-1
+let annoFillOpacity = 0.9;  // background fill opacity 0-1
 let measureIdCounter = 0;
 window._measIdCounter = 0;
 
@@ -1785,7 +1791,8 @@ async function saveCurrentPageData() {
     measurements,
     pageName: pageNames[pageNum] || '',
     annoSize: annoSize,
-    annoOpacity: annoOpacity
+    annoTextOpacity: annoTextOpacity,
+    annoFillOpacity: annoFillOpacity
   });
   
   // Update project modifiedAt
@@ -1810,7 +1817,8 @@ async function loadPageDataForDrawing(drawingId) {
     if (pd.pageName) pageNames[pd.pageNum] = pd.pageName;
     // Restore anno settings from the last loaded page (will be overwritten per-page)
     if (pd.annoSize != null) annoSize = pd.annoSize;
-    if (pd.annoOpacity != null) annoOpacity = pd.annoOpacity;
+    if (pd.annoTextOpacity != null) annoTextOpacity = pd.annoTextOpacity;
+    if (pd.annoFillOpacity != null) annoFillOpacity = pd.annoFillOpacity;
     if (pd.scale) pageScales[pd.pageNum] = pd.scale;
     if (pd.measurements && pd.measurements.length > 0) {
       pageMeasurements[pd.pageNum] = pd.measurements;
@@ -1893,6 +1901,7 @@ function pdfToScreen(px, py) {
 viewer.addEventListener('mousedown', (e) => {
   if (!pdfDoc) return;
   if (calibrationMode) return;
+  if (e.target.closest('.anno-controls')) return;
   if (measureMode && !e.shiftKey) return;
   isPanning = true;
   startX = e.clientX - panX;
@@ -1924,7 +1933,7 @@ viewer.addEventListener('click', (e) => {
   if (!pdfDoc) return;
   if (isPanning) return;
   
-  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner')) {
+  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls')) {
     return;
   }
 
@@ -2313,9 +2322,10 @@ function finishMeasurement() {
     pxLength: pxLen,
     distance: dist,
     duct: null,
-    labelText: null,     // custom label (null = auto-generated)
-    labelSize: null,     // per-measurement override (null = use global)
-    labelOpacity: null   // per-measurement override (null = use global)
+    labelText: null,        // custom label (null = auto-generated)
+    labelSize: null,        // per-measurement override (null = use global)
+    labelTextOpacity: null, // per-measurement text opacity override
+    labelFillOpacity: null  // per-measurement fill opacity override
   };
   
   if (!pageMeasurements[currentPage]) pageMeasurements[currentPage] = [];
@@ -2578,7 +2588,8 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   }
   
   const effSize = (measObj && measObj.labelSize != null) ? measObj.labelSize : annoSize;
-  const effOpacity = (measObj && measObj.labelOpacity != null) ? measObj.labelOpacity : annoOpacity;
+  const effTextOpacity = (measObj && measObj.labelTextOpacity != null) ? measObj.labelTextOpacity : annoTextOpacity;
+  const effFillOpacity = (measObj && measObj.labelFillOpacity != null) ? measObj.labelFillOpacity : annoFillOpacity;
   const fontSize = effSize * baseScale;
   mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
   const textWidth = mCtx.measureText(text).width;
@@ -2591,8 +2602,8 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   mCtx.translate(mx, my);
   mCtx.rotate(displayAngle);
   
-  mCtx.globalAlpha = effOpacity;
-  mCtx.fillStyle = 'rgba(22, 33, 62, 0.9)';
+  mCtx.globalAlpha = effFillOpacity;
+  mCtx.fillStyle = 'rgb(22, 33, 62)';
   const bgHeight = fontSize + padding * 2;
   mCtx.beginPath();
   mCtx.roundRect(-textWidth/2 - padding, -bgHeight/2, textWidth + padding*2, bgHeight, 4 * baseScale);
@@ -2602,6 +2613,7 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   mCtx.lineWidth = 1;
   mCtx.stroke();
   
+  mCtx.globalAlpha = effTextOpacity;
   mCtx.fillStyle = '#ffffff';
   mCtx.textAlign = 'center';
   mCtx.textBaseline = 'middle';
@@ -2619,9 +2631,11 @@ window.toggleAnnoPopover = function() {
 
 window.updateAnnoGlobals = function() {
   annoSize = parseInt(document.getElementById('annoSizeSlider').value);
-  annoOpacity = parseInt(document.getElementById('annoOpacitySlider').value) / 100;
+  annoTextOpacity = parseInt(document.getElementById('annoTextOpacitySlider').value) / 100;
+  annoFillOpacity = parseInt(document.getElementById('annoFillOpacitySlider').value) / 100;
   document.getElementById('annoSizeVal').textContent = annoSize;
-  document.getElementById('annoOpacityVal').textContent = Math.round(annoOpacity * 100) + '%';
+  document.getElementById('annoTextOpacityVal').textContent = Math.round(annoTextOpacity * 100) + '%';
+  document.getElementById('annoFillOpacityVal').textContent = Math.round(annoFillOpacity * 100) + '%';
   drawMeasureOverlay();
   scheduleSave();
 };
@@ -2646,20 +2660,26 @@ window.editMeasurement = function(id) {
   
   const currentLabel = m.labelText || '';
   const currentSize = m.labelSize != null ? m.labelSize : annoSize;
-  const currentOpacity = m.labelOpacity != null ? Math.round(m.labelOpacity * 100) : Math.round(annoOpacity * 100);
+  const currentTextOp = m.labelTextOpacity != null ? Math.round(m.labelTextOpacity * 100) : Math.round(annoTextOpacity * 100);
+  const currentFillOp = m.labelFillOpacity != null ? Math.round(m.labelFillOpacity * 100) : Math.round(annoFillOpacity * 100);
   
   const editHtml = `<div class="meas-edit-inline" id="meas-edit-${id}">
     <label>Custom Label</label>
     <input type="text" id="measLabel-${id}" value="${currentLabel.replace(/"/g, '&quot;')}" placeholder="Auto: ${m.distance.formatted}${m.duct ? ' ' + m.duct.symbol + ' ' + m.duct.dims : ''}" oninput="updateMeasProp(${id},'labelText',this.value)">
     <label>Size</label>
     <div class="slider-row">
-      <input type="range" min="8" max="28" value="${currentSize}" step="1" oninput="updateMeasProp(${id},'labelSize',parseInt(this.value));this.nextElementSibling.textContent=this.value">
+      <input type="range" min="2" max="28" value="${currentSize}" step="1" oninput="updateMeasProp(${id},'labelSize',parseInt(this.value));this.nextElementSibling.textContent=this.value">
       <span class="slider-val">${currentSize}</span>
     </div>
-    <label>Opacity</label>
+    <label>Text Opacity</label>
     <div class="slider-row">
-      <input type="range" min="10" max="100" value="${currentOpacity}" step="5" oninput="updateMeasProp(${id},'labelOpacity',parseInt(this.value)/100);this.nextElementSibling.textContent=this.value+'%'">
-      <span class="slider-val">${currentOpacity}%</span>
+      <input type="range" min="10" max="100" value="${currentTextOp}" step="5" oninput="updateMeasProp(${id},'labelTextOpacity',parseInt(this.value)/100);this.nextElementSibling.textContent=this.value+'%'">
+      <span class="slider-val">${currentTextOp}%</span>
+    </div>
+    <label>Fill Opacity</label>
+    <div class="slider-row">
+      <input type="range" min="0" max="100" value="${currentFillOp}" step="5" oninput="updateMeasProp(${id},'labelFillOpacity',parseInt(this.value)/100);this.nextElementSibling.textContent=this.value+'%'">
+      <span class="slider-val">${currentFillOp}%</span>
     </div>
   </div>`;
   item.insertAdjacentHTML('beforeend', editHtml);
@@ -2749,9 +2769,11 @@ window.clearAllMeasurements = function() {
 // ---- Page name display/edit ----
 function syncAnnoSliders() {
   const sizeSlider = document.getElementById('annoSizeSlider');
-  const opacitySlider = document.getElementById('annoOpacitySlider');
+  const textOpSlider = document.getElementById('annoTextOpacitySlider');
+  const fillOpSlider = document.getElementById('annoFillOpacitySlider');
   if (sizeSlider) { sizeSlider.value = annoSize; document.getElementById('annoSizeVal').textContent = annoSize; }
-  if (opacitySlider) { opacitySlider.value = Math.round(annoOpacity * 100); document.getElementById('annoOpacityVal').textContent = Math.round(annoOpacity * 100) + '%'; }
+  if (textOpSlider) { textOpSlider.value = Math.round(annoTextOpacity * 100); document.getElementById('annoTextOpacityVal').textContent = Math.round(annoTextOpacity * 100) + '%'; }
+  if (fillOpSlider) { fillOpSlider.value = Math.round(annoFillOpacity * 100); document.getElementById('annoFillOpacityVal').textContent = Math.round(annoFillOpacity * 100) + '%'; }
 }
 
 function updatePageNameDisplay() {
