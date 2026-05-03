@@ -2672,213 +2672,209 @@ function getElbowCLRPx(duct) {
   return halfW * 3; // 1.5 * D equivalent
 }
 
-function drawFitting(points, fit, duct, color) {
-  // Revit-style: duct walls curve through the turn using bezier curves
-  // The wall endpoints from incoming segment connect to wall startpoints of outgoing segment
-  // with smooth curves. Control point = the corner where the walls would meet if extended.
-  if (fit.pointIdx < 1 || fit.pointIdx >= points.length - 1) return;
-  const V = points[fit.pointIdx];
-  const A = points[fit.pointIdx - 1];
-  const B = points[fit.pointIdx + 1];
-  if (!A || !B) return;
+// Line-line intersection: p1 + t*d1 = p2 + s*d2. Returns intersection point or null if parallel.
+function lineLineIntersect(p1, d1, p2, d2) {
+  const denom = d1.x * d2.y - d1.y * d2.x;
+  if (Math.abs(denom) < 0.0001) return null;
+  const t = ((p2.x - p1.x) * d2.y - (p2.y - p1.y) * d2.x) / denom;
+  return { x: p1.x + d1.x * t, y: p1.y + d1.y * t };
+}
 
+// Unified duct wall rendering: traces both wall paths as one continuous shape with bezier turns
+function drawDuctRun(points, duct, fittings, color) {
+  if (points.length < 2) return;
   const halfW = getDuctHalfWidthPx(duct);
+  const isSpiral = duct.type === 'spiral';
 
-  // Incoming segment direction (A → V)
-  const dIn = { x: V.x - A.x, y: V.y - A.y };
-  const lIn = Math.sqrt(dIn.x*dIn.x + dIn.y*dIn.y) || 1;
-  const uIn = { x: dIn.x/lIn, y: dIn.y/lIn };
-  // Perpendicular to incoming (left side = -uy, ux; right side = uy, -ux)
-  const nInL = { x: -uIn.y, y: uIn.x };  // left normal
-  const nInR = { x: uIn.y, y: -uIn.x };  // right normal
+  // Build fitting lookup by pointIdx for label rendering
+  const fittingMap = {};
+  for (const f of fittings) {
+    fittingMap[f.pointIdx] = f;
+  }
 
-  // Outgoing segment direction (V → B)
-  const dOut = { x: B.x - V.x, y: B.y - V.y };
-  const lOut = Math.sqrt(dOut.x*dOut.x + dOut.y*dOut.y) || 1;
-  const uOut = { x: dOut.x/lOut, y: dOut.y/lOut };
-  const nOutL = { x: -uOut.y, y: uOut.x };
-  const nOutR = { x: uOut.y, y: -uOut.x };
+  // Step 1: Compute direction and perpendicular for each segment
+  const segs = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const dx = points[i+1].x - points[i].x;
+    const dy = points[i+1].y - points[i].y;
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    segs.push({ ux, uy, nx: -uy, ny: ux, len });
+  }
 
-  // Wall endpoints at the vertex for incoming segment
-  // (where the straight walls of incoming segment end)
-  const inWallL = { x: V.x + nInL.x * halfW, y: V.y + nInL.y * halfW };
-  const inWallR = { x: V.x + nInR.x * halfW, y: V.y + nInR.y * halfW };
+  // Step 2: Build left and right wall paths with bezier curves at turns
+  // Each path element: { type: 'M'|'L'|'Q', ... }
+  const leftPath = [];
+  const rightPath = [];
 
-  // Wall startpoints at the vertex for outgoing segment
-  // (where the straight walls of outgoing segment begin)
-  const outWallL = { x: V.x + nOutL.x * halfW, y: V.y + nOutL.y * halfW };
-  const outWallR = { x: V.x + nOutR.x * halfW, y: V.y + nOutR.y * halfW };
+  // Start points
+  const s0 = segs[0];
+  const p0L = { x: points[0].x + s0.nx * halfW, y: points[0].y + s0.ny * halfW };
+  const p0R = { x: points[0].x - s0.nx * halfW, y: points[0].y - s0.ny * halfW };
+  leftPath.push({ type: 'M', x: p0L.x, y: p0L.y });
+  rightPath.push({ type: 'M', x: p0R.x, y: p0R.y });
 
-  // Control points for the bezier curves:
-  // The "corner" where each wall would intersect if extended straight through the vertex.
-  // For the left wall: extend incoming left wall forward and outgoing left wall backward, find intersection.
-  // For simplicity and reliability, use the vertex offset by halfW along the bisector of the two normals.
-  // But even simpler: quadratic bezier with control point at the extended corner.
-  
-  // Left wall corner: intersection of incoming-left-wall line and outgoing-left-wall line
-  const cpL = lineIntersect(
-    inWallL.x, inWallL.y, inWallL.x + uIn.x, inWallL.y + uIn.y,
-    outWallL.x, outWallL.y, outWallL.x - uOut.x, outWallL.y - uOut.y
-  );
-  // Right wall corner
-  const cpR = lineIntersect(
-    inWallR.x, inWallR.y, inWallR.x + uIn.x, inWallR.y + uIn.y,
-    outWallR.x, outWallR.y, outWallR.x - uOut.x, outWallR.y - uOut.y
-  );
+  // Track segment start/end wall positions for spiral seams
+  const segWalls = []; // per segment: { startL, startR, endL, endR }
 
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    // End of this segment (wall positions at points[i+1])
+    const endL = { x: points[i+1].x + seg.nx * halfW, y: points[i+1].y + seg.ny * halfW };
+    const endR = { x: points[i+1].x - seg.nx * halfW, y: points[i+1].y - seg.ny * halfW };
+
+    // Start of this segment (wall positions at points[i])
+    const startL = { x: points[i].x + seg.nx * halfW, y: points[i].y + seg.ny * halfW };
+    const startR = { x: points[i].x - seg.nx * halfW, y: points[i].y - seg.ny * halfW };
+    segWalls.push({ startL, startR, endL, endR });
+
+    // Add straight line to end of segment
+    leftPath.push({ type: 'L', x: endL.x, y: endL.y });
+    rightPath.push({ type: 'L', x: endR.x, y: endR.y });
+
+    // If there's a next segment, add bezier curve at the turn
+    if (i < segs.length - 1) {
+      const nextSeg = segs[i+1];
+      // Outgoing wall start at points[i+1]
+      const outL = { x: points[i+1].x + nextSeg.nx * halfW, y: points[i+1].y + nextSeg.ny * halfW };
+      const outR = { x: points[i+1].x - nextSeg.nx * halfW, y: points[i+1].y - nextSeg.ny * halfW };
+
+      // Control point: intersection of extended incoming wall line and extended outgoing wall line
+      const cpL = lineLineIntersect(
+        endL, { x: seg.ux, y: seg.uy },
+        outL, { x: -nextSeg.ux, y: -nextSeg.uy }
+      );
+      const cpR = lineLineIntersect(
+        endR, { x: seg.ux, y: seg.uy },
+        outR, { x: -nextSeg.ux, y: -nextSeg.uy }
+      );
+
+      if (cpL) {
+        leftPath.push({ type: 'Q', cpx: cpL.x, cpy: cpL.y, x: outL.x, y: outL.y });
+      } else {
+        leftPath.push({ type: 'L', x: outL.x, y: outL.y });
+      }
+      if (cpR) {
+        rightPath.push({ type: 'Q', cpx: cpR.x, cpy: cpR.y, x: outR.x, y: outR.y });
+      } else {
+        rightPath.push({ type: 'L', x: outR.x, y: outR.y });
+      }
+    }
+  }
+
+  // Step 3: Render wall paths
   mCtx.save();
   mCtx.strokeStyle = color;
   mCtx.lineWidth = 2.5;
   mCtx.setLineDash([]);
   mCtx.globalAlpha = 1.0;
 
-  // Left wall curve
-  if (cpL) {
+  function renderPath(path) {
     mCtx.beginPath();
-    mCtx.moveTo(inWallL.x, inWallL.y);
-    mCtx.quadraticCurveTo(cpL.x, cpL.y, outWallL.x, outWallL.y);
+    for (const cmd of path) {
+      if (cmd.type === 'M') mCtx.moveTo(cmd.x, cmd.y);
+      else if (cmd.type === 'L') mCtx.lineTo(cmd.x, cmd.y);
+      else if (cmd.type === 'Q') mCtx.quadraticCurveTo(cmd.cpx, cmd.cpy, cmd.x, cmd.y);
+    }
     mCtx.stroke();
-  } else {
-    mCtx.beginPath(); mCtx.moveTo(inWallL.x, inWallL.y); mCtx.lineTo(outWallL.x, outWallL.y); mCtx.stroke();
   }
 
-  // Right wall curve
-  if (cpR) {
-    mCtx.beginPath();
-    mCtx.moveTo(inWallR.x, inWallR.y);
-    mCtx.quadraticCurveTo(cpR.x, cpR.y, outWallR.x, outWallR.y);
-    mCtx.stroke();
-  } else {
-    mCtx.beginPath(); mCtx.moveTo(inWallR.x, inWallR.y); mCtx.lineTo(outWallR.x, outWallR.y); mCtx.stroke();
+  renderPath(leftPath);
+  renderPath(rightPath);
+
+  // End caps
+  const firstL = leftPath[0], firstR = rightPath[0];
+  mCtx.beginPath();
+  mCtx.moveTo(firstL.x, firstL.y);
+  mCtx.lineTo(firstR.x, firstR.y);
+  mCtx.stroke();
+
+  const lastL = leftPath[leftPath.length - 1];
+  const lastR = rightPath[rightPath.length - 1];
+  mCtx.beginPath();
+  mCtx.moveTo(lastL.x, lastL.y);
+  mCtx.lineTo(lastR.x, lastR.y);
+  mCtx.stroke();
+
+  // Step 4: Spiral seam lines (only on straight segments)
+  if (isSpiral) {
+    mCtx.lineWidth = 1.5;
+    mCtx.globalAlpha = 0.8;
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      const sw = segWalls[i];
+      const pitch = halfW * 2.5;
+      const numSeams = Math.floor(seg.len / pitch);
+      for (let s = 1; s <= numSeams; s++) {
+        const t1 = (s - 0.5) / (numSeams + 1);
+        const t2 = (s + 0.5) / (numSeams + 1);
+        const x1 = sw.startL.x + (sw.endL.x - sw.startL.x) * t1;
+        const y1 = sw.startL.y + (sw.endL.y - sw.startL.y) * t1;
+        const x2 = sw.startR.x + (sw.endR.x - sw.startR.x) * t2;
+        const y2 = sw.startR.y + (sw.endR.y - sw.startR.y) * t2;
+        mCtx.beginPath();
+        mCtx.moveTo(x1, y1);
+        mCtx.lineTo(x2, y2);
+        mCtx.stroke();
+      }
+    }
+    mCtx.globalAlpha = 1.0;
   }
 
-  // Fitting label
+  // Step 5: Fitting labels at turn points
   const effSize = (_currentRenderMeas && _currentRenderMeas.labelSize != null) ? _currentRenderMeas.labelSize : annoSize;
   const effTextOp = (_currentRenderMeas && _currentRenderMeas.labelTextOpacity != null) ? _currentRenderMeas.labelTextOpacity : annoTextOpacity;
   const effFillOp = (_currentRenderMeas && _currentRenderMeas.labelFillOpacity != null) ? _currentRenderMeas.labelFillOpacity : annoFillOpacity;
-  const labelSz = effSize * 0.65 * baseScale;
-  const renderSz = Math.max(28, labelSz);
-  const lsc = labelSz / renderSz;
-  mCtx.font = `bold ${renderSz}px -apple-system, BlinkMacSystemFont, sans-serif`;
-  const ftLabel = getFittingLabel(fit.type);
-  const tw = mCtx.measureText(ftLabel).width;
-  // Label outside the bend
-  const cross = uIn.x * uOut.y - uIn.y * uOut.x;
-  const outsideCP = cross > 0 ? cpR : cpL; // the outside wall corner
-  const lx = outsideCP ? outsideCP.x : V.x;
-  const ly = outsideCP ? outsideCP.y : V.y;
-  mCtx.save();
-  mCtx.translate(lx, ly); mCtx.scale(lsc, lsc);
-  mCtx.globalAlpha = effFillOp;
-  mCtx.fillStyle = 'rgba(22, 33, 62, 0.9)';
-  mCtx.beginPath(); mCtx.roundRect(-tw/2-3, -renderSz/2-3, tw+6, renderSz+6, 3); mCtx.fill();
-  mCtx.globalAlpha = effTextOp;
-  mCtx.fillStyle = '#00ff88'; mCtx.textAlign = 'center'; mCtx.textBaseline = 'middle';
-  mCtx.fillText(ftLabel, 0, 0);
-  mCtx.restore();
 
-  mCtx.restore();
-}
+  for (const fit of fittings) {
+    if (fit.pointIdx < 1 || fit.pointIdx >= points.length - 1) continue;
+    const segIdx = fit.pointIdx - 1; // incoming segment index
+    if (segIdx >= segs.length - 1) continue; // need a next segment too
+    const seg = segs[segIdx];
+    const nextSeg = segs[segIdx + 1];
+    const V = points[fit.pointIdx];
 
-// Line intersection helper: two lines defined by point+direction
-// Line 1: (x1,y1) toward (x2,y2); Line 2: (x3,y3) toward (x4,y4)
-function lineIntersect(x1,y1,x2,y2, x3,y3,x4,y4) {
-  const dx1 = x2-x1, dy1 = y2-y1;
-  const dx2 = x4-x3, dy2 = y4-y3;
-  const denom = dx1*dy2 - dy1*dx2;
-  if (Math.abs(denom) < 0.0001) return null; // parallel
-  const t = ((x3-x1)*dy2 - (y3-y1)*dx2) / denom;
-  return { x: x1 + dx1*t, y: y1 + dy1*t };
-}
+    // Determine outside of the bend via cross product
+    const cross = seg.ux * nextSeg.uy - seg.uy * nextSeg.ux;
 
-function drawSpiralDuct(points, duct, color, trimPoints) {
-  const diam = parseFloat(duct.dims) || 14;
-  const ductHalfWidth = getDuctHalfWidthPx(duct);
-  
-  // Build a set of trim distances per point index
-  // trimPoints: [{pointIdx, trimLength}] — trim that many px before/after the turn point
-  const trimBefore = {}; // keyed by segment end index (i): trim from end of segment i-1→i
-  const trimAfter = {};  // keyed by segment start index (i-1): trim from start of segment i-1→i
-  if (trimPoints) {
-    for (const tp of trimPoints) {
-      const idx = tp.pointIdx;
-      // The segment ending at this point (segment idx-1 → idx): trim its end
-      trimBefore[idx] = tp.trimLength;
-      // The segment starting from this point (segment idx → idx+1): trim its start
-      trimAfter[idx] = tp.trimLength;
-    }
-  }
-  
-  for (let i = 1; i < points.length; i++) {
-    const ax = points[i-1].x, ay = points[i-1].y;
-    const bx = points[i].x, by = points[i].y;
-    const dx = bx - ax, dy = by - ay;
-    const len = Math.sqrt(dx*dx + dy*dy);
-    if (len < 1) continue;
-    
-    const ux = dx / len, uy = dy / len;
-    const nx = -uy * ductHalfWidth, ny = ux * ductHalfWidth;
-    
-    // Calculate trim distances for this segment
-    const trimStart = trimAfter[i-1] || 0;  // trim from start (point i-1 is a fitting)
-    const trimEnd = trimBefore[i] || 0;      // trim from end (point i is a fitting)
-    const effectiveLen = len - trimStart - trimEnd;
-    if (effectiveLen < 1) continue;
-    
-    // Trimmed start and end points along the segment
-    const sax = ax + ux * trimStart, say = ay + uy * trimStart;
-    const sbx = bx - ux * trimEnd, sby = by - uy * trimEnd;
-    
-    // Outer walls — solid, full opacity
-    mCtx.strokeStyle = color;
-    mCtx.lineWidth = 2.5;
-    mCtx.globalAlpha = 1.0;
-    mCtx.setLineDash([]);
-    
+    // Compute control point on the outside wall for label positioning
+    const endWall = cross > 0
+      ? { x: V.x - seg.nx * halfW, y: V.y - seg.ny * halfW }   // right wall (outside)
+      : { x: V.x + seg.nx * halfW, y: V.y + seg.ny * halfW };  // left wall (outside)
+    const outWall = cross > 0
+      ? { x: V.x - nextSeg.nx * halfW, y: V.y - nextSeg.ny * halfW }
+      : { x: V.x + nextSeg.nx * halfW, y: V.y + nextSeg.ny * halfW };
+    const cp = lineLineIntersect(
+      endWall, { x: seg.ux, y: seg.uy },
+      outWall, { x: -nextSeg.ux, y: -nextSeg.uy }
+    );
+    const lx = cp ? cp.x : V.x;
+    const ly = cp ? cp.y : V.y;
+
+    const labelSz = effSize * 0.65 * baseScale;
+    const renderSz = Math.max(28, labelSz);
+    const lsc = labelSz / renderSz;
+    mCtx.font = `bold ${renderSz}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    const ftLabel = getFittingLabel(fit.type);
+    const tw = mCtx.measureText(ftLabel).width;
+
+    mCtx.save();
+    mCtx.translate(lx, ly);
+    mCtx.scale(lsc, lsc);
+    mCtx.globalAlpha = effFillOp;
+    mCtx.fillStyle = 'rgba(22, 33, 62, 0.9)';
     mCtx.beginPath();
-    mCtx.moveTo(sax + nx, say + ny);
-    mCtx.lineTo(sbx + nx, sby + ny);
-    mCtx.stroke();
-    
-    mCtx.beginPath();
-    mCtx.moveTo(sax - nx, say - ny);
-    mCtx.lineTo(sbx - nx, sby - ny);
-    mCtx.stroke();
-    
-    // Spiral seam lines within the trimmed segment
-    const pitch = ductHalfWidth * 2.5;
-    const numSeams = Math.floor(effectiveLen / pitch);
-    mCtx.lineWidth = 1.5;
-    mCtx.globalAlpha = 0.8;
-    for (let s = 1; s <= numSeams; s++) {
-      const t1 = (s - 0.5) / (numSeams + 1);
-      const t2 = (s + 0.5) / (numSeams + 1);
-      const x1 = sax + (sbx - sax) * t1 + nx;
-      const y1 = say + (sby - say) * t1 + ny;
-      const x2 = sax + (sbx - sax) * t2 - nx;
-      const y2 = say + (sby - say) * t2 - ny;
-      mCtx.beginPath();
-      mCtx.moveTo(x1, y1);
-      mCtx.lineTo(x2, y2);
-      mCtx.stroke();
-    }
-    mCtx.globalAlpha = 1.0;
-    
-    // End caps — only at actual duct endpoints, not at fittings
-    mCtx.lineWidth = 2.5;
-    if (i === 1 && !trimAfter[0]) {
-      mCtx.beginPath();
-      mCtx.moveTo(sax + nx, say + ny);
-      mCtx.lineTo(sax - nx, say - ny);
-      mCtx.stroke();
-    }
-    if (i === points.length - 1 && !trimBefore[i]) {
-      mCtx.beginPath();
-      mCtx.moveTo(sbx + nx, sby + ny);
-      mCtx.lineTo(sbx - nx, sby - ny);
-      mCtx.stroke();
-    }
+    mCtx.roundRect(-tw/2 - 3, -renderSz/2 - 3, tw + 6, renderSz + 6, 3);
+    mCtx.fill();
+    mCtx.globalAlpha = effTextOp;
+    mCtx.fillStyle = '#00ff88';
+    mCtx.textAlign = 'center';
+    mCtx.textBaseline = 'middle';
+    mCtx.fillText(ftLabel, 0, 0);
+    mCtx.restore();
   }
+
+  mCtx.restore();
 }
 
 function drawMeasurementLine(points, label, duct, color, isDashed) {
@@ -2892,59 +2888,29 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
     return;
   }
   
-  // Skip centerline and endpoint dots for spiral ducts (walls already show the run)
-  const isSpiral = duct && duct.type === 'spiral';
-  
-  // Build fitting trim data for this measurement
+  // Build fittings list for this measurement
   const fittings = (_currentRenderMeas && _currentRenderMeas.fittings) ? _currentRenderMeas.fittings : [];
-  let trimPoints = null;
-  if (duct && fittings.length > 0) {
-    trimPoints = fittings.map(f => ({
-      pointIdx: f.pointIdx,
-      trimLength: getElbowCLRPx(duct)
-    }));
-  }
   
-  if (!isSpiral) {
+  // For duct-tagged runs, draw the unified duct walls (no centerline)
+  // For plain measurements, draw the centerline
+  if (duct && points.length >= 2) {
+    drawDuctRun(points, duct, fittings, color);
+  } else {
     mCtx.strokeStyle = color;
     mCtx.lineWidth = 2.5;
     if (isDashed) mCtx.setLineDash([8, 4]);
     else mCtx.setLineDash([]);
     
-    // Draw centerline segments, trimming at elbow tangent points
-    if (trimPoints && trimPoints.length > 0) {
-      const trimBefore = {};
-      const trimAfter = {};
-      for (const tp of trimPoints) {
-        trimBefore[tp.pointIdx] = tp.trimLength;
-        trimAfter[tp.pointIdx] = tp.trimLength;
-      }
-      for (let i = 1; i < points.length; i++) {
-        const ax = points[i-1].x, ay = points[i-1].y;
-        const bx = points[i].x, by = points[i].y;
-        const dx = bx - ax, dy = by - ay;
-        const len = Math.sqrt(dx*dx + dy*dy);
-        if (len < 1) continue;
-        const ux = dx / len, uy = dy / len;
-        const tStart = trimAfter[i-1] || 0;
-        const tEnd = trimBefore[i] || 0;
-        if (len - tStart - tEnd < 1) continue;
-        mCtx.beginPath();
-        mCtx.moveTo(ax + ux * tStart, ay + uy * tStart);
-        mCtx.lineTo(bx - ux * tEnd, by - uy * tEnd);
-        mCtx.stroke();
-      }
-    } else {
-      mCtx.beginPath();
-      mCtx.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++) {
+    mCtx.beginPath();
+    mCtx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
         mCtx.lineTo(points[i].x, points[i].y);
-      }
-      mCtx.stroke();
     }
+    mCtx.stroke();
     mCtx.setLineDash([]);
   }
   
+  // Draw endpoint dots (for all measurements)
   for (const p of points) {
     mCtx.fillStyle = color;
     mCtx.beginPath();
@@ -2953,16 +2919,6 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
     mCtx.strokeStyle = '#1a1a2e';
     mCtx.lineWidth = 1;
     mCtx.stroke();
-  }
-  
-  // Draw spiral duct representation if applicable
-  if (duct && duct.type === 'spiral' && points.length >= 2) {
-    drawSpiralDuct(points, duct, color, trimPoints);
-  }
-  
-  // Draw fittings at turn points
-  for (const fit of fittings) {
-    drawFitting(points, fit, duct, color);
   }
 
   const midIdx = Math.floor(points.length / 2);
