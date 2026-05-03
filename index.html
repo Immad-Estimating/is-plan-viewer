@@ -59,7 +59,7 @@
   .project-card .card-actions { display: flex; gap: 4px; }
   .project-card .card-actions button { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 3px; }
   .project-card .card-actions button:hover { color: #e94560; background: rgba(233,69,96,0.1); }
-  .stage-badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; text-transform: uppercase; }
+  .stage-badge { display: inline-block; font-size: 9px; padding: 2px 5px; border-radius: 3px; font-weight: 600; text-transform: uppercase; white-space: nowrap; line-height: 1.2; }
   .stage-badge.award { background: rgba(0,255,136,0.15); color: #00ff88; }
   .stage-badge.bid { background: rgba(233,69,96,0.15); color: #e94560; }
   .stage-badge.budgeting { background: rgba(255,170,0,0.15); color: #ffaa00; }
@@ -235,7 +235,7 @@
   .dashboard-left { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; transition: box-shadow 0.2s; outline: 2px solid transparent; outline-offset: -2px; }
   .dashboard-left.drop-hover { outline-color: #e94560; box-shadow: inset 0 0 30px rgba(233,69,96,0.15), 0 0 15px rgba(233,69,96,0.3); }
   .dashboard-content { flex: 1; overflow-y: auto; padding: 20px; }
-  .dashboard-right { width: 440px; flex-shrink: 0; display: flex; flex-direction: column; border-left: 1px solid #0f3460; background: #16213e; overflow: hidden; transition: width 0.25s ease, opacity 0.25s ease; }
+  .dashboard-right { width: 520px; min-width: 320px; max-width: 80vw; flex-shrink: 0; display: flex; flex-direction: column; border-left: 1px solid #0f3460; background: #16213e; overflow: hidden; transition: width 0.25s ease, opacity 0.25s ease; }
   .dashboard-right.collapsed { width: 0; border-left: none; opacity: 0; overflow: hidden; }
   .qb-panel-header { padding: 10px 14px; border-bottom: 1px solid #0f3460; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .qb-panel-header h3 { font-size: 14px; color: #e94560; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -245,7 +245,7 @@
   .qb-panel-search input { width: 100%; background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 8px 10px; border-radius: 4px; font-size: 13px; }
   .qb-panel-search input:focus { outline: none; border-color: #e94560; box-shadow: 0 0 6px rgba(233,69,96,0.2); }
   .qb-table-wrap { flex: 1; overflow-y: auto; padding: 0 6px 6px; }
-  .qb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .qb-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
   .qb-table th { text-align: left; color: #a0a0c0; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 1px solid #0f3460; position: sticky; top: 0; background: #16213e; z-index: 1; }
   .qb-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
   .qb-table th.sortable:hover { color: #e0e0e0; }
@@ -254,7 +254,7 @@
   .qb-table th .col-filter-btn { font-size: 13px; opacity: 0.4; cursor: pointer; margin-left: 4px; position: relative; }
   .qb-table th .col-filter-btn:hover { opacity: 1; }
   .qb-table th .col-filter-btn.filtered { opacity: 1; color: #00ff88; }
-  .col-filter-dropdown { display: none; position: absolute; top: 100%; right: 0; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 6px; min-width: 160px; max-height: 220px; overflow-y: auto; z-index: 50; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+  .col-filter-dropdown { display: none; position: fixed; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 8px; min-width: 200px; max-width: 280px; max-height: 320px; overflow-y: auto; z-index: 500; box-shadow: 0 8px 30px rgba(0,0,0,0.7); }
   .col-filter-dropdown.open { display: block; }
   .col-filter-dropdown label { display: flex; align-items: center; gap: 6px; padding: 4px 6px; font-size: 12px; color: #e0e0e0; cursor: pointer; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .col-filter-dropdown label:hover { background: #0f3460; }
@@ -268,11 +268,13 @@
   .qb-table tr.qb-row.imported:hover { background: rgba(0,255,136,0.14); }
   .qb-table tr.qb-row:active { cursor: grabbing; }
   .qb-table td { padding: 8px 8px; vertical-align: middle; }
-  .qb-table .qb-proj-name { color: #e0e0e0; font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .qb-table .qb-client { color: #a0a0c0; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qb-table .qb-proj-name { color: #e0e0e0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qb-table .qb-client { color: #a0a0c0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .qb-table .qb-modified { color: #a0a0c0; font-size: 12px; white-space: nowrap; }
   .qb-imported-tag { display: inline-block; font-size: 10px; color: #00ff88; margin-left: 4px; font-weight: 600; }
   .qb-count { font-size: 12px; color: #a0a0c0; padding: 0 14px 6px; flex-shrink: 0; }
+  .qb-resize-handle { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 20; }
+  .qb-resize-handle:hover, .qb-resize-handle.active { background: rgba(233,69,96,0.4); }
   .collapse-toggle { position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 10; background: #16213e; border: 1px solid #0f3460; border-right: none; color: #a0a0c0; padding: 10px 3px; border-radius: 4px 0 0 4px; cursor: pointer; font-size: 11px; }
   .collapse-toggle:hover { background: #0f3460; color: #e0e0e0; }
 
@@ -315,7 +317,7 @@
     <div class="dashboard-left" id="dashboardLeft">
       <div class="dashboard-content" id="dashboardContent"></div>
     </div>
-    <div class="dashboard-right" id="dashboardRight">
+    <div class="dashboard-right" id="dashboardRight"><div class="qb-resize-handle" id="qbResizeHandle"></div>
       <div class="qb-panel-header">
         <h3>Active Bids (Quickbase)</h3>
         <a href="https://reeisinc.quickbase.com/db/bkkh6iiww?a=q&qid=9" target="_blank" rel="noopener" title="Open Quickbase Bid Table" style="background:none;border:1px solid #0f3460;color:#a0a0c0;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;text-decoration:none;flex-shrink:0;transition:background 0.15s;display:inline-flex;align-items:center;" onmouseover="this.style.background='#0f3460';this.style.color='#e0e0e0'" onmouseout="this.style.background='none';this.style.color='#a0a0c0'">↗ QB</a>
@@ -328,7 +330,7 @@
       <div class="qb-count" id="qbCount"></div>
       <div class="qb-table-wrap">
         <table class="qb-table">
-          <thead><tr>
+          <colgroup><col style="width:38%"><col style="width:22%"><col style="width:22%"><col style="width:18%"></colgroup><thead><tr>
             <th class="sortable" data-sort="name" style="position:relative"><span onclick="sortQBPanel('name')" style="cursor:pointer">Project <span class="sort-arrow" id="sortArrow-name"></span></span><span class="col-filter-btn" id="filterBtn-name" onclick="event.stopPropagation();toggleColFilter('name')">⧩</span><div class="col-filter-dropdown" id="filterDrop-name"></div></th>
             <th class="sortable" data-sort="client" style="position:relative"><span onclick="sortQBPanel('client')" style="cursor:pointer">Client <span class="sort-arrow" id="sortArrow-client"></span></span><span class="col-filter-btn" id="filterBtn-client" onclick="event.stopPropagation();toggleColFilter('client')">⧩</span><div class="col-filter-dropdown" id="filterDrop-client"></div></th>
             <th class="sortable" data-sort="stage" style="position:relative"><span onclick="sortQBPanel('stage')" style="cursor:pointer">Stage <span class="sort-arrow" id="sortArrow-stage"></span></span><span class="col-filter-btn" id="filterBtn-stage" onclick="event.stopPropagation();toggleColFilter('stage')">⧩</span><div class="col-filter-dropdown" id="filterDrop-stage"></div></th>
@@ -943,6 +945,7 @@ window.toggleColFilter = function(field) {
       <label><input type="radio" name="dateFilter" value="1y" ${sel==='1y' ? 'checked' : ''}> Last year</label>
       <div class="filter-actions"><button onclick="applyDateFilter()">Apply</button><button onclick="clearColFilter('modified')">Clear</button></div>
     `;
+    positionFilterDropdown(field, drop);
     drop.classList.add('open');
     return;
   }
@@ -966,6 +969,7 @@ window.toggleColFilter = function(field) {
   }).join('');
   html += `<div class="filter-actions"><button onclick="applyColFilter('${field}')">Apply</button><button onclick="clearColFilter('${field}')">Clear</button></div>`;
   drop.innerHTML = html;
+  positionFilterDropdown(field, drop);
   drop.classList.add('open');
 };
 
@@ -1016,6 +1020,45 @@ document.addEventListener('click', (e) => {
     ['name','client','stage','modified'].forEach(f => document.getElementById(`filterDrop-${f}`)?.classList.remove('open'));
   }
 });
+
+function positionFilterDropdown(field, drop) {
+  const btn = document.getElementById(`filterBtn-${field}`);
+  if (!btn) return;
+  const rect = btn.getBoundingClientRect();
+  drop.style.top = (rect.bottom + 4) + 'px';
+  // Try to align right edge with button, but keep within viewport
+  const dropWidth = 240;
+  let left = rect.right - dropWidth;
+  if (left < 8) left = 8;
+  if (left + dropWidth > window.innerWidth - 8) left = window.innerWidth - dropWidth - 8;
+  drop.style.left = left + 'px';
+}
+
+// QB panel resize handle
+(function() {
+  const handle = document.getElementById('qbResizeHandle');
+  const panel = document.getElementById('dashboardRight');
+  if (!handle || !panel) return;
+  let startX, startW;
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = panel.offsetWidth;
+    handle.classList.add('active');
+    const onMove = (e) => {
+      const delta = startX - e.clientX;
+      const newW = Math.max(320, Math.min(window.innerWidth * 0.8, startW + delta));
+      panel.style.width = newW + 'px';
+    };
+    const onUp = () => {
+      handle.classList.remove('active');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+})();
 
 window.refreshQBPanel = async function() {
   try {
