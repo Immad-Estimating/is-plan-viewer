@@ -1782,8 +1782,13 @@ async function loadDrawingIntoViewer(projectId, drawingId) {
   currentPage = 1;
   dropZone.classList.add('hidden');
   await renderPage();
-  fitToScreen();
-  updateScaleLabel();
+  // Wait for layout to settle before fitting (viewer may have just become visible)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      fitToScreen();
+      updateScaleLabel();
+    });
+  });
 }
 
 // ---- Coordinate helpers ----
