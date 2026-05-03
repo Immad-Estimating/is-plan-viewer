@@ -112,7 +112,7 @@
   .upload-zone .uz-btn { display: inline-block; margin-top: 8px; background: #e94560; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
   
   .drawing-list { display: flex; flex-direction: column; gap: 8px; }
-  .drawing-item { background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: border-color 0.15s; }
+  a.drawing-item, .drawing-item { display: flex; text-decoration: none; color: inherit; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 12px 16px; align-items: center; justify-content: space-between; cursor: pointer; transition: border-color 0.15s; }
   .drawing-item:hover { border-color: #e94560; }
   .drawing-item .di-info { flex: 1; }
   .drawing-item .di-name { font-size: 14px; font-weight: 500; }
@@ -1380,7 +1380,7 @@ async function renderDrawingManager(projectId) {
       const size = d.fileSize ? formatFileSize(d.fileSize) : '';
       const pages = d.pageCount ? `${d.pageCount} page${d.pageCount !== 1 ? 's' : ''}` : '';
       const safeName = escapeHtml(d.fileName).replace(/'/g, "\\'");
-      html += `<div class="drawing-item" onclick="openDrawing(${projectId}, ${d.id})">
+      html += `<a class="drawing-item" href="#/project/${projectId}/drawing/${d.id}">
         <div class="di-info">
           <div class="di-name" id="drawingName-${d.id}">📄 ${escapeHtml(d.fileName)}</div>
           <div class="di-meta">
@@ -1390,11 +1390,11 @@ async function renderDrawingManager(projectId) {
           </div>
         </div>
         <div class="di-actions">
-          <button onclick="event.stopPropagation(); renameDrawing(${d.id})" title="Rename">✏️</button>
-          <button onclick="event.stopPropagation(); duplicateDrawing(${d.id})" title="Duplicate">📋</button>
-          <button onclick="event.stopPropagation(); deleteDrawing(${d.id}, '${safeName}')" title="Delete">🗑️</button>
+          <button onclick="event.stopPropagation(); event.preventDefault(); renameDrawing(${d.id})" title="Rename">✏️</button>
+          <button onclick="event.stopPropagation(); event.preventDefault(); duplicateDrawing(${d.id})" title="Duplicate">📋</button>
+          <button onclick="event.stopPropagation(); event.preventDefault(); deleteDrawing(${d.id}, '${safeName}')" title="Delete">🗑️</button>
         </div>
-      </div>`;
+      </a>`;
     }
     html += `</div>`;
   }
