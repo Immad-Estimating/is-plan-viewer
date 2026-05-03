@@ -367,7 +367,7 @@
     <button id="zoomOutBtn" onclick="zoom(-1)" title="Zoom Out (-)">−</button>
     <span class="zoom-display" id="zoomDisplay">100%</span>
     <button id="zoomInBtn" onclick="zoom(1)" title="Zoom In (+)">+</button>
-    <button onclick="fitToScreen()" title="Fit to Screen">Fit</button>
+    <button onclick="fitToScreen()" title="Fit to Screen (F)">Fit</button>
     <div class="separator"></div>
     <button onclick="prevPage()" title="Previous Page">◀</button>
     <span class="page-info" id="pageInfo">No PDF loaded</span>
@@ -1940,7 +1940,7 @@ window.addEventListener('keydown', (e) => {
   if (!pdfDoc) return;
   if (e.key === '+' || e.key === '=') { e.preventDefault(); window.zoom(1); }
   else if (e.key === '-') { e.preventDefault(); window.zoom(-1); }
-  else if (e.key === '0') { e.preventDefault(); window.fitToScreen(); }
+  else if (e.key === '0' || e.key === 'f' || e.key === 'F') { e.preventDefault(); window.fitToScreen(); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); window.prevPage(); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); window.nextPage(); }
   else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
@@ -2606,7 +2606,8 @@ window.prevPage = async function() {
   await saveCurrentPageData();
   currentPage--;
   await renderPage();
-  fitToScreen();
+  // Keep current zoom/pan — don't fitToScreen
+  applyTransform();
   saveLastPage();
 };
 
@@ -2615,7 +2616,8 @@ window.nextPage = async function() {
   await saveCurrentPageData();
   currentPage++;
   await renderPage();
-  fitToScreen();
+  // Keep current zoom/pan — don't fitToScreen
+  applyTransform();
   saveLastPage();
 };
 
