@@ -2418,8 +2418,8 @@ function drawSpiralDuct(points, duct, color) {
     
     // Two parallel lines (outer walls of duct)
     mCtx.strokeStyle = color;
-    mCtx.lineWidth = 1.5;
-    mCtx.globalAlpha = 0.7;
+    mCtx.lineWidth = 2.5;
+    mCtx.globalAlpha = 1.0;
     mCtx.setLineDash([]);
     
     mCtx.beginPath();
@@ -2433,10 +2433,10 @@ function drawSpiralDuct(points, duct, color) {
     mCtx.stroke();
     
     // Spiral seam hatch marks (diagonal lines across the duct)
-    const spacing = ductHalfWidth * 2.5; // space between hash marks
+    const spacing = ductHalfWidth * 2.0; // space between hash marks
     const numHatches = Math.floor(len / spacing);
-    mCtx.lineWidth = 1;
-    mCtx.globalAlpha = 0.4;
+    mCtx.lineWidth = 1.5;
+    mCtx.globalAlpha = 0.7;
     for (let h = 1; h <= numHatches; h++) {
       const t = h / (numHatches + 1);
       const cx = ax + dx * t;
@@ -2454,9 +2454,9 @@ function drawSpiralDuct(points, duct, color) {
     
     mCtx.globalAlpha = 1.0;
     
-    // End caps (small arcs at start and end)
-    mCtx.lineWidth = 1.5;
-    mCtx.globalAlpha = 0.7;
+    // End caps
+    mCtx.lineWidth = 2.5;
+    mCtx.globalAlpha = 1.0;
     if (i === 1) {
       mCtx.beginPath();
       mCtx.moveTo(ax + nx, ay + ny);
@@ -2484,18 +2484,23 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
     return;
   }
   
-  mCtx.strokeStyle = color;
-  mCtx.lineWidth = 2.5;
-  if (isDashed) mCtx.setLineDash([8, 4]);
-  else mCtx.setLineDash([]);
+  // Skip centerline and endpoint dots for spiral ducts (walls already show the run)
+  const isSpiral = duct && duct.type === 'spiral';
   
-  mCtx.beginPath();
-  mCtx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) {
-    mCtx.lineTo(points[i].x, points[i].y);
+  if (!isSpiral) {
+    mCtx.strokeStyle = color;
+    mCtx.lineWidth = 2.5;
+    if (isDashed) mCtx.setLineDash([8, 4]);
+    else mCtx.setLineDash([]);
+    
+    mCtx.beginPath();
+    mCtx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      mCtx.lineTo(points[i].x, points[i].y);
+    }
+    mCtx.stroke();
+    mCtx.setLineDash([]);
   }
-  mCtx.stroke();
-  mCtx.setLineDash([]);
   
   for (const p of points) {
     mCtx.fillStyle = color;
