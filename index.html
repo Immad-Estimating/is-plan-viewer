@@ -168,6 +168,7 @@
         <h4>Architectural</h4>
         <button class="scale-option" data-type="arch" data-ratio="48">1/4" = 1'-0"</button>
         <button class="scale-option" data-type="arch" data-ratio="96">1/8" = 1'-0"</button>
+        <button class="scale-option" data-type="arch" data-ratio="128">3/32" = 1'-0"</button>
         <button class="scale-option" data-type="arch" data-ratio="64">3/16" = 1'-0"</button>
         <button class="scale-option" data-type="arch" data-ratio="24">1/2" = 1'-0"</button>
         <button class="scale-option" data-type="arch" data-ratio="12">1" = 1'-0"</button>
@@ -393,6 +394,8 @@ viewer.addEventListener('dblclick', (e) => {
 // Mouse wheel zoom
 viewer.addEventListener('wheel', (e) => {
   if (!pdfDoc) return;
+  // Let the scale popover scroll naturally when open
+  if (e.target.closest('.scale-popover')) return;
   e.preventDefault();
   const rect = viewer.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
