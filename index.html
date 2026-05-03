@@ -1765,30 +1765,41 @@ async function loadDrawingIntoViewer(projectId, drawingId) {
   activeDrawingId = drawingId;
   activeProjectId = projectId;
   
-  const drawing = await idbGet('drawings', drawingId);
-  if (!drawing || !drawing.pdfBlob) {
-    navigateTo(`#/project/${projectId}`);
-    return;
-  }
-  
-  document.getElementById('viewerDrawingName').textContent = drawing.fileName;
-  
-  // Load page data
-  await loadPageDataForDrawing(drawingId);
-  
-  // Load PDF
-  const arrayBuffer = await drawing.pdfBlob.arrayBuffer();
-  pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  currentPage = 1;
-  dropZone.classList.add('hidden');
-  await renderPage();
-  // Wait for layout to settle before fitting (viewer may have just become visible)
-  requestAnimationFrame(() => {
+  try {
+    const drawing = await idbGet('drawings', drawingId);
+    console.log('[viewer] drawing loaded:', drawingId, drawing ? 'found' : 'NOT FOUND', drawing ? `blob=${!!drawing.pdfBlob} size=${drawing.pdfBlob?.size}` : '');
+    if (!drawing || !drawing.pdfBlob) {
+      console.error('[viewer] No drawing or no pdfBlob for id:', drawingId);
+      navigateTo(`#/project/${projectId}`);
+      return;
+    }
+    
+    document.getElementById('viewerDrawingName').textContent = drawing.fileName;
+    
+    // Load page data
+    await loadPageDataForDrawing(drawingId);
+    
+    // Load PDF from blob
+    const arrayBuffer = await drawing.pdfBlob.arrayBuffer();
+    console.log('[viewer] arrayBuffer size:', arrayBuffer.byteLength);
+    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    console.log('[viewer] PDF loaded, pages:', pdfDoc.numPages);
+    currentPage = 1;
+    dropZone.classList.add('hidden');
+    await renderPage();
+    console.log('[viewer] renderPage done, canvas:', canvas.width, 'x', canvas.height);
+    // Wait for layout to settle before fitting (viewer may have just become visible)
     requestAnimationFrame(() => {
-      fitToScreen();
-      updateScaleLabel();
+      requestAnimationFrame(() => {
+        const rect = viewer.getBoundingClientRect();
+        console.log('[viewer] viewer rect:', rect.width, 'x', rect.height);
+        fitToScreen();
+        updateScaleLabel();
+      });
     });
-  });
+  } catch (err) {
+    console.error('[viewer] Error loading drawing:', err);
+  }
 }
 
 // ---- Coordinate helpers ----
