@@ -34,6 +34,13 @@
   .page-name-editable[contenteditable="true"] { outline: none; border-color: #e94560; color: #fff; max-width: 300px; }
   
   /* Annotation controls */
+  .duct-draw-bar { display: none; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 55; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 6px 14px; gap: 10px; align-items: center; box-shadow: 0 4px 16px rgba(0,0,0,0.4); font-size: 13px; white-space: nowrap; }
+  .duct-draw-bar.active { display: flex; }
+  .duct-draw-bar label { color: #a0a0c0; font-size: 12px; }
+  .duct-draw-bar select, .duct-draw-bar input { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-size: 13px; }
+  .duct-draw-bar select:focus, .duct-draw-bar input:focus { outline: none; border-color: #e94560; }
+  .duct-draw-bar .dd-dim { width: 55px; text-align: center; font-weight: 600; }
+  .duct-draw-bar .dd-hint { color: #a0a0c0; font-size: 11px; }
   .anno-controls { position: absolute; top: 8px; right: 16px; z-index: 50; display: flex; gap: 8px; align-items: center; }
   .anno-controls.panel-open { right: 316px; }
   .anno-btn { background: #16213e; border: 1px solid #0f3460; color: #a0a0c0; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; transition: background 0.15s; }
@@ -400,6 +407,7 @@
     <button onclick="nextPage()" title="Next Page">▶</button>
     <div class="separator"></div>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)">📐 Measure</button>
+    <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (S)">◎ Duct</button>
     <button id="panelBtn" onclick="togglePanel()" title="Measurements Panel">📋</button>
   </div>
 
@@ -492,7 +500,19 @@
       </div>
 
       <!-- Panel toggle -->
-      <!-- Annotation controls -->
+      <!-- Duct draw config bar -->
+    <div class="duct-draw-bar" id="ductDrawBar">
+      <select id="ddType" onchange="ddTypeChanged()">
+        <option value="spiral">◎ Spiral</option>
+        <option value="round">● Round</option>
+        <option value="rect">▬ Rect</option>
+        <option value="oval">⬭ Oval</option>
+      </select>
+      <span id="ddDiamGroup"><label>⌀</label><input type="text" id="ddDiam" class="dd-dim" value="14"></span>
+      <span id="ddRectGroup" style="display:none"><label>W</label><input type="text" id="ddW" class="dd-dim" value="24"><label>×</label><input type="text" id="ddH" class="dd-dim" value="12"></span>
+      <span class="dd-hint">Click to draw · Enter to finish</span>
+    </div>
+    <!-- Annotation controls -->
     <div class="anno-controls" id="annoControls">
       <button class="anno-btn" id="annoBtn" onclick="toggleAnnoPopover()">🏷️ Labels</button>
       <div class="anno-popover" id="annoPopover">
@@ -1728,6 +1748,7 @@ let startX, startY;
 
 // Measurement state
 let measureMode = false;
+let ductDrawMode = false;
 let measPoints = [];
 let mousePos = null;
 let calibrationMode = false;
@@ -1933,7 +1954,7 @@ viewer.addEventListener('click', (e) => {
   if (!pdfDoc) return;
   if (isPanning) return;
   
-  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls')) {
+  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar')) {
     return;
   }
 
@@ -2010,6 +2031,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') { e.preventDefault(); window.prevPage(); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); window.nextPage(); }
   else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
+  else if (e.key === 's' || e.key === 'S') { e.preventDefault(); window.toggleDuctDraw(); }
   else if (e.key === 'Escape') {
     if (calibrationMode) { cancelCalibration(); return; }
     if (measPoints.length > 0) { measPoints = []; drawMeasureOverlay(); }
@@ -2296,6 +2318,7 @@ function renderSavedCustomScales() {
 
 // ---- Measure mode ----
 window.toggleMeasureMode = function() {
+  if (ductDrawMode) toggleDuctDraw();
   measureMode = !measureMode;
   const btn = document.getElementById('measureBtn');
   btn.classList.toggle('active', measureMode);
@@ -2304,6 +2327,43 @@ window.toggleMeasureMode = function() {
     measPoints = [];
     drawMeasureOverlay();
   }
+};
+
+window.toggleDuctDraw = function() {
+  ductDrawMode = !ductDrawMode;
+  if (ductDrawMode && !measureMode) {
+    measureMode = true; // duct draw uses the measure click system
+  }
+  document.getElementById('ductDrawBtn').classList.toggle('active', ductDrawMode);
+  document.getElementById('measureBtn').classList.toggle('active', measureMode && !ductDrawMode);
+  viewer.classList.toggle('measuring', measureMode);
+  document.getElementById('ductDrawBar').classList.toggle('active', ductDrawMode);
+  if (!ductDrawMode) {
+    measPoints = [];
+    measureMode = false;
+    viewer.classList.remove('measuring');
+    document.getElementById('measureBtn').classList.remove('active');
+    drawMeasureOverlay();
+  }
+};
+
+window.ddTypeChanged = function() {
+  const t = document.getElementById('ddType').value;
+  const isRect = (t === 'rect' || t === 'oval');
+  document.getElementById('ddDiamGroup').style.display = isRect ? 'none' : '';
+  document.getElementById('ddRectGroup').style.display = isRect ? '' : 'none';
+};
+
+function getDuctDrawConfig() {
+  const type = document.getElementById('ddType').value;
+  const symbols = { rect: '▬', oval: '⬭', round: '●', spiral: '◎' };
+  if (type === 'rect' || type === 'oval') {
+    const w = document.getElementById('ddW').value.trim() || '24';
+    const h = document.getElementById('ddH').value.trim() || '12';
+    return { type, dims: w + 'x' + h, symbol: symbols[type] };
+  }
+  const d = document.getElementById('ddDiam').value.trim() || '14';
+  return { type, dims: d, symbol: symbols[type] };
 };
 
 function finishMeasurement() {
@@ -2331,9 +2391,17 @@ function finishMeasurement() {
   if (!pageMeasurements[currentPage]) pageMeasurements[currentPage] = [];
   pageMeasurements[currentPage].push(meas);
   
+  if (ductDrawMode) {
+    meas.duct = getDuctDrawConfig();
+    measPoints = [];
+    drawMeasureOverlay();
+    updatePanel();
+    scheduleSave();
+    return;
+  }
+  
   pendingMeasurementId = meas.id;
   measPoints = [];
-  
   showDuctPopup(meas);
   drawMeasureOverlay();
   updatePanel();
@@ -2436,7 +2504,12 @@ function drawMeasureOverlay() {
     const dist = computeRealDistance(pxLen, scale);
     
     _currentRenderMeas = null;
-    drawMeasurementLine(pts, dist.formatted, null, '#00ff88', true);
+    if (ductDrawMode) {
+      _currentRenderMeas = null;
+      drawMeasurementLine(pts, dist.formatted, getDuctDrawConfig(), '#00ff88', true);
+    } else {
+      drawMeasurementLine(pts, dist.formatted, null, '#00ff88', true);
+    }
   }
 }
 
