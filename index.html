@@ -1656,7 +1656,9 @@ async function doDuplicate(originalDrawing, includeTakeoff) {
 // Global measurement counter for duplicates
 window._measIdCounter = window._measIdCounter || 0;
 
-window.goBackFromViewer = function() {
+window.goBackFromViewer = async function() {
+  await saveCurrentPageData();
+  saveLastPage();
   if (currentRoute.projectId) {
     navigateTo(`#/project/${currentRoute.projectId}`);
   } else {
@@ -1785,7 +1787,8 @@ async function loadDrawingIntoViewer(projectId, drawingId) {
     console.log('[viewer] arrayBuffer size:', arrayBuffer.byteLength);
     pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     console.log('[viewer] PDF loaded, pages:', pdfDoc.numPages);
-    currentPage = 1;
+    // Restore last viewed page or start at page 1
+    currentPage = (drawing.lastPage && drawing.lastPage >= 1 && drawing.lastPage <= pdfDoc.numPages) ? drawing.lastPage : 1;
     dropZone.classList.add('hidden');
     await renderPage();
     console.log('[viewer] renderPage done, canvas:', canvas.width, 'x', canvas.height);
@@ -2582,11 +2585,11 @@ window.fitToScreen = function() {
 
 window.prevPage = async function() {
   if (!pdfDoc || currentPage <= 1) return;
-  // Save current page data before switching
   await saveCurrentPageData();
   currentPage--;
   await renderPage();
   fitToScreen();
+  saveLastPage();
 };
 
 window.nextPage = async function() {
@@ -2595,7 +2598,20 @@ window.nextPage = async function() {
   currentPage++;
   await renderPage();
   fitToScreen();
+  saveLastPage();
 };
+
+// Save last viewed page to the drawing record
+async function saveLastPage() {
+  if (!activeDrawingId) return;
+  try {
+    const drawing = await idbGet('drawings', activeDrawingId);
+    if (drawing && drawing.lastPage !== currentPage) {
+      drawing.lastPage = currentPage;
+      await idbPut('drawings', drawing);
+    }
+  } catch (e) { /* non-critical */ }
+}
 
 // =====================================================
 // App Init
