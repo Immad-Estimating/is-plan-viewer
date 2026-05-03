@@ -232,8 +232,8 @@
 
   /* ===== Dashboard Two-Panel Layout ===== */
   .dashboard-body { display: flex; flex: 1; overflow: hidden; }
-  .dashboard-left { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; border: 2px solid transparent; }
-  .dashboard-left.drop-hover { border-color: #e94560; box-shadow: inset 0 0 30px rgba(233,69,96,0.15), 0 0 15px rgba(233,69,96,0.3); }
+  .dashboard-left { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; transition: box-shadow 0.2s; outline: 2px solid transparent; outline-offset: -2px; }
+  .dashboard-left.drop-hover { outline-color: #e94560; box-shadow: inset 0 0 30px rgba(233,69,96,0.15), 0 0 15px rgba(233,69,96,0.3); }
   .dashboard-content { flex: 1; overflow-y: auto; padding: 20px; }
   .dashboard-right { width: 380px; flex-shrink: 0; display: flex; flex-direction: column; border-left: 1px solid #0f3460; background: #16213e; overflow: hidden; transition: width 0.25s ease, opacity 0.25s ease; }
   .dashboard-right.collapsed { width: 0; border-left: none; opacity: 0; overflow: hidden; }
@@ -247,6 +247,10 @@
   .qb-table-wrap { flex: 1; overflow-y: auto; padding: 0 6px 6px; }
   .qb-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   .qb-table th { text-align: left; color: #a0a0c0; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 1px solid #0f3460; position: sticky; top: 0; background: #16213e; z-index: 1; }
+  .qb-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+  .qb-table th.sortable:hover { color: #e0e0e0; }
+  .qb-table th.sortable .sort-arrow { font-size: 9px; opacity: 0.5; }
+  .qb-table th.sortable.active .sort-arrow { opacity: 1; color: #e94560; }
   .qb-table tr.qb-row { cursor: grab; border-bottom: 1px solid rgba(15,52,96,0.5); transition: background 0.15s; }
   .qb-table tr.qb-row:hover { background: rgba(15,52,96,0.6); }
   .qb-table tr.qb-row.imported { background: rgba(0,255,136,0.08); }
@@ -302,6 +306,7 @@
     <div class="dashboard-right" id="dashboardRight">
       <div class="qb-panel-header">
         <h3>Active Bids (Quickbase)</h3>
+        <a href="https://reeisinc.quickbase.com/db/bkkh6iiww" target="_blank" rel="noopener" title="Open Quickbase Bid Table" style="background:none;border:1px solid #0f3460;color:#a0a0c0;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;text-decoration:none;flex-shrink:0;transition:background 0.15s;display:inline-flex;align-items:center;" onmouseover="this.style.background='#0f3460';this.style.color='#e0e0e0'" onmouseout="this.style.background='none';this.style.color='#a0a0c0'">↗ QB</a>
         <button onclick="refreshQBPanel()" title="Refresh from Quickbase">🔄 Refresh</button>
         <button onclick="toggleQBPanel()" title="Collapse">✕</button>
       </div>
@@ -311,7 +316,7 @@
       <div class="qb-count" id="qbCount"></div>
       <div class="qb-table-wrap">
         <table class="qb-table">
-          <thead><tr><th>Project</th><th>Client</th><th>Stage</th></tr></thead>
+          <thead><tr><th class="sortable" data-sort="name" onclick="sortQBPanel('name')">Project <span class="sort-arrow" id="sortArrow-name"></span></th><th class="sortable" data-sort="client" onclick="sortQBPanel('client')">Client <span class="sort-arrow" id="sortArrow-client"></span></th><th class="sortable" data-sort="stage" onclick="sortQBPanel('stage')">Stage <span class="sort-arrow" id="sortArrow-stage"></span></th></tr></thead>
           <tbody id="qbTableBody"></tbody>
         </table>
       </div>
@@ -803,6 +808,8 @@ function showToast(msg, accent = false) {
 // ===== QB Sidebar Panel =====
 let qbPanelCollapsed = false;
 let qbPanelFilter = '';
+let qbSortField = 'name'; // 'name', 'client', 'stage'
+let qbSortAsc = true;
 
 function getActiveQBProjects() {
   const excluded = ['lost', 'no bid'];
@@ -820,6 +827,22 @@ async function renderQBPanel() {
   if (qbPanelFilter) {
     active = active.filter(p => fuzzyMatch(p.name || '', qbPanelFilter) || fuzzyMatch(p.client || '', qbPanelFilter) || fuzzyMatch(p.builder || '', qbPanelFilter));
   }
+  // Sort
+  active.sort((a, b) => {
+    const av = (a[qbSortField] || '').toLowerCase();
+    const bv = (b[qbSortField] || '').toLowerCase();
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return qbSortAsc ? cmp : -cmp;
+  });
+  // Update sort arrows
+  ['name','client','stage'].forEach(f => {
+    const th = document.querySelector(`th[data-sort="${f}"]`);
+    const arrow = document.getElementById(`sortArrow-${f}`);
+    if (th && arrow) {
+      th.classList.toggle('active', f === qbSortField);
+      arrow.textContent = f === qbSortField ? (qbSortAsc ? '▲' : '▼') : '';
+    }
+  });
   
   const tbody = document.getElementById('qbTableBody');
   const countEl = document.getElementById('qbCount');
@@ -847,6 +870,16 @@ async function renderQBPanel() {
 
 window.filterQBPanel = function() {
   qbPanelFilter = document.getElementById('qbPanelSearch').value.trim();
+  renderQBPanel();
+};
+
+window.sortQBPanel = function(field) {
+  if (qbSortField === field) {
+    qbSortAsc = !qbSortAsc;
+  } else {
+    qbSortField = field;
+    qbSortAsc = true;
+  }
   renderQBPanel();
 };
 
