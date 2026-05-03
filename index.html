@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IS Mechanical — Plan Viewer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  
+  /* Toolbar */
+  .toolbar { background: #16213e; padding: 8px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #0f3460; z-index: 10; flex-shrink: 0; }
+  .toolbar .logo { font-weight: 700; font-size: 16px; color: #e94560; margin-right: 8px; }
+  .toolbar button { background: #0f3460; color: #e0e0e0; border: 1px solid #1a4080; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; transition: background 0.15s; }
+  .toolbar button:hover { background: #1a4080; }
+  .toolbar button:active { background: #e94560; }
+  .toolbar .zoom-display { font-size: 13px; min-width: 50px; text-align: center; color: #a0a0c0; }
+  .toolbar .separator { width: 1px; height: 24px; background: #0f3460; }
+  .toolbar .page-info { font-size: 13px; color: #a0a0c0; }
+  
+  #fileInput { display: none; }
+  .upload-btn { background: #e94560 !important; border-color: #e94560 !important; font-weight: 600; }
+  .upload-btn:hover { background: #c73550 !important; }
+  
+  /* Viewer */
+  .viewer-container { flex: 1; overflow: hidden; position: relative; cursor: grab; }
+  .viewer-container.grabbing { cursor: grabbing; }
+  .viewer-container canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  
+  /* Drop zone */
+  .drop-zone { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5; }
+  .drop-zone.hidden { display: none; }
+  .drop-zone .icon { font-size: 64px; margin-bottom: 16px; }
+  .drop-zone h2 { font-size: 22px; color: #e94560; margin-bottom: 8px; }
+  .drop-zone p { font-size: 14px; color: #a0a0c0; }
+  
+  /* Drag overlay */
+  .drag-overlay { position: absolute; inset: 0; background: rgba(233, 69, 96, 0.1); border: 3px dashed #e94560; z-index: 20; display: none; align-items: center; justify-content: center; }
+  .drag-overlay.active { display: flex; }
+  .drag-overlay span { font-size: 20px; color: #e94560; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="logo">IS Mechanical</span>
+  <div class="separator"></div>
+  <input type="file" id="fileInput" accept="application/pdf">
+  <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Upload PDF</button>
+  <div class="separator"></div>
+  <button id="zoomOutBtn" onclick="zoom(-1)" title="Zoom Out (-)">−</button>
+  <span class="zoom-display" id="zoomDisplay">100%</span>
+  <button id="zoomInBtn" onclick="zoom(1)" title="Zoom In (+)">+</button>
+  <button onclick="fitToScreen()" title="Fit to Screen">Fit</button>
+  <div class="separator"></div>
+  <button onclick="prevPage()" title="Previous Page">◀</button>
+  <span class="page-info" id="pageInfo">No PDF loaded</span>
+  <button onclick="nextPage()" title="Next Page">▶</button>
+</div>
+
+<div class="viewer-container" id="viewer">
+  <div class="drop-zone" id="dropZone">
+    <div class="icon">📐</div>
+    <h2>Plan Viewer</h2>
+    <p>Upload a PDF or drag & drop it here</p>
+  </div>
+  <canvas id="pdfCanvas"></canvas>
+  <div class="drag-overlay" id="dragOverlay"><span>Drop PDF here</span></div>
+</div>
+
+<script type="module">
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+
+let pdfDoc = null;
+let currentPage = 1;
+let currentScale = 1.0;
+let baseScale = 1.0;
+let panX = 0, panY = 0;
+let isPanning = false;
+let startX, startY;
+
+const canvas = document.getElementById('pdfCanvas');
+const ctx = canvas.getContext('2d');
+const viewer = document.getElementById('viewer');
+const dropZone = document.getElementById('dropZone');
+const dragOverlay = document.getElementById('dragOverlay');
+
+// File input
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  if (e.target.files[0]) loadPDF(e.target.files[0]);
+});
+
+// Drag and drop
+viewer.addEventListener('dragover', (e) => { e.preventDefault(); dragOverlay.classList.add('active'); });
+viewer.addEventListener('dragleave', (e) => { 
+  if (!viewer.contains(e.relatedTarget)) dragOverlay.classList.remove('active'); 
+});
+viewer.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragOverlay.classList.remove('active');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') loadPDF(file);
+});
+
+// Pan
+viewer.addEventListener('mousedown', (e) => {
+  if (!pdfDoc) return;
+  isPanning = true;
+  startX = e.clientX - panX;
+  startY = e.clientY - panY;
+  viewer.classList.add('grabbing');
+});
+window.addEventListener('mousemove', (e) => {
+  if (!isPanning) return;
+  panX = e.clientX - startX;
+  panY = e.clientY - startY;
+  applyTransform();
+});
+window.addEventListener('mouseup', () => {
+  isPanning = false;
+  viewer.classList.remove('grabbing');
+});
+
+// Mouse wheel zoom
+viewer.addEventListener('wheel', (e) => {
+  if (!pdfDoc) return;
+  e.preventDefault();
+  const rect = viewer.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  const oldScale = currentScale;
+  const delta = e.deltaY > 0 ? -1 : 1;
+  currentScale = Math.min(10, Math.max(0.1, currentScale * (1 + delta * 0.1)));
+  
+  // Zoom toward mouse position
+  const ratio = currentScale / oldScale;
+  panX = mouseX - ratio * (mouseX - panX);
+  panY = mouseY - ratio * (mouseY - panY);
+  
+  applyTransform();
+  updateZoomDisplay();
+}, { passive: false });
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+  if (!pdfDoc) return;
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); window.zoom(1); }
+  else if (e.key === '-') { e.preventDefault(); window.zoom(-1); }
+  else if (e.key === '0') { e.preventDefault(); window.fitToScreen(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); window.prevPage(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); window.nextPage(); }
+});
+
+async function loadPDF(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  currentPage = 1;
+  dropZone.classList.add('hidden');
+  await renderPage();
+  fitToScreen();
+}
+
+async function renderPage() {
+  if (!pdfDoc) return;
+  const page = await pdfDoc.getPage(currentPage);
+  const viewport = page.getViewport({ scale: 2 }); // render at 2x for sharpness
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  baseScale = 2;
+  
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  
+  document.getElementById('pageInfo').textContent = `Page ${currentPage} / ${pdfDoc.numPages}`;
+  applyTransform();
+}
+
+function applyTransform() {
+  const displayScale = currentScale / baseScale;
+  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${displayScale})`;
+}
+
+function updateZoomDisplay() {
+  const pct = Math.round((currentScale / baseScale) * 100);
+  document.getElementById('zoomDisplay').textContent = `${pct}%`;
+}
+
+// Expose to global for inline onclick handlers
+window.zoom = function(dir) {
+  if (!pdfDoc) return;
+  const rect = viewer.getBoundingClientRect();
+  const centerX = rect.width / 2;
+  const centerY = rect.height / 2;
+  
+  const oldScale = currentScale;
+  currentScale = Math.min(10, Math.max(0.1, currentScale * (1 + dir * 0.15)));
+  
+  const ratio = currentScale / oldScale;
+  panX = centerX - ratio * (centerX - panX);
+  panY = centerY - ratio * (centerY - panY);
+  
+  applyTransform();
+  updateZoomDisplay();
+};
+
+window.fitToScreen = function() {
+  if (!pdfDoc) return;
+  const rect = viewer.getBoundingClientRect();
+  const scaleX = rect.width / (canvas.width);
+  const scaleY = rect.height / (canvas.height);
+  const fit = Math.min(scaleX, scaleY) * baseScale * 0.95;
+  currentScale = fit;
+  
+  const displayScale = currentScale / baseScale;
+  panX = (rect.width - canvas.width * displayScale) / 2;
+  panY = (rect.height - canvas.height * displayScale) / 2;
+  
+  applyTransform();
+  updateZoomDisplay();
+};
+
+window.prevPage = function() {
+  if (!pdfDoc || currentPage <= 1) return;
+  currentPage--;
+  renderPage().then(() => fitToScreen());
+};
+
+window.nextPage = function() {
+  if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+  currentPage++;
+  renderPage().then(() => fitToScreen());
+};
+</script>
+</body>
+</html>
