@@ -251,6 +251,17 @@
   .qb-table th.sortable:hover { color: #e0e0e0; }
   .qb-table th.sortable .sort-arrow { font-size: 9px; opacity: 0.5; }
   .qb-table th.sortable.active .sort-arrow { opacity: 1; color: #e94560; }
+  .qb-table th .col-filter-btn { font-size: 10px; opacity: 0.4; cursor: pointer; margin-left: 2px; position: relative; }
+  .qb-table th .col-filter-btn:hover { opacity: 1; }
+  .qb-table th .col-filter-btn.filtered { opacity: 1; color: #00ff88; }
+  .col-filter-dropdown { display: none; position: absolute; top: 100%; left: 0; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 6px; min-width: 160px; max-height: 220px; overflow-y: auto; z-index: 50; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+  .col-filter-dropdown.open { display: block; }
+  .col-filter-dropdown label { display: flex; align-items: center; gap: 6px; padding: 3px 4px; font-size: 11px; color: #e0e0e0; cursor: pointer; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .col-filter-dropdown label:hover { background: #0f3460; }
+  .col-filter-dropdown input[type="checkbox"] { accent-color: #e94560; flex-shrink: 0; }
+  .col-filter-dropdown .filter-actions { display: flex; gap: 4px; padding-top: 4px; border-top: 1px solid #0f3460; margin-top: 4px; }
+  .col-filter-dropdown .filter-actions button { flex: 1; background: #0f3460; color: #e0e0e0; border: none; padding: 4px; border-radius: 3px; cursor: pointer; font-size: 10px; }
+  .col-filter-dropdown .filter-actions button:hover { background: #1a4080; }
   .qb-table tr.qb-row { cursor: grab; border-bottom: 1px solid rgba(15,52,96,0.5); transition: background 0.15s; }
   .qb-table tr.qb-row:hover { background: rgba(15,52,96,0.6); }
   .qb-table tr.qb-row.imported { background: rgba(0,255,136,0.08); }
@@ -306,7 +317,7 @@
     <div class="dashboard-right" id="dashboardRight">
       <div class="qb-panel-header">
         <h3>Active Bids (Quickbase)</h3>
-        <a href="https://reeisinc.quickbase.com/db/bkkh6iiww" target="_blank" rel="noopener" title="Open Quickbase Bid Table" style="background:none;border:1px solid #0f3460;color:#a0a0c0;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;text-decoration:none;flex-shrink:0;transition:background 0.15s;display:inline-flex;align-items:center;" onmouseover="this.style.background='#0f3460';this.style.color='#e0e0e0'" onmouseout="this.style.background='none';this.style.color='#a0a0c0'">↗ QB</a>
+        <a href="https://reeisinc.quickbase.com/db/bkkh6iiww?a=q&qid=9" target="_blank" rel="noopener" title="Open Quickbase Bid Table" style="background:none;border:1px solid #0f3460;color:#a0a0c0;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;text-decoration:none;flex-shrink:0;transition:background 0.15s;display:inline-flex;align-items:center;" onmouseover="this.style.background='#0f3460';this.style.color='#e0e0e0'" onmouseout="this.style.background='none';this.style.color='#a0a0c0'">↗ QB</a>
         <button onclick="refreshQBPanel()" title="Refresh from Quickbase">🔄 Refresh</button>
         <button onclick="toggleQBPanel()" title="Collapse">✕</button>
       </div>
@@ -316,7 +327,11 @@
       <div class="qb-count" id="qbCount"></div>
       <div class="qb-table-wrap">
         <table class="qb-table">
-          <thead><tr><th class="sortable" data-sort="name" onclick="sortQBPanel('name')">Project <span class="sort-arrow" id="sortArrow-name"></span></th><th class="sortable" data-sort="client" onclick="sortQBPanel('client')">Client <span class="sort-arrow" id="sortArrow-client"></span></th><th class="sortable" data-sort="stage" onclick="sortQBPanel('stage')">Stage <span class="sort-arrow" id="sortArrow-stage"></span></th></tr></thead>
+          <thead><tr>
+            <th class="sortable" data-sort="name" style="position:relative"><span onclick="sortQBPanel('name')" style="cursor:pointer">Project <span class="sort-arrow" id="sortArrow-name"></span></span><span class="col-filter-btn" id="filterBtn-name" onclick="event.stopPropagation();toggleColFilter('name')">⧩</span><div class="col-filter-dropdown" id="filterDrop-name"></div></th>
+            <th class="sortable" data-sort="client" style="position:relative"><span onclick="sortQBPanel('client')" style="cursor:pointer">Client <span class="sort-arrow" id="sortArrow-client"></span></span><span class="col-filter-btn" id="filterBtn-client" onclick="event.stopPropagation();toggleColFilter('client')">⧩</span><div class="col-filter-dropdown" id="filterDrop-client"></div></th>
+            <th class="sortable" data-sort="stage" style="position:relative"><span onclick="sortQBPanel('stage')" style="cursor:pointer">Stage <span class="sort-arrow" id="sortArrow-stage"></span></span><span class="col-filter-btn" id="filterBtn-stage" onclick="event.stopPropagation();toggleColFilter('stage')">⧩</span><div class="col-filter-dropdown" id="filterDrop-stage"></div></th>
+          </tr></thead>
           <tbody id="qbTableBody"></tbody>
         </table>
       </div>
@@ -827,6 +842,12 @@ async function renderQBPanel() {
   if (qbPanelFilter) {
     active = active.filter(p => fuzzyMatch(p.name || '', qbPanelFilter) || fuzzyMatch(p.client || '', qbPanelFilter) || fuzzyMatch(p.builder || '', qbPanelFilter));
   }
+  // Apply column filters
+  ['name','client','stage'].forEach(f => {
+    if (colFilters[f]) {
+      active = active.filter(p => colFilters[f].has((p[f]||'').trim().toLowerCase() || '(empty)'));
+    }
+  });
   // Sort
   active.sort((a, b) => {
     const av = (a[qbSortField] || '').toLowerCase();
@@ -882,6 +903,70 @@ window.sortQBPanel = function(field) {
   }
   renderQBPanel();
 };
+
+// Column filters: { name: Set, client: Set, stage: Set } — null means no filter (show all)
+const colFilters = { name: null, client: null, stage: null };
+
+window.toggleColFilter = function(field) {
+  const drop = document.getElementById(`filterDrop-${field}`);
+  const isOpen = drop.classList.contains('open');
+  // Close all dropdowns first
+  ['name','client','stage'].forEach(f => document.getElementById(`filterDrop-${f}`).classList.remove('open'));
+  if (isOpen) return;
+  
+  // Get unique values for this column from active (non-filtered-by-this-col) data
+  const excluded = ['lost', 'no bid'];
+  let pool = qbProjects.filter(p => !excluded.includes((p.stage||'').toLowerCase().trim()));
+  // Apply other column filters but not this one
+  ['name','client','stage'].forEach(f => {
+    if (f !== field && colFilters[f]) {
+      pool = pool.filter(p => colFilters[f].has((p[f]||'').toLowerCase().trim() || '(empty)'));
+    }
+  });
+  
+  const values = [...new Set(pool.map(p => (p[field]||'').trim() || '(empty)'))].sort((a,b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  const currentFilter = colFilters[field];
+  
+  let html = values.map(v => {
+    const checked = !currentFilter || currentFilter.has(v.toLowerCase());
+    const escaped = v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    return `<label><input type="checkbox" data-val="${escaped}" ${checked ? 'checked' : ''}> ${escaped}</label>`;
+  }).join('');
+  html += `<div class="filter-actions"><button onclick="applyColFilter('${field}')">Apply</button><button onclick="clearColFilter('${field}')">Clear</button></div>`;
+  drop.innerHTML = html;
+  drop.classList.add('open');
+};
+
+window.applyColFilter = function(field) {
+  const drop = document.getElementById(`filterDrop-${field}`);
+  const checks = drop.querySelectorAll('input[type="checkbox"]');
+  const selected = new Set();
+  let allChecked = true;
+  checks.forEach(cb => {
+    if (cb.checked) selected.add(cb.dataset.val.toLowerCase());
+    else allChecked = false;
+  });
+  colFilters[field] = allChecked ? null : (selected.size > 0 ? selected : new Set(['__none__']));
+  drop.classList.remove('open');
+  // Update filter icon
+  const btn = document.getElementById(`filterBtn-${field}`);
+  btn.classList.toggle('filtered', !allChecked);
+  renderQBPanel();
+};
+
+window.clearColFilter = function(field) {
+  colFilters[field] = null;
+  document.getElementById(`filterDrop-${field}`).classList.remove('open');
+  document.getElementById(`filterBtn-${field}`).classList.remove('filtered');
+  renderQBPanel();
+};
+
+// Close filter dropdowns on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.col-filter-dropdown') && !e.target.closest('.col-filter-btn')) {
+    ['name','client','stage'].forEach(f => document.getElementById(`filterDrop-${f}`)?.classList.remove('open'));
+  }
+});
 
 window.refreshQBPanel = async function() {
   try {
