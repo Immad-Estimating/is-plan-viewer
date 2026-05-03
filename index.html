@@ -363,9 +363,16 @@ viewer.addEventListener('click', (e) => {
   if (!pdfDoc) return;
   if (isPanning) return;
   
+  // Clicks on UI widgets (scale, duct popup, calibration) should never place points
+  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner')) {
+    // Still close scale popover if clicking the widget toggle while popover is open elsewhere
+    return;
+  }
+
   // Close scale popover if clicking outside
-  if (scalePopover.classList.contains('open') && !e.target.closest('.scale-widget')) {
+  if (scalePopover.classList.contains('open')) {
     scalePopover.classList.remove('open');
+    return;
   }
 
   if (calibrationMode) {
