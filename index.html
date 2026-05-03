@@ -1523,9 +1523,11 @@ window.renameDrawing = async function(drawingId) {
   nameEl.style.display = 'block';
   
   // Block clicks inside the name from triggering the <a> link
-  const blockLink = (e) => { e.stopPropagation(); e.preventDefault(); };
-  nameEl.addEventListener('click', blockLink);
-  nameEl.addEventListener('mousedown', blockLink);
+  // stopPropagation prevents <a> navigation; do NOT preventDefault on mousedown (kills cursor placement)
+  const blockClick = (e) => { e.stopPropagation(); e.preventDefault(); };
+  const blockMouse = (e) => { e.stopPropagation(); };
+  nameEl.addEventListener('click', blockClick);
+  nameEl.addEventListener('mousedown', blockMouse);
   
   nameEl.focus();
   
@@ -1550,8 +1552,8 @@ window.renameDrawing = async function(drawingId) {
     nameEl.style.outline = '';
     nameEl.style.padding = '';
     nameEl.style.cursor = '';
-    nameEl.removeEventListener('click', blockLink);
-    nameEl.removeEventListener('mousedown', blockLink);
+    nameEl.removeEventListener('click', blockClick);
+    nameEl.removeEventListener('mousedown', blockMouse);
     if (parentLink) delete parentLink.dataset.renaming;
     const newName = nameEl.textContent.trim();
     if (newName && newName !== currentName) {
