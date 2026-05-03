@@ -2428,7 +2428,7 @@ function drawMeasureOverlay() {
     drawSimpleLine(pts, '#ffaa00');
   }
   
-  if (measureMode && measPoints.length > 0) {
+  if ((measureMode || spiralMode) && measPoints.length > 0) {
     const pts = [...measPoints];
     if (mousePos) pts.push(mousePos);
     
@@ -2436,7 +2436,12 @@ function drawMeasureOverlay() {
     const dist = computeRealDistance(pxLen, scale);
     
     _currentRenderMeas = null;
-    drawMeasurementLine(pts, dist.formatted, null, '#00ff88', true);
+    if (spiralMode) {
+      const liveDuct = getSpiralToolDuct();
+      drawMeasurementLine(pts, dist.formatted, liveDuct, '#00ff88', true);
+    } else {
+      drawMeasurementLine(pts, dist.formatted, null, '#00ff88', true);
+    }
   }
 }
 
