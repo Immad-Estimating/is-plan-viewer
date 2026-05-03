@@ -2637,103 +2637,170 @@ function drawSimpleLine(points, color) {
   }
 }
 
-function drawFitting(points, fit, duct, color) {
-  if (fit.pointIdx < 0 || fit.pointIdx >= points.length) return;
-  const p = points[fit.pointIdx];
-  
-  // Calculate real-world elbow radius: ~1.5x duct diameter, converted to canvas pixels
+// --- SMACNA elbow helper functions ---
+function getDuctHalfWidthPx(duct) {
   const diam = parseFloat(duct.dims) || 14;
-  // Use the page scale to get proper pixel size
-  const scale = getScaleForPage(currentPage);
-  let radiusPx;
-  if (scale && scale.type === 'arch') {
-    // For architectural: pxPerFoot = (864 * baseScale) / ratio
-    const pxPerFoot = (864 * baseScale) / scale.ratio;
-    const elbowRadiusFt = (diam * 1.5) / 12; // 1.5x diameter in feet
-    radiusPx = elbowRadiusFt * pxPerFoot;
-  } else if (scale && scale.type === 'custom' && scale.customUnit === 'ft') {
-    const elbowRadiusFt = (diam * 1.5) / 12;
-    radiusPx = elbowRadiusFt * scale.pxPerUnit;
-  } else {
-    // Fallback: visual size based on duct rendering width
-    radiusPx = Math.max(8, diam * 0.8) * (baseScale / 2);
+  // For rect/oval WxH, use the larger dimension
+  let D = diam;
+  if (duct.dims && duct.dims.includes('x')) {
+    const parts = duct.dims.split('x').map(Number);
+    D = Math.max(parts[0] || 14, parts[1] || 14);
   }
-  // Clamp radius so it's visible but not absurd
-  radiusPx = Math.max(6, Math.min(radiusPx, 80));
-  
-  // Get incoming and outgoing angles
+  const scale = getScaleForPage(currentPage);
+  if (scale) {
+    const pxPerFoot = getPxPerRealFoot(scale);
+    if (pxPerFoot) return (D / 12) * pxPerFoot / 2;
+  }
+  // Fallback: proportional visual size matching spiral duct code
+  return Math.max(4, Math.min(30, D * 0.7)) * (baseScale / 2);
+}
+
+function getElbowCLRPx(duct) {
+  const diam = parseFloat(duct.dims) || 14;
+  let D = diam;
+  if (duct.dims && duct.dims.includes('x')) {
+    const parts = duct.dims.split('x').map(Number);
+    D = Math.max(parts[0] || 14, parts[1] || 14);
+  }
+  const scale = getScaleForPage(currentPage);
+  if (scale) {
+    const pxPerFoot = getPxPerRealFoot(scale);
+    if (pxPerFoot) return (D * 1.5 / 12) * pxPerFoot;
+  }
+  // Fallback
+  const halfW = Math.max(4, Math.min(30, D * 0.7)) * (baseScale / 2);
+  return halfW * 3; // 1.5 * D equivalent
+}
+
+function drawFitting(points, fit, duct, color) {
+  if (fit.pointIdx < 1 || fit.pointIdx >= points.length - 1) return;
+  const p = points[fit.pointIdx];
   const prev = points[fit.pointIdx - 1];
   const next = points[fit.pointIdx + 1];
   if (!prev || !next) return;
-  
+
+  const halfW = getDuctHalfWidthPx(duct);
+  const CLR = getElbowCLRPx(duct);
+
+  // Clamp for sanity
+  const clrPx = Math.max(halfW * 1.5, Math.min(CLR, 200));
+  const innerR = Math.max(2, clrPx - halfW); // throat
+  const outerR = clrPx + halfW;                // heel
+
+  // Incoming / outgoing direction vectors
   const inAngle = Math.atan2(p.y - prev.y, p.x - prev.x);
   const outAngle = Math.atan2(next.y - p.y, next.x - p.x);
-  
-  // Draw elbow arc
-  // The arc represents the centerline path through the elbow
-  const perpIn = inAngle + Math.PI / 2;
-  const perpOut = outAngle + Math.PI / 2;
-  
-  // Determine which side the turn center is on
+
+  // Sweep angle for this fitting type
+  const sweepMap = { '90el': Math.PI / 2, '45el': Math.PI / 4, '22el': Math.PI / 8 };
+  const sweep = sweepMap[fit.type] || Math.PI / 2;
+
+  // Determine turn direction: cross product tells us CW vs CCW
   const cross = (p.x - prev.x) * (next.y - p.y) - (p.y - prev.y) * (next.x - p.x);
-  const sign = cross > 0 ? 1 : -1;
-  
-  // Center of the arc
-  const cx = p.x + Math.cos(inAngle + sign * Math.PI / 2) * radiusPx;
-  const cy = p.y + Math.sin(inAngle + sign * Math.PI / 2) * radiusPx;
-  
-  // Arc start and end angles (from center)
-  const startAngle = Math.atan2(p.y - cy, p.x - cx);
-  // End point of arc
-  const endPx = p.x + Math.cos(outAngle) * radiusPx * 0.1;
-  const endPy = p.y + Math.sin(outAngle) * radiusPx * 0.1;
-  const endAngle = Math.atan2(endPy - cy, endPx - cx);
-  
-  // Draw the arc symbol
+  const turnSign = cross > 0 ? 1 : -1; // +1 = turning right (CW on screen), -1 = left
+
+  // Arc center is offset from the vertex point perpendicular to incoming direction
+  const perpAngle = inAngle + turnSign * Math.PI / 2;
+  const cx = p.x + Math.cos(perpAngle) * clrPx;
+  const cy = p.y + Math.sin(perpAngle) * clrPx;
+
+  // Arc start angle (from center back to the vertex tangent point)
+  const arcStart = Math.atan2(p.y - cy, p.x - cx);
+  // Arc end angle = start rotated by sweep in the turn direction
+  const arcEnd = arcStart - turnSign * sweep;
+  const ccw = turnSign > 0; // canvas arc direction
+
   mCtx.save();
-  mCtx.strokeStyle = '#ffaa00'; // amber for fittings — distinct from green duct
+  mCtx.strokeStyle = color; // #00ff88 — matches duct
   mCtx.lineWidth = 2.5;
   mCtx.setLineDash([]);
-  mCtx.globalAlpha = 0.9;
-  
-  // Simple arc at the elbow point
+  mCtx.globalAlpha = 1.0;
+
+  // Inner throat arc
   mCtx.beginPath();
-  if (cross > 0) {
-    mCtx.arc(cx, cy, radiusPx, startAngle, startAngle - sign * (Math.PI / 2 * (fit.type === '45el' ? 0.5 : fit.type === '22el' ? 0.25 : 1)), true);
-  } else {
-    mCtx.arc(cx, cy, radiusPx, startAngle, startAngle - sign * (Math.PI / 2 * (fit.type === '45el' ? 0.5 : fit.type === '22el' ? 0.25 : 1)), false);
-  }
+  mCtx.arc(cx, cy, innerR, arcStart, arcEnd, ccw);
   mCtx.stroke();
-  
-  // Draw fitting label
-  const labelSize = 10 * baseScale;
-  const renderSize = Math.max(24, labelSize);
+
+  // Outer heel arc
+  mCtx.beginPath();
+  mCtx.arc(cx, cy, outerR, arcStart, arcEnd, ccw);
+  mCtx.stroke();
+
+  // Tangent connection lines at start of elbow (connecting inner/outer arcs to duct walls)
+  const innerStartX = cx + Math.cos(arcStart) * innerR;
+  const innerStartY = cy + Math.sin(arcStart) * innerR;
+  const outerStartX = cx + Math.cos(arcStart) * outerR;
+  const outerStartY = cy + Math.sin(arcStart) * outerR;
+
+  mCtx.beginPath();
+  mCtx.moveTo(innerStartX, innerStartY);
+  mCtx.lineTo(outerStartX, outerStartY);
+  mCtx.stroke();
+
+  // Tangent connection lines at end of elbow
+  const innerEndX = cx + Math.cos(arcEnd) * innerR;
+  const innerEndY = cy + Math.sin(arcEnd) * innerR;
+  const outerEndX = cx + Math.cos(arcEnd) * outerR;
+  const outerEndY = cy + Math.sin(arcEnd) * outerR;
+
+  mCtx.beginPath();
+  mCtx.moveTo(innerEndX, innerEndY);
+  mCtx.lineTo(outerEndX, outerEndY);
+  mCtx.stroke();
+
+  // Fitting label
+  const effSize = (_currentRenderMeas && _currentRenderMeas.labelSize != null) ? _currentRenderMeas.labelSize : annoSize;
+  const effTextOpacity = (_currentRenderMeas && _currentRenderMeas.labelTextOpacity != null) ? _currentRenderMeas.labelTextOpacity : annoTextOpacity;
+  const effFillOpacity = (_currentRenderMeas && _currentRenderMeas.labelFillOpacity != null) ? _currentRenderMeas.labelFillOpacity : annoFillOpacity;
+  const labelSize = effSize * 0.7 * baseScale;
+  const renderSize = Math.max(28, labelSize);
   const lScale = labelSize / renderSize;
-  mCtx.font = `bold ${renderSize}px -apple-system, sans-serif`;
+  mCtx.font = `bold ${renderSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
   const ftLabel = getFittingLabel(fit.type);
   const tw = mCtx.measureText(ftLabel).width;
-  
+
+  // Position label near the center of the arc, offset outward
+  const midArcAngle = arcStart - turnSign * sweep / 2;
+  const labelR = outerR + 10 / lScale;
+  const lx = cx + Math.cos(midArcAngle) * labelR;
+  const ly = cy + Math.sin(midArcAngle) * labelR;
+
   mCtx.save();
-  mCtx.translate(p.x, p.y - radiusPx - 8);
+  mCtx.translate(lx, ly);
   mCtx.scale(lScale, lScale);
-  mCtx.globalAlpha = 0.85;
+  mCtx.globalAlpha = effFillOpacity;
   mCtx.fillStyle = 'rgba(22, 33, 62, 0.9)';
   const pad = 3;
   mCtx.beginPath();
   mCtx.roundRect(-tw/2 - pad, -renderSize/2 - pad, tw + pad*2, renderSize + pad*2, 3);
   mCtx.fill();
-  mCtx.fillStyle = '#ffaa00';
+  mCtx.globalAlpha = effTextOpacity;
+  mCtx.fillStyle = '#00ff88';
   mCtx.textAlign = 'center';
   mCtx.textBaseline = 'middle';
   mCtx.fillText(ftLabel, 0, 0);
   mCtx.restore();
-  
+
   mCtx.restore();
 }
 
-function drawSpiralDuct(points, duct, color) {
+function drawSpiralDuct(points, duct, color, trimPoints) {
   const diam = parseFloat(duct.dims) || 14;
-  const ductHalfWidth = Math.max(4, Math.min(30, diam * 0.7)) * (baseScale / 2);
+  const ductHalfWidth = getDuctHalfWidthPx(duct);
+  
+  // Build a set of trim distances per point index
+  // trimPoints: [{pointIdx, trimLength}] — trim that many px before/after the turn point
+  const trimBefore = {}; // keyed by segment end index (i): trim from end of segment i-1→i
+  const trimAfter = {};  // keyed by segment start index (i-1): trim from start of segment i-1→i
+  if (trimPoints) {
+    for (const tp of trimPoints) {
+      const idx = tp.pointIdx;
+      // The segment ending at this point (segment idx-1 → idx): trim its end
+      trimBefore[idx] = tp.trimLength;
+      // The segment starting from this point (segment idx → idx+1): trim its start
+      trimAfter[idx] = tp.trimLength;
+    }
+  }
   
   for (let i = 1; i < points.length; i++) {
     const ax = points[i-1].x, ay = points[i-1].y;
@@ -2742,9 +2809,18 @@ function drawSpiralDuct(points, duct, color) {
     const len = Math.sqrt(dx*dx + dy*dy);
     if (len < 1) continue;
     
-    // Unit vectors: along duct and perpendicular
-    const ux = dx / len, uy = dy / len; // along
-    const nx = -uy * ductHalfWidth, ny = ux * ductHalfWidth; // perpendicular
+    const ux = dx / len, uy = dy / len;
+    const nx = -uy * ductHalfWidth, ny = ux * ductHalfWidth;
+    
+    // Calculate trim distances for this segment
+    const trimStart = trimAfter[i-1] || 0;  // trim from start (point i-1 is a fitting)
+    const trimEnd = trimBefore[i] || 0;      // trim from end (point i is a fitting)
+    const effectiveLen = len - trimStart - trimEnd;
+    if (effectiveLen < 1) continue;
+    
+    // Trimmed start and end points along the segment
+    const sax = ax + ux * trimStart, say = ay + uy * trimStart;
+    const sbx = bx - ux * trimEnd, sby = by - uy * trimEnd;
     
     // Outer walls — solid, full opacity
     mCtx.strokeStyle = color;
@@ -2753,29 +2829,27 @@ function drawSpiralDuct(points, duct, color) {
     mCtx.setLineDash([]);
     
     mCtx.beginPath();
-    mCtx.moveTo(ax + nx, ay + ny);
-    mCtx.lineTo(bx + nx, by + ny);
+    mCtx.moveTo(sax + nx, say + ny);
+    mCtx.lineTo(sbx + nx, sby + ny);
     mCtx.stroke();
     
     mCtx.beginPath();
-    mCtx.moveTo(ax - nx, ay - ny);
-    mCtx.lineTo(bx - nx, by - ny);
+    mCtx.moveTo(sax - nx, say - ny);
+    mCtx.lineTo(sbx - nx, sby - ny);
     mCtx.stroke();
     
-    // Spiral seam — parallel diagonal lines all angled the same direction
-    // Like a barber pole: each line goes from one wall to the other at the same pitch
-    const pitch = ductHalfWidth * 2.5; // spacing along the duct between seam lines
-    const numSeams = Math.floor(len / pitch);
+    // Spiral seam lines within the trimmed segment
+    const pitch = ductHalfWidth * 2.5;
+    const numSeams = Math.floor(effectiveLen / pitch);
     mCtx.lineWidth = 1.5;
     mCtx.globalAlpha = 0.8;
     for (let s = 1; s <= numSeams; s++) {
-      // Start point on one wall, end point on the other wall, offset by one pitch
-      const t1 = (s - 0.5) / (numSeams + 1); // start position along duct
-      const t2 = (s + 0.5) / (numSeams + 1); // end position (shifted forward)
-      const x1 = ax + dx * t1 + nx; // start on top wall
-      const y1 = ay + dy * t1 + ny;
-      const x2 = ax + dx * t2 - nx; // end on bottom wall
-      const y2 = ay + dy * t2 - ny;
+      const t1 = (s - 0.5) / (numSeams + 1);
+      const t2 = (s + 0.5) / (numSeams + 1);
+      const x1 = sax + (sbx - sax) * t1 + nx;
+      const y1 = say + (sby - say) * t1 + ny;
+      const x2 = sax + (sbx - sax) * t2 - nx;
+      const y2 = say + (sby - say) * t2 - ny;
       mCtx.beginPath();
       mCtx.moveTo(x1, y1);
       mCtx.lineTo(x2, y2);
@@ -2783,18 +2857,18 @@ function drawSpiralDuct(points, duct, color) {
     }
     mCtx.globalAlpha = 1.0;
     
-    // End caps
+    // End caps — only at actual duct endpoints, not at fittings
     mCtx.lineWidth = 2.5;
-    if (i === 1) {
+    if (i === 1 && !trimAfter[0]) {
       mCtx.beginPath();
-      mCtx.moveTo(ax + nx, ay + ny);
-      mCtx.lineTo(ax - nx, ay - ny);
+      mCtx.moveTo(sax + nx, say + ny);
+      mCtx.lineTo(sax - nx, say - ny);
       mCtx.stroke();
     }
-    if (i === points.length - 1) {
+    if (i === points.length - 1 && !trimBefore[i]) {
       mCtx.beginPath();
-      mCtx.moveTo(bx + nx, by + ny);
-      mCtx.lineTo(bx - nx, by - ny);
+      mCtx.moveTo(sbx + nx, sby + ny);
+      mCtx.lineTo(sbx - nx, sby - ny);
       mCtx.stroke();
     }
   }
@@ -2814,18 +2888,53 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   // Skip centerline and endpoint dots for spiral ducts (walls already show the run)
   const isSpiral = duct && duct.type === 'spiral';
   
+  // Build fitting trim data for this measurement
+  const fittings = (_currentRenderMeas && _currentRenderMeas.fittings) ? _currentRenderMeas.fittings : [];
+  let trimPoints = null;
+  if (duct && fittings.length > 0) {
+    trimPoints = fittings.map(f => ({
+      pointIdx: f.pointIdx,
+      trimLength: getElbowCLRPx(duct)
+    }));
+  }
+  
   if (!isSpiral) {
     mCtx.strokeStyle = color;
     mCtx.lineWidth = 2.5;
     if (isDashed) mCtx.setLineDash([8, 4]);
     else mCtx.setLineDash([]);
     
-    mCtx.beginPath();
-    mCtx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      mCtx.lineTo(points[i].x, points[i].y);
+    // Draw centerline segments, trimming at elbow tangent points
+    if (trimPoints && trimPoints.length > 0) {
+      const trimBefore = {};
+      const trimAfter = {};
+      for (const tp of trimPoints) {
+        trimBefore[tp.pointIdx] = tp.trimLength;
+        trimAfter[tp.pointIdx] = tp.trimLength;
+      }
+      for (let i = 1; i < points.length; i++) {
+        const ax = points[i-1].x, ay = points[i-1].y;
+        const bx = points[i].x, by = points[i].y;
+        const dx = bx - ax, dy = by - ay;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len < 1) continue;
+        const ux = dx / len, uy = dy / len;
+        const tStart = trimAfter[i-1] || 0;
+        const tEnd = trimBefore[i] || 0;
+        if (len - tStart - tEnd < 1) continue;
+        mCtx.beginPath();
+        mCtx.moveTo(ax + ux * tStart, ay + uy * tStart);
+        mCtx.lineTo(bx - ux * tEnd, by - uy * tEnd);
+        mCtx.stroke();
+      }
+    } else {
+      mCtx.beginPath();
+      mCtx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        mCtx.lineTo(points[i].x, points[i].y);
+      }
+      mCtx.stroke();
     }
-    mCtx.stroke();
     mCtx.setLineDash([]);
   }
   
@@ -2841,11 +2950,10 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   
   // Draw spiral duct representation if applicable
   if (duct && duct.type === 'spiral' && points.length >= 2) {
-    drawSpiralDuct(points, duct, color);
+    drawSpiralDuct(points, duct, color, trimPoints);
   }
   
   // Draw fittings at turn points
-  const fittings = (_currentRenderMeas && _currentRenderMeas.fittings) ? _currentRenderMeas.fittings : [];
   for (const fit of fittings) {
     drawFitting(points, fit, duct, color);
   }
@@ -3096,7 +3204,7 @@ function updatePanel() {
         const counts = {};
         m.fittings.forEach(f => { counts[f.type] = (counts[f.type] || 0) + 1; });
         const parts = Object.entries(counts).map(([t, c]) => `${c}× ${getFittingLabel(t)}`);
-        fittingInfo = `<div class="meas-duct" style="color:#ffaa00">${parts.join(', ')}</div>`;
+        fittingInfo = `<div class="meas-duct" style="color:#00ff88">${parts.join(', ')}</div>`;
       }
       const customLabel = m.labelText ? `<div class="meas-duct" style="color:#e94560;font-style:italic">"${escapeHtml(m.labelText)}"</div>` : '';
       html += `<div class="meas-item" data-id="${m.id}">
