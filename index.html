@@ -1934,7 +1934,7 @@ viewer.addEventListener('wheel', (e) => {
 
 // Keyboard shortcuts
 window.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
     if (e.key === 'Escape') {
       document.getElementById('ductPopup').classList.remove('open');
       document.getElementById('customLengthPopup').classList.remove('open');
