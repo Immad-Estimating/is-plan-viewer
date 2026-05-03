@@ -118,7 +118,7 @@
   .drawing-item .di-name { font-size: 14px; font-weight: 500; }
   .drawing-item .di-meta { font-size: 12px; color: #a0a0c0; margin-top: 4px; display: flex; gap: 12px; }
   .drawing-item .di-actions { display: flex; gap: 6px; }
-  .drawing-item .di-actions button { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 3px; }
+  .drawing-item .di-actions button { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 3px; }
   .drawing-item .di-actions button:hover { color: #e94560; background: rgba(233,69,96,0.1); }
   
   /* ===== Viewer View ===== */
@@ -229,6 +229,7 @@
   .confirm-box .confirm-btns button { padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 13px; border: 1px solid #0f3460; }
   .confirm-box .confirm-btns .confirm-yes { background: #e94560; color: #fff; border-color: #e94560; font-weight: 600; }
   .confirm-box .confirm-btns .confirm-no { background: #0f3460; color: #e0e0e0; }
+  #duplicateDialog .confirm-box { text-align: left; }
 
   /* ===== Dashboard Two-Panel Layout ===== */
   .dashboard-body { display: flex; flex: 1; overflow: hidden; }
@@ -510,6 +511,19 @@
     <div class="confirm-btns">
       <button class="confirm-no" id="confirmNo">Cancel</button>
       <button class="confirm-yes" id="confirmYes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DUPLICATE DIALOG ===== -->
+<div class="confirm-overlay" id="duplicateDialog">
+  <div class="confirm-box" style="width:400px;text-align:left">
+    <p style="font-size:15px;font-weight:600;color:#e94560;margin-bottom:12px" id="dupTitle">Duplicate Drawing</p>
+    <p style="font-size:13px;margin-bottom:16px;color:#a0a0c0" id="dupMessage"></p>
+    <div class="confirm-btns" style="justify-content:flex-end;gap:8px">
+      <button class="confirm-no" id="dupCancel">Cancel</button>
+      <button class="confirm-yes" id="dupDrawingOnly" style="background:#0f3460;border-color:#1a4080;font-weight:500">Drawing Only</button>
+      <button class="confirm-yes" id="dupWithTakeoff" style="background:#00cc6a;border-color:#00cc6a;color:#1a1a2e">Drawing + Takeoff</button>
     </div>
   </div>
 </div>
@@ -1361,20 +1375,24 @@ async function renderDrawingManager(projectId) {
     // Sort by uploadedAt desc
     const sorted = [...drawings].sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0));
     for (const d of sorted) {
-      const date = d.uploadedAt ? new Date(d.uploadedAt).toLocaleDateString() : '';
+      const lastTouched = Math.max(d.uploadedAt || 0, d.modifiedAt || 0);
+      const dateStr = lastTouched ? formatDateTime(lastTouched) : '';
       const size = d.fileSize ? formatFileSize(d.fileSize) : '';
       const pages = d.pageCount ? `${d.pageCount} page${d.pageCount !== 1 ? 's' : ''}` : '';
+      const safeName = escapeHtml(d.fileName).replace(/'/g, "\\'");
       html += `<div class="drawing-item" onclick="openDrawing(${projectId}, ${d.id})">
         <div class="di-info">
-          <div class="di-name">📄 ${escapeHtml(d.fileName)}</div>
+          <div class="di-name" id="drawingName-${d.id}">📄 ${escapeHtml(d.fileName)}</div>
           <div class="di-meta">
             ${pages ? `<span>${pages}</span>` : ''}
             ${size ? `<span>${size}</span>` : ''}
-            ${date ? `<span>${date}</span>` : ''}
+            ${dateStr ? `<span>${dateStr}</span>` : ''}
           </div>
         </div>
         <div class="di-actions">
-          <button onclick="event.stopPropagation(); deleteDrawing(${d.id}, '${escapeHtml(d.fileName).replace(/'/g, "\\'")}')" title="Delete">🗑️</button>
+          <button onclick="event.stopPropagation(); renameDrawing(${d.id})" title="Rename">✏️</button>
+          <button onclick="event.stopPropagation(); duplicateDrawing(${d.id})" title="Duplicate">📋</button>
+          <button onclick="event.stopPropagation(); deleteDrawing(${d.id}, '${safeName}')" title="Delete">🗑️</button>
         </div>
       </div>`;
     }
@@ -1446,6 +1464,18 @@ async function handleDrawingFiles(files) {
   renderDrawingManager(currentManagerProjectId);
 }
 
+function formatDateTime(ts) {
+  const d = new Date(ts);
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${month}/${day}/${year} ${hours}:${mins} ${ampm}`;
+}
+
 function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -1471,6 +1501,142 @@ window.deleteDrawing = function(drawingId, fileName) {
     renderDrawingManager(currentManagerProjectId);
   });
 };
+
+window.renameDrawing = async function(drawingId) {
+  const nameEl = document.getElementById(`drawingName-${drawingId}`);
+  if (!nameEl || nameEl.contentEditable === 'true') return;
+  
+  const drawing = await idbGet('drawings', drawingId);
+  if (!drawing) return;
+  
+  const currentName = drawing.fileName;
+  nameEl.textContent = currentName;
+  nameEl.contentEditable = 'true';
+  nameEl.style.outline = '1px solid #e94560';
+  nameEl.style.borderRadius = '3px';
+  nameEl.style.padding = '2px 6px';
+  nameEl.focus();
+  
+  const range = document.createRange();
+  // Select just the name part before extension
+  const dotIdx = currentName.lastIndexOf('.');
+  const textNode = nameEl.firstChild;
+  if (textNode && dotIdx > 0) {
+    range.setStart(textNode, 0);
+    range.setEnd(textNode, dotIdx);
+  } else {
+    range.selectNodeContents(nameEl);
+  }
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  
+  let saved = false;
+  const save = async () => {
+    if (saved) return;
+    saved = true;
+    nameEl.contentEditable = 'false';
+    nameEl.style.outline = '';
+    nameEl.style.padding = '';
+    const newName = nameEl.textContent.trim();
+    if (newName && newName !== currentName) {
+      drawing.fileName = newName;
+      drawing.modifiedAt = Date.now();
+      await idbPut('drawings', drawing);
+      // Update project modifiedAt
+      if (currentManagerProjectId) {
+        const proj = await idbGet('projects', currentManagerProjectId);
+        if (proj) { proj.modifiedAt = Date.now(); await idbPut('projects', proj); }
+      }
+    }
+    nameEl.textContent = '📄 ' + (newName || currentName);
+  };
+  nameEl.addEventListener('blur', save, { once: true });
+  nameEl.addEventListener('keydown', function handler(e) {
+    if (e.key === 'Enter') { e.preventDefault(); nameEl.blur(); nameEl.removeEventListener('keydown', handler); }
+    if (e.key === 'Escape') { nameEl.textContent = currentName; nameEl.blur(); nameEl.removeEventListener('keydown', handler); }
+  });
+};
+
+window.duplicateDrawing = async function(drawingId) {
+  const drawing = await idbGet('drawings', drawingId);
+  if (!drawing) return;
+  
+  const dialog = document.getElementById('duplicateDialog');
+  const msgEl = document.getElementById('dupMessage');
+  msgEl.textContent = `"${drawing.fileName}" — Do you want to duplicate just the PDF, or include all measurements and scale data?`;
+  dialog.classList.add('open');
+  
+  const btnCancel = document.getElementById('dupCancel');
+  const btnDrawing = document.getElementById('dupDrawingOnly');
+  const btnTakeoff = document.getElementById('dupWithTakeoff');
+  
+  const cleanup = () => {
+    dialog.classList.remove('open');
+    btnCancel.replaceWith(btnCancel.cloneNode(true));
+    btnDrawing.replaceWith(btnDrawing.cloneNode(true));
+    btnTakeoff.replaceWith(btnTakeoff.cloneNode(true));
+  };
+  
+  document.getElementById('dupCancel').addEventListener('click', cleanup, { once: true });
+  
+  document.getElementById('dupDrawingOnly').addEventListener('click', async () => {
+    cleanup();
+    await doDuplicate(drawing, false);
+  }, { once: true });
+  
+  document.getElementById('dupWithTakeoff').addEventListener('click', async () => {
+    cleanup();
+    await doDuplicate(drawing, true);
+  }, { once: true });
+};
+
+async function doDuplicate(originalDrawing, includeTakeoff) {
+  const now = Date.now();
+  const newName = originalDrawing.fileName.replace(/(\.pdf)$/i, ' (Copy)$1');
+  
+  const newDrawing = {
+    projectId: originalDrawing.projectId,
+    fileName: newName,
+    pdfBlob: originalDrawing.pdfBlob,
+    fileSize: originalDrawing.fileSize,
+    pageCount: originalDrawing.pageCount,
+    uploadedAt: now,
+    modifiedAt: now
+  };
+  
+  const newId = await idbAdd('drawings', newDrawing);
+  
+  if (includeTakeoff) {
+    // Copy all pageData for the original drawing
+    const allPageData = await idbGetAllByIndex('pageData', 'drawingId', originalDrawing.id);
+    for (const pd of allPageData) {
+      const newKey = `${newId}-${pd.pageNum}`;
+      const newPd = {
+        id: newKey,
+        drawingId: newId,
+        pageNum: pd.pageNum,
+        scale: pd.scale ? { ...pd.scale } : null,
+        measurements: pd.measurements ? pd.measurements.map(m => ({ ...m, id: ++window._measIdCounter })) : []
+      };
+      await idbPut('pageData', newPd);
+    }
+    showToast(`Duplicated "${originalDrawing.fileName}" with all takeoff data`);
+  } else {
+    showToast(`Duplicated "${originalDrawing.fileName}" (drawing only)`);
+  }
+  
+  // Update project modifiedAt
+  if (currentManagerProjectId) {
+    const proj = await idbGet('projects', currentManagerProjectId);
+    if (proj) { proj.modifiedAt = now; await idbPut('projects', proj); }
+  }
+  
+  renderDrawingManager(currentManagerProjectId);
+}
+
+// Global measurement counter for duplicates
+window._measIdCounter = window._measIdCounter || 0;
 
 window.goBackFromViewer = function() {
   if (currentRoute.projectId) {
@@ -1503,6 +1669,7 @@ let pendingMeasurementId = null;
 const pageScales = {};
 const pageMeasurements = {};
 let measureIdCounter = 0;
+window._measIdCounter = 0;
 
 // Current drawing context for auto-save
 let activeDrawingId = null;
@@ -2034,8 +2201,9 @@ function finishMeasurement() {
   const pxLen = computePolylineLength(measPoints);
   const dist = computeRealDistance(pxLen, scale);
   
+  window._measIdCounter = ++measureIdCounter;
   const meas = {
-    id: ++measureIdCounter,
+    id: measureIdCounter,
     page: currentPage,
     points: [...measPoints],
     scale: scale ? { ...scale } : null,
