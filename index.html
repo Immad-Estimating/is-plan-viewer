@@ -235,43 +235,44 @@
   .dashboard-left { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; transition: box-shadow 0.2s; outline: 2px solid transparent; outline-offset: -2px; }
   .dashboard-left.drop-hover { outline-color: #e94560; box-shadow: inset 0 0 30px rgba(233,69,96,0.15), 0 0 15px rgba(233,69,96,0.3); }
   .dashboard-content { flex: 1; overflow-y: auto; padding: 20px; }
-  .dashboard-right { width: 380px; flex-shrink: 0; display: flex; flex-direction: column; border-left: 1px solid #0f3460; background: #16213e; overflow: hidden; transition: width 0.25s ease, opacity 0.25s ease; }
+  .dashboard-right { width: 440px; flex-shrink: 0; display: flex; flex-direction: column; border-left: 1px solid #0f3460; background: #16213e; overflow: hidden; transition: width 0.25s ease, opacity 0.25s ease; }
   .dashboard-right.collapsed { width: 0; border-left: none; opacity: 0; overflow: hidden; }
   .qb-panel-header { padding: 10px 14px; border-bottom: 1px solid #0f3460; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-  .qb-panel-header h3 { font-size: 13px; color: #e94560; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qb-panel-header h3 { font-size: 14px; color: #e94560; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .qb-panel-header button { background: none; border: 1px solid #0f3460; color: #a0a0c0; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 12px; flex-shrink: 0; transition: background 0.15s; }
   .qb-panel-header button:hover { background: #0f3460; color: #e0e0e0; }
   .qb-panel-search { padding: 8px 14px; flex-shrink: 0; }
-  .qb-panel-search input { width: 100%; background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 6px 10px; border-radius: 4px; font-size: 12px; }
+  .qb-panel-search input { width: 100%; background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 8px 10px; border-radius: 4px; font-size: 13px; }
   .qb-panel-search input:focus { outline: none; border-color: #e94560; box-shadow: 0 0 6px rgba(233,69,96,0.2); }
   .qb-table-wrap { flex: 1; overflow-y: auto; padding: 0 6px 6px; }
-  .qb-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .qb-table th { text-align: left; color: #a0a0c0; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 1px solid #0f3460; position: sticky; top: 0; background: #16213e; z-index: 1; }
+  .qb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .qb-table th { text-align: left; color: #a0a0c0; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 1px solid #0f3460; position: sticky; top: 0; background: #16213e; z-index: 1; }
   .qb-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
   .qb-table th.sortable:hover { color: #e0e0e0; }
-  .qb-table th.sortable .sort-arrow { font-size: 9px; opacity: 0.5; }
+  .qb-table th.sortable .sort-arrow { font-size: 11px; opacity: 0.5; }
   .qb-table th.sortable.active .sort-arrow { opacity: 1; color: #e94560; }
-  .qb-table th .col-filter-btn { font-size: 10px; opacity: 0.4; cursor: pointer; margin-left: 2px; position: relative; }
+  .qb-table th .col-filter-btn { font-size: 13px; opacity: 0.4; cursor: pointer; margin-left: 4px; position: relative; }
   .qb-table th .col-filter-btn:hover { opacity: 1; }
   .qb-table th .col-filter-btn.filtered { opacity: 1; color: #00ff88; }
-  .col-filter-dropdown { display: none; position: absolute; top: 100%; left: 0; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 6px; min-width: 160px; max-height: 220px; overflow-y: auto; z-index: 50; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+  .col-filter-dropdown { display: none; position: absolute; top: 100%; right: 0; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 6px; min-width: 160px; max-height: 220px; overflow-y: auto; z-index: 50; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
   .col-filter-dropdown.open { display: block; }
-  .col-filter-dropdown label { display: flex; align-items: center; gap: 6px; padding: 3px 4px; font-size: 11px; color: #e0e0e0; cursor: pointer; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .col-filter-dropdown label { display: flex; align-items: center; gap: 6px; padding: 4px 6px; font-size: 12px; color: #e0e0e0; cursor: pointer; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .col-filter-dropdown label:hover { background: #0f3460; }
   .col-filter-dropdown input[type="checkbox"] { accent-color: #e94560; flex-shrink: 0; }
   .col-filter-dropdown .filter-actions { display: flex; gap: 4px; padding-top: 4px; border-top: 1px solid #0f3460; margin-top: 4px; }
-  .col-filter-dropdown .filter-actions button { flex: 1; background: #0f3460; color: #e0e0e0; border: none; padding: 4px; border-radius: 3px; cursor: pointer; font-size: 10px; }
+  .col-filter-dropdown .filter-actions button { flex: 1; background: #0f3460; color: #e0e0e0; border: none; padding: 5px; border-radius: 3px; cursor: pointer; font-size: 11px; }
   .col-filter-dropdown .filter-actions button:hover { background: #1a4080; }
   .qb-table tr.qb-row { cursor: grab; border-bottom: 1px solid rgba(15,52,96,0.5); transition: background 0.15s; }
   .qb-table tr.qb-row:hover { background: rgba(15,52,96,0.6); }
   .qb-table tr.qb-row.imported { background: rgba(0,255,136,0.08); }
   .qb-table tr.qb-row.imported:hover { background: rgba(0,255,136,0.14); }
   .qb-table tr.qb-row:active { cursor: grabbing; }
-  .qb-table td { padding: 6px 8px; vertical-align: middle; }
-  .qb-table .qb-proj-name { color: #e0e0e0; font-weight: 500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qb-table td { padding: 8px 8px; vertical-align: middle; }
+  .qb-table .qb-proj-name { color: #e0e0e0; font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .qb-table .qb-client { color: #a0a0c0; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .qb-imported-tag { display: inline-block; font-size: 9px; color: #00ff88; margin-left: 4px; font-weight: 600; }
-  .qb-count { font-size: 11px; color: #a0a0c0; padding: 0 14px 6px; flex-shrink: 0; }
+  .qb-table .qb-modified { color: #a0a0c0; font-size: 12px; white-space: nowrap; }
+  .qb-imported-tag { display: inline-block; font-size: 10px; color: #00ff88; margin-left: 4px; font-weight: 600; }
+  .qb-count { font-size: 12px; color: #a0a0c0; padding: 0 14px 6px; flex-shrink: 0; }
   .collapse-toggle { position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 10; background: #16213e; border: 1px solid #0f3460; border-right: none; color: #a0a0c0; padding: 10px 3px; border-radius: 4px 0 0 4px; cursor: pointer; font-size: 11px; }
   .collapse-toggle:hover { background: #0f3460; color: #e0e0e0; }
 
@@ -331,6 +332,7 @@
             <th class="sortable" data-sort="name" style="position:relative"><span onclick="sortQBPanel('name')" style="cursor:pointer">Project <span class="sort-arrow" id="sortArrow-name"></span></span><span class="col-filter-btn" id="filterBtn-name" onclick="event.stopPropagation();toggleColFilter('name')">⧩</span><div class="col-filter-dropdown" id="filterDrop-name"></div></th>
             <th class="sortable" data-sort="client" style="position:relative"><span onclick="sortQBPanel('client')" style="cursor:pointer">Client <span class="sort-arrow" id="sortArrow-client"></span></span><span class="col-filter-btn" id="filterBtn-client" onclick="event.stopPropagation();toggleColFilter('client')">⧩</span><div class="col-filter-dropdown" id="filterDrop-client"></div></th>
             <th class="sortable" data-sort="stage" style="position:relative"><span onclick="sortQBPanel('stage')" style="cursor:pointer">Stage <span class="sort-arrow" id="sortArrow-stage"></span></span><span class="col-filter-btn" id="filterBtn-stage" onclick="event.stopPropagation();toggleColFilter('stage')">⧩</span><div class="col-filter-dropdown" id="filterDrop-stage"></div></th>
+            <th class="sortable" data-sort="modified" style="position:relative"><span onclick="sortQBPanel('modified')" style="cursor:pointer">Modified <span class="sort-arrow" id="sortArrow-modified"></span></span><span class="col-filter-btn" id="filterBtn-modified" onclick="event.stopPropagation();toggleColFilter('modified')">⧩</span><div class="col-filter-dropdown" id="filterDrop-modified"></div></th>
           </tr></thead>
           <tbody id="qbTableBody"></tbody>
         </table>
@@ -834,6 +836,13 @@ function getActiveQBProjects() {
   });
 }
 
+function formatQBDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d)) return '';
+  return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
+}
+
 async function renderQBPanel() {
   const allProjects = await idbGetAll('projects');
   const importedQbIds = new Set(allProjects.filter(p => p.qbId).map(p => p.qbId));
@@ -848,15 +857,19 @@ async function renderQBPanel() {
       active = active.filter(p => colFilters[f].has((p[f]||'').trim().toLowerCase() || '(empty)'));
     }
   });
+  if (colFilters.modified && colFilters.modified._cutoff) {
+    active = active.filter(p => p.modified && p.modified >= colFilters.modified._cutoff);
+  }
   // Sort
   active.sort((a, b) => {
-    const av = (a[qbSortField] || '').toLowerCase();
-    const bv = (b[qbSortField] || '').toLowerCase();
+    let av, bv;
+    if (qbSortField === 'modified') { av = a.modified || ''; bv = b.modified || ''; }
+    else { av = (a[qbSortField] || '').toLowerCase(); bv = (b[qbSortField] || '').toLowerCase(); }
     const cmp = av < bv ? -1 : av > bv ? 1 : 0;
     return qbSortAsc ? cmp : -cmp;
   });
   // Update sort arrows
-  ['name','client','stage'].forEach(f => {
+  ['name','client','stage','modified'].forEach(f => {
     const th = document.querySelector(`th[data-sort="${f}"]`);
     const arrow = document.getElementById(`sortArrow-${f}`);
     if (th && arrow) {
@@ -873,10 +886,12 @@ async function renderQBPanel() {
     const imported = importedQbIds.has(q.id);
     const stageBadge = q.stage ? `<span class="stage-badge ${getStageCssClass(q.stage)}">${escapeHtml(q.stage)}</span>` : '';
     const importedTag = imported ? '<span class="qb-imported-tag">✓</span>' : '';
+    const modDate = q.modified ? formatQBDate(q.modified) : '';
     return `<tr class="qb-row${imported ? ' imported' : ''}" draggable="true" data-qbid="${q.id}">
       <td class="qb-proj-name" title="${escapeHtml(q.name)}">${escapeHtml(q.name)}${importedTag}</td>
       <td class="qb-client" title="${escapeHtml(q.client || '')}">${escapeHtml(q.client || '')}</td>
       <td>${stageBadge}</td>
+      <td class="qb-modified">${modDate}</td>
     </tr>`;
   }).join('');
   
@@ -905,21 +920,38 @@ window.sortQBPanel = function(field) {
 };
 
 // Column filters: { name: Set, client: Set, stage: Set } — null means no filter (show all)
-const colFilters = { name: null, client: null, stage: null };
+const colFilters = { name: null, client: null, stage: null, modified: null };
 
 window.toggleColFilter = function(field) {
   const drop = document.getElementById(`filterDrop-${field}`);
   const isOpen = drop.classList.contains('open');
-  // Close all dropdowns first
-  ['name','client','stage'].forEach(f => document.getElementById(`filterDrop-${f}`).classList.remove('open'));
+  ['name','client','stage','modified'].forEach(f => document.getElementById(`filterDrop-${f}`).classList.remove('open'));
   if (isOpen) return;
   
-  // Get unique values for this column from active (non-filtered-by-this-col) data
+  if (field === 'modified') {
+    const current = colFilters.modified;
+    const sel = current ? current._preset || '' : '';
+    drop.innerHTML = `
+      <label style="font-weight:600;color:#a0a0c0;padding-bottom:2px">Filter by date</label>
+      <label><input type="radio" name="dateFilter" value="" ${!sel ? 'checked' : ''}> All dates</label>
+      <label><input type="radio" name="dateFilter" value="7d" ${sel==='7d' ? 'checked' : ''}> Last 7 days</label>
+      <label><input type="radio" name="dateFilter" value="14d" ${sel==='14d' ? 'checked' : ''}> Last 2 weeks</label>
+      <label><input type="radio" name="dateFilter" value="30d" ${sel==='30d' ? 'checked' : ''}> Last 30 days</label>
+      <label><input type="radio" name="dateFilter" value="60d" ${sel==='60d' ? 'checked' : ''}> Last 60 days</label>
+      <label><input type="radio" name="dateFilter" value="90d" ${sel==='90d' ? 'checked' : ''}> Last 90 days</label>
+      <label><input type="radio" name="dateFilter" value="6m" ${sel==='6m' ? 'checked' : ''}> Last 6 months</label>
+      <label><input type="radio" name="dateFilter" value="1y" ${sel==='1y' ? 'checked' : ''}> Last year</label>
+      <div class="filter-actions"><button onclick="applyDateFilter()">Apply</button><button onclick="clearColFilter('modified')">Clear</button></div>
+    `;
+    drop.classList.add('open');
+    return;
+  }
+  
   const excluded = ['lost', 'no bid'];
   let pool = qbProjects.filter(p => !excluded.includes((p.stage||'').toLowerCase().trim()));
-  // Apply other column filters but not this one
-  ['name','client','stage'].forEach(f => {
+  ['name','client','stage','modified'].forEach(f => {
     if (f !== field && colFilters[f]) {
+      if (f === 'modified') return;
       pool = pool.filter(p => colFilters[f].has((p[f]||'').toLowerCase().trim() || '(empty)'));
     }
   });
@@ -935,6 +967,23 @@ window.toggleColFilter = function(field) {
   html += `<div class="filter-actions"><button onclick="applyColFilter('${field}')">Apply</button><button onclick="clearColFilter('${field}')">Clear</button></div>`;
   drop.innerHTML = html;
   drop.classList.add('open');
+};
+
+window.applyDateFilter = function() {
+  const drop = document.getElementById('filterDrop-modified');
+  const selected = drop.querySelector('input[name="dateFilter"]:checked');
+  const val = selected ? selected.value : '';
+  if (!val) {
+    colFilters.modified = null;
+    document.getElementById('filterBtn-modified').classList.remove('filtered');
+  } else {
+    const ms = { '7d': 7, '14d': 14, '30d': 30, '60d': 60, '90d': 90, '6m': 182, '1y': 365 };
+    const cutoff = new Date(Date.now() - (ms[val] || 30) * 86400000).toISOString();
+    colFilters.modified = { _preset: val, _cutoff: cutoff };
+    document.getElementById('filterBtn-modified').classList.add('filtered');
+  }
+  drop.classList.remove('open');
+  renderQBPanel();
 };
 
 window.applyColFilter = function(field) {
@@ -964,7 +1013,7 @@ window.clearColFilter = function(field) {
 // Close filter dropdowns on outside click
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.col-filter-dropdown') && !e.target.closest('.col-filter-btn')) {
-    ['name','client','stage'].forEach(f => document.getElementById(`filterDrop-${f}`)?.classList.remove('open'));
+    ['name','client','stage','modified'].forEach(f => document.getElementById(`filterDrop-${f}`)?.classList.remove('open'));
   }
 });
 
