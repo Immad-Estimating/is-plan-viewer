@@ -10,11 +10,12 @@
   body { background: #1a1a2e; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
   
   /* Toolbar */
-  .toolbar { background: #16213e; padding: 8px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #0f3460; z-index: 10; flex-shrink: 0; }
+  .toolbar { background: #16213e; padding: 8px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #0f3460; z-index: 100; flex-shrink: 0; }
   .toolbar .logo { font-weight: 700; font-size: 16px; color: #e94560; margin-right: 8px; }
   .toolbar button { background: #0f3460; color: #e0e0e0; border: 1px solid #1a4080; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; transition: background 0.15s; }
   .toolbar button:hover { background: #1a4080; }
   .toolbar button:active { background: #e94560; }
+  .toolbar button.active { background: #e94560; border-color: #e94560; }
   .toolbar .zoom-display { font-size: 13px; min-width: 50px; text-align: center; color: #a0a0c0; }
   .toolbar .separator { width: 1px; height: 24px; background: #0f3460; }
   .toolbar .page-info { font-size: 13px; color: #a0a0c0; }
@@ -23,10 +24,16 @@
   .upload-btn { background: #e94560 !important; border-color: #e94560 !important; font-weight: 600; }
   .upload-btn:hover { background: #c73550 !important; }
   
+  /* Main layout */
+  .main-content { flex: 1; display: flex; overflow: hidden; }
+  
   /* Viewer */
   .viewer-container { flex: 1; overflow: hidden; position: relative; cursor: grab; }
   .viewer-container.grabbing { cursor: grabbing; }
+  .viewer-container.measuring { cursor: crosshair; }
+  .viewer-container.measuring.grabbing { cursor: crosshair; }
   .viewer-container canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  #measureCanvas { pointer-events: none; z-index: 5; }
   
   /* Drop zone */
   .drop-zone { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 5; }
@@ -39,6 +46,84 @@
   .drag-overlay { position: absolute; inset: 0; background: rgba(233, 69, 96, 0.1); border: 3px dashed #e94560; z-index: 20; display: none; align-items: center; justify-content: center; }
   .drag-overlay.active { display: flex; }
   .drag-overlay span { font-size: 20px; color: #e94560; font-weight: 600; }
+
+  /* Scale floating button */
+  .scale-widget { position: absolute; bottom: 16px; left: 16px; z-index: 50; }
+  .scale-btn { background: #16213e; border: 1px solid #0f3460; color: #a0a0c0; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 6px; transition: background 0.15s; white-space: nowrap; }
+  .scale-btn:hover { background: #0f3460; }
+  .scale-label { font-size: 11px; color: #00ff88; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+  
+  /* Scale popover */
+  .scale-popover { display: none; position: absolute; bottom: 42px; left: 0; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 12px; min-width: 260px; max-height: 400px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  .scale-popover.open { display: block; }
+  .scale-popover h4 { font-size: 12px; color: #a0a0c0; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .scale-popover .scale-option { display: block; width: 100%; background: none; border: none; color: #e0e0e0; padding: 6px 8px; text-align: left; cursor: pointer; font-size: 13px; border-radius: 4px; transition: background 0.1s; }
+  .scale-popover .scale-option:hover { background: #0f3460; }
+  .scale-popover .scale-option.selected { background: #0f3460; color: #00ff88; }
+  .scale-popover .divider { height: 1px; background: #0f3460; margin: 8px 0; }
+  .scale-popover .custom-scale-section { margin-top: 4px; }
+  .scale-popover .custom-scale-section p { font-size: 11px; color: #a0a0c0; margin-bottom: 6px; }
+  .scale-popover input[type="text"] { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 5px 8px; border-radius: 4px; font-size: 12px; width: 100%; margin-top: 4px; }
+  .scale-popover input[type="text"]:focus { outline: none; border-color: #e94560; }
+
+  /* Custom scale calibration banner */
+  .calibration-banner { display: none; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: #e94560; color: #fff; padding: 8px 16px; border-radius: 6px; font-size: 13px; z-index: 60; white-space: nowrap; }
+  .calibration-banner.active { display: flex; align-items: center; gap: 10px; }
+  .calibration-banner button { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+  /* Duct popup */
+  .duct-popup { display: none; position: absolute; z-index: 70; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); min-width: 240px; }
+  .duct-popup.open { display: block; }
+  .duct-popup h4 { font-size: 13px; color: #e94560; margin-bottom: 10px; }
+  .duct-popup label { font-size: 12px; color: #a0a0c0; display: block; margin-bottom: 4px; }
+  .duct-popup select, .duct-popup input { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 5px 8px; border-radius: 4px; font-size: 12px; width: 100%; margin-bottom: 8px; }
+  .duct-popup select:focus, .duct-popup input:focus { outline: none; border-color: #e94560; }
+  .duct-popup .duct-btns { display: flex; gap: 8px; margin-top: 4px; }
+  .duct-popup .duct-btns button { flex: 1; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; border: 1px solid #0f3460; }
+  .duct-popup .duct-btns .save-btn { background: #00ff88; color: #1a1a2e; border-color: #00ff88; font-weight: 600; }
+  .duct-popup .duct-btns .skip-btn { background: #0f3460; color: #e0e0e0; }
+  .duct-popup .duct-dims { display: none; }
+  .duct-popup .duct-dims.show { display: block; }
+
+  /* Side panel */
+  .side-panel { width: 0; overflow: hidden; background: #16213e; border-left: 1px solid #0f3460; transition: width 0.2s ease; flex-shrink: 0; display: flex; flex-direction: column; }
+  .side-panel.open { width: 300px; }
+  .side-panel-header { padding: 12px 14px; border-bottom: 1px solid #0f3460; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .side-panel-header h3 { font-size: 14px; color: #e94560; }
+  .side-panel-header button { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 16px; }
+  .side-panel-content { flex: 1; overflow-y: auto; padding: 8px; }
+  .side-panel-footer { padding: 10px 14px; border-top: 1px solid #0f3460; flex-shrink: 0; }
+  .side-panel-footer button { width: 100%; background: #e94560; color: #fff; border: none; padding: 7px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .side-panel-footer button:hover { background: #c73550; }
+
+  .panel-toggle-btn { position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 50; background: #16213e; border: 1px solid #0f3460; border-right: none; color: #a0a0c0; padding: 8px 4px; border-radius: 4px 0 0 4px; cursor: pointer; font-size: 14px; transition: right 0.2s ease; }
+  
+  /* Measurement list items */
+  .meas-group { margin-bottom: 8px; }
+  .meas-group-title { font-size: 11px; color: #a0a0c0; text-transform: uppercase; padding: 4px 6px; letter-spacing: 0.5px; }
+  .meas-item { background: #1a1a2e; border: 1px solid #0f3460; border-radius: 4px; padding: 8px 10px; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+  .meas-item .meas-info { flex: 1; }
+  .meas-item .meas-length { color: #00ff88; font-weight: 600; font-size: 13px; }
+  .meas-item .meas-duct { color: #a0a0c0; font-size: 11px; margin-top: 2px; }
+  .meas-item .meas-delete { background: none; border: none; color: #e94560; cursor: pointer; font-size: 16px; padding: 0 4px; opacity: 0.6; }
+  .meas-item .meas-delete:hover { opacity: 1; }
+  .meas-empty { font-size: 12px; color: #a0a0c0; text-align: center; padding: 20px; }
+
+  /* Custom scale input popup */
+  .custom-length-popup { display: none; position: absolute; z-index: 70; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); min-width: 220px; }
+  .custom-length-popup.open { display: block; }
+  .custom-length-popup h4 { font-size: 13px; color: #e94560; margin-bottom: 8px; }
+  .custom-length-popup p { font-size: 11px; color: #a0a0c0; margin-bottom: 8px; }
+  .custom-length-popup input { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 5px 8px; border-radius: 4px; font-size: 12px; width: 100%; margin-bottom: 8px; }
+  .custom-length-popup .popup-btns { display: flex; gap: 8px; }
+  .custom-length-popup .popup-btns button { flex: 1; padding: 5px; border-radius: 4px; cursor: pointer; font-size: 12px; border: 1px solid #0f3460; }
+  .custom-length-popup .popup-btns .ok-btn { background: #00ff88; color: #1a1a2e; border-color: #00ff88; font-weight: 600; }
+  .custom-length-popup .popup-btns .cancel-btn { background: #0f3460; color: #e0e0e0; }
+
+  /* Scrollbar for panel */
+  .side-panel-content::-webkit-scrollbar { width: 6px; }
+  .side-panel-content::-webkit-scrollbar-track { background: #1a1a2e; }
+  .side-panel-content::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
 </style>
 </head>
 <body>
@@ -57,16 +142,112 @@
   <button onclick="prevPage()" title="Previous Page">◀</button>
   <span class="page-info" id="pageInfo">No PDF loaded</span>
   <button onclick="nextPage()" title="Next Page">▶</button>
+  <div class="separator"></div>
+  <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)">📐 Measure</button>
+  <button id="panelBtn" onclick="togglePanel()" title="Measurements Panel">📋</button>
 </div>
 
-<div class="viewer-container" id="viewer">
-  <div class="drop-zone" id="dropZone">
-    <div class="icon">📐</div>
-    <h2>Plan Viewer</h2>
-    <p>Upload a PDF or drag & drop it here</p>
+<div class="main-content">
+  <div class="viewer-container" id="viewer">
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">📐</div>
+      <h2>Plan Viewer</h2>
+      <p>Upload a PDF or drag & drop it here</p>
+    </div>
+    <canvas id="pdfCanvas"></canvas>
+    <canvas id="measureCanvas"></canvas>
+    <div class="drag-overlay" id="dragOverlay"><span>Drop PDF here</span></div>
+
+    <!-- Scale widget -->
+    <div class="scale-widget" id="scaleWidget">
+      <button class="scale-btn" id="scaleBtn" onclick="toggleScalePopover()">
+        <span>📏</span>
+        <span class="scale-label" id="scaleLabelText">No Scale</span>
+      </button>
+      <div class="scale-popover" id="scalePopover">
+        <h4>Architectural</h4>
+        <button class="scale-option" data-type="arch" data-ratio="48">1/4" = 1'-0"</button>
+        <button class="scale-option" data-type="arch" data-ratio="96">1/8" = 1'-0"</button>
+        <button class="scale-option" data-type="arch" data-ratio="64">3/16" = 1'-0"</button>
+        <button class="scale-option" data-type="arch" data-ratio="24">1/2" = 1'-0"</button>
+        <button class="scale-option" data-type="arch" data-ratio="12">1" = 1'-0"</button>
+        <button class="scale-option" data-type="arch" data-ratio="32">3/8" = 1'-0"</button>
+        <button class="scale-option" data-type="arch" data-ratio="16">3/4" = 1'-0"</button>
+        <button class="scale-option" data-type="arch" data-ratio="8">1-1/2" = 1'-0"</button>
+        <button class="scale-option" data-type="arch" data-ratio="4">3" = 1'-0"</button>
+        <div class="divider"></div>
+        <h4>Engineering</h4>
+        <button class="scale-option" data-type="eng" data-ratio="10">1:10</button>
+        <button class="scale-option" data-type="eng" data-ratio="20">1:20</button>
+        <button class="scale-option" data-type="eng" data-ratio="50">1:50</button>
+        <button class="scale-option" data-type="eng" data-ratio="100">1:100</button>
+        <button class="scale-option" data-type="eng" data-ratio="200">1:200</button>
+        <button class="scale-option" data-type="eng" data-ratio="500">1:500</button>
+        <div class="divider"></div>
+        <h4>Custom Scale</h4>
+        <div class="custom-scale-section">
+          <p>Draw a line of known distance on the plan, then enter the real-world length.</p>
+          <button class="scale-option" id="customScaleBtn" data-type="custom">✏️ Calibrate Custom Scale…</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calibration banner -->
+    <div class="calibration-banner" id="calibrationBanner">
+      <span>📏 Click two points of a known distance</span>
+      <button onclick="cancelCalibration()">Cancel</button>
+    </div>
+
+    <!-- Custom length input popup -->
+    <div class="custom-length-popup" id="customLengthPopup">
+      <h4>Enter Known Distance</h4>
+      <p>Type the real-world distance for the line you drew.</p>
+      <input type="text" id="customLengthInput" placeholder='e.g. 10ft, 20\'-6", 5m' />
+      <div class="popup-btns">
+        <button class="cancel-btn" onclick="cancelCustomLength()">Cancel</button>
+        <button class="ok-btn" onclick="confirmCustomLength()">Set Scale</button>
+      </div>
+    </div>
+
+    <!-- Duct popup -->
+    <div class="duct-popup" id="ductPopup">
+      <h4>Tag as Duct Run?</h4>
+      <label>Duct Type</label>
+      <select id="ductTypeSelect" onchange="onDuctTypeChange()">
+        <option value="">None (plain measurement)</option>
+        <option value="rect">▬ Rectangular</option>
+        <option value="oval">⬭ Oval</option>
+        <option value="round">● Round</option>
+      </select>
+      <div class="duct-dims" id="ductDimsRect">
+        <label>Width × Height (inches)</label>
+        <input type="text" id="ductRectDims" placeholder="e.g. 24x12" />
+      </div>
+      <div class="duct-dims" id="ductDimsRound">
+        <label>Diameter (inches)</label>
+        <input type="text" id="ductRoundDiam" placeholder="e.g. 14" />
+      </div>
+      <div class="duct-btns">
+        <button class="skip-btn" onclick="finishDuct(false)">Skip</button>
+        <button class="save-btn" onclick="finishDuct(true)">Save</button>
+      </div>
+    </div>
+
+    <!-- Panel toggle -->
+    <button class="panel-toggle-btn" id="panelToggle" onclick="togglePanel()" title="Toggle Measurements Panel">◀</button>
   </div>
-  <canvas id="pdfCanvas"></canvas>
-  <div class="drag-overlay" id="dragOverlay"><span>Drop PDF here</span></div>
+
+  <!-- Side Panel -->
+  <div class="side-panel" id="sidePanel">
+    <div class="side-panel-header">
+      <h3>Measurements</h3>
+      <button onclick="togglePanel()" title="Close">✕</button>
+    </div>
+    <div class="side-panel-content" id="panelContent"></div>
+    <div class="side-panel-footer">
+      <button onclick="clearAllMeasurements()">Clear All</button>
+    </div>
+  </div>
 </div>
 
 <script type="module">
@@ -81,11 +262,35 @@ let panX = 0, panY = 0;
 let isPanning = false;
 let startX, startY;
 
+// Measurement state
+let measureMode = false;
+let measPoints = []; // current in-progress points [{x,y},...] in PDF pixel coords
+let mousePos = null; // current mouse in PDF pixel coords
+let calibrationMode = false;
+let calibrationPoints = [];
+let pendingMeasurementId = null;
+
+// Per-page state
+// pageScales[pageNum] = { type: 'arch'|'eng'|'custom', ratio: number, label: string, pxPerUnit: number|null }
+// For arch: ratio = how many drawing inches per real foot. pxPerUnit = null (computed from PDF DPI)
+// For eng: ratio = scale factor. pxPerUnit = null
+// For custom: pxPerUnit = pixels per real-world unit (feet or meters)
+const pageScales = {};
+
+// pageMeasurements[pageNum] = [{ id, points:[{x,y},...], scale:{...}, length, duct:{type,dims}|null }]
+const pageMeasurements = {};
+
+let measureIdCounter = 0;
+
 const canvas = document.getElementById('pdfCanvas');
 const ctx = canvas.getContext('2d');
+const mCanvas = document.getElementById('measureCanvas');
+const mCtx = mCanvas.getContext('2d');
 const viewer = document.getElementById('viewer');
 const dropZone = document.getElementById('dropZone');
 const dragOverlay = document.getElementById('dragOverlay');
+const scalePopover = document.getElementById('scalePopover');
+const sidePanel = document.getElementById('sidePanel');
 
 // File input
 document.getElementById('fileInput').addEventListener('change', (e) => {
@@ -104,23 +309,85 @@ viewer.addEventListener('drop', (e) => {
   if (file && file.type === 'application/pdf') loadPDF(file);
 });
 
-// Pan
+// ---- Coordinate helpers ----
+function screenToPdf(clientX, clientY) {
+  const rect = viewer.getBoundingClientRect();
+  const sx = clientX - rect.left;
+  const sy = clientY - rect.top;
+  const displayScale = currentScale / baseScale;
+  const pdfX = (sx - panX) / displayScale;
+  const pdfY = (sy - panY) / displayScale;
+  return { x: pdfX, y: pdfY };
+}
+
+function pdfToScreen(px, py) {
+  const displayScale = currentScale / baseScale;
+  return {
+    x: px * displayScale + panX,
+    y: py * displayScale + panY
+  };
+}
+
+// ---- Mouse handling ----
 viewer.addEventListener('mousedown', (e) => {
   if (!pdfDoc) return;
+  if (calibrationMode) return;
+  if (measureMode && !e.shiftKey) return; // don't pan in measure mode unless shift held
   isPanning = true;
   startX = e.clientX - panX;
   startY = e.clientY - panY;
   viewer.classList.add('grabbing');
 });
+
 window.addEventListener('mousemove', (e) => {
-  if (!isPanning) return;
-  panX = e.clientX - startX;
-  panY = e.clientY - startY;
-  applyTransform();
+  if (isPanning) {
+    panX = e.clientX - startX;
+    panY = e.clientY - startY;
+    applyTransform();
+    drawMeasureOverlay();
+    return;
+  }
+  if ((measureMode || calibrationMode) && pdfDoc) {
+    mousePos = screenToPdf(e.clientX, e.clientY);
+    drawMeasureOverlay();
+  }
 });
+
 window.addEventListener('mouseup', () => {
   isPanning = false;
   viewer.classList.remove('grabbing');
+});
+
+viewer.addEventListener('click', (e) => {
+  if (!pdfDoc) return;
+  if (isPanning) return;
+  
+  // Close scale popover if clicking outside
+  if (scalePopover.classList.contains('open') && !e.target.closest('.scale-widget')) {
+    scalePopover.classList.remove('open');
+  }
+
+  if (calibrationMode) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    calibrationPoints.push(pt);
+    if (calibrationPoints.length === 2) {
+      showCustomLengthPopup();
+    }
+    drawMeasureOverlay();
+    return;
+  }
+
+  if (!measureMode) return;
+  
+  const pt = screenToPdf(e.clientX, e.clientY);
+  measPoints.push(pt);
+  drawMeasureOverlay();
+});
+
+viewer.addEventListener('dblclick', (e) => {
+  if (!measureMode || measPoints.length < 2) return;
+  e.preventDefault();
+  finishMeasurement();
 });
 
 // Mouse wheel zoom
@@ -135,24 +402,609 @@ viewer.addEventListener('wheel', (e) => {
   const delta = e.deltaY > 0 ? -1 : 1;
   currentScale = Math.min(10, Math.max(0.1, currentScale * (1 + delta * 0.1)));
   
-  // Zoom toward mouse position
   const ratio = currentScale / oldScale;
   panX = mouseX - ratio * (mouseX - panX);
   panY = mouseY - ratio * (mouseY - panY);
   
   applyTransform();
+  drawMeasureOverlay();
   updateZoomDisplay();
 }, { passive: false });
 
 // Keyboard shortcuts
 window.addEventListener('keydown', (e) => {
+  // Don't capture if typing in input
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+    if (e.key === 'Escape') {
+      // Close any popups
+      document.getElementById('ductPopup').classList.remove('open');
+      document.getElementById('customLengthPopup').classList.remove('open');
+      cancelCalibration();
+    }
+    if (e.key === 'Enter' && e.target.id === 'customLengthInput') {
+      confirmCustomLength();
+    }
+    return;
+  }
   if (!pdfDoc) return;
   if (e.key === '+' || e.key === '=') { e.preventDefault(); window.zoom(1); }
   else if (e.key === '-') { e.preventDefault(); window.zoom(-1); }
   else if (e.key === '0') { e.preventDefault(); window.fitToScreen(); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); window.prevPage(); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); window.nextPage(); }
+  else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
+  else if (e.key === 'Escape') {
+    if (calibrationMode) { cancelCalibration(); return; }
+    if (measPoints.length > 0) { measPoints = []; drawMeasureOverlay(); }
+  }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && measPoints.length > 0) {
+    e.preventDefault();
+    measPoints.pop();
+    drawMeasureOverlay();
+  }
+  else if (e.key === 'Enter' && measPoints.length >= 2) {
+    e.preventDefault();
+    finishMeasurement();
+  }
 });
+
+// ---- Scale helpers ----
+
+// Architectural scales: ratio = how many drawing inches per 1 real foot
+// e.g., 1/4" = 1'-0" means 0.25 drawing inches = 1 real foot, so ratio = 48 (48 * 0.25" = 12" = 1')
+// Wait — actually the ratio stored is the reciprocal factor: at 1/4"=1'-0", 1 real foot = 0.25 drawing inches
+// So PDF pixels per real foot = (DPI of PDF / ratio). Standard PDF = 72 DPI.
+// At 1/4"=1'-0": 1 real foot = 0.25", which at 72 DPI = 18 px. So ratio 48 means: real_feet = px_distance / (72/ratio)... 
+// Let me think differently:
+// The scale "1/4 inch = 1 foot" means: on paper, 0.25 inches represents 1 foot.
+// PDF default is 72 points per inch. Our render scale is baseScale (2).
+// So on canvas, 0.25 * 72 * baseScale = 36 pixels represents 1 real foot.
+// General: paper_inches_per_foot = 12 / ratio. canvas_px_per_foot = (12/ratio) * 72 * 1 (we use PDF coords before baseScale is applied... actually we store in canvas px which includes baseScale).
+// Wait. Our coordinates are in canvas pixel space (which is rendered at baseScale=2 multiplied by 72 DPI).
+// Canvas px per inch of PDF = 72 * baseScale = 144.
+// At 1/4"=1'-0": 1 foot = 0.25 paper inches = 0.25 * 144 = 36 canvas px.
+// At 1/8"=1'-0": 1 foot = 0.125 paper inches = 0.125 * 144 = 18 canvas px.
+// General for arch: canvas_px_per_foot = (1/ratio) * 12 * 72 * baseScale = (12 * 72 * baseScale) / ratio = (864 * baseScale) / ratio
+// Hmm wait. ratio for 1/4"=1'-0" is stored as 48. Let's verify: (864 * 2) / 48 = 36. And above I calculated 36. ✓
+// For 1/8"=1'-0": ratio=96. (864*2)/96 = 18. And 0.125*144=18. ✓
+
+function getScaleForPage(pageNum) {
+  return pageScales[pageNum] || null;
+}
+
+function getPxPerRealFoot(scale) {
+  if (!scale) return null;
+  if (scale.type === 'custom') {
+    return scale.pxPerUnit; // already in canvas px per foot (or meter for eng custom)
+  }
+  if (scale.type === 'arch') {
+    // ratio = drawing scale denominator. canvas_px_per_foot = (864 * baseScale) / ratio
+    return (864 * baseScale) / scale.ratio;
+  }
+  if (scale.type === 'eng') {
+    // Engineering: 1:ratio means 1 unit on paper = ratio units in real life
+    // canvas_px_per_unit = (72 * baseScale) / ratio (since 1 inch on paper = 72 * baseScale canvas px)
+    // Actually for engineering, we need to decide units. Let's say meters.
+    // 1:100 means 1cm on paper = 1m in real life, or 1 inch on paper = 100 inches real.
+    // canvas_px_per_real_unit: if we define unit as the ratio's unit:
+    // At 1:100, 1 paper unit = 100 real units. 1 paper inch = 72*baseScale px = 100 real inches.
+    // px_per_real_inch = 72*baseScale / ratio. For meters: px_per_real_meter = 72*baseScale*39.3701/ratio
+    // Let's keep it simpler: for engineering, return px per real unit where unit depends on context.
+    // We'll handle formatting separately.
+    // px per "real drawing unit" where 1 drawing unit on paper = ratio real units
+    // Actually let's just return px_per_real_inch for engineering too, then format as metric.
+    return (72 * baseScale) / scale.ratio; // px per real inch
+  }
+  return null;
+}
+
+function computeRealDistance(pxDist, scale) {
+  if (!scale) return { value: pxDist, unit: 'px', formatted: pxDist.toFixed(1) + ' px' };
+  
+  if (scale.type === 'arch') {
+    const pxPerFoot = (864 * baseScale) / scale.ratio;
+    const feet = pxDist / pxPerFoot;
+    return formatFeetInches(feet);
+  }
+  if (scale.type === 'eng') {
+    // px per real inch
+    const pxPerInch = (72 * baseScale) / scale.ratio;
+    const realInches = pxDist / pxPerInch;
+    // Convert to meters
+    const meters = realInches * 0.0254;
+    return formatMetric(meters);
+  }
+  if (scale.type === 'custom') {
+    if (scale.customUnit === 'ft') {
+      const feet = pxDist / scale.pxPerUnit;
+      return formatFeetInches(feet);
+    } else {
+      const meters = pxDist / scale.pxPerUnit;
+      return formatMetric(meters);
+    }
+  }
+  return { value: pxDist, unit: 'px', formatted: pxDist.toFixed(1) + ' px' };
+}
+
+function formatFeetInches(totalFeet) {
+  const negative = totalFeet < 0;
+  totalFeet = Math.abs(totalFeet);
+  const feet = Math.floor(totalFeet);
+  const inches = Math.round((totalFeet - feet) * 12);
+  const adjustedFeet = inches === 12 ? feet + 1 : feet;
+  const adjustedInches = inches === 12 ? 0 : inches;
+  const sign = negative ? '-' : '';
+  const formatted = adjustedInches === 0 ? `${sign}${adjustedFeet}'-0"` : `${sign}${adjustedFeet}'-${adjustedInches}"`;
+  return { value: totalFeet, unit: 'ft', formatted };
+}
+
+function formatMetric(meters) {
+  if (meters >= 1) {
+    return { value: meters, unit: 'm', formatted: meters.toFixed(2) + ' m' };
+  }
+  return { value: meters * 100, unit: 'cm', formatted: (meters * 100).toFixed(1) + ' cm' };
+}
+
+function computePolylineLength(points) {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i-1].x;
+    const dy = points[i].y - points[i-1].y;
+    total += Math.sqrt(dx*dx + dy*dy);
+  }
+  return total;
+}
+
+function computeSegmentLength(p1, p2) {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+// ---- Scale UI ----
+window.toggleScalePopover = function() {
+  scalePopover.classList.toggle('open');
+  updateScaleOptionHighlight();
+};
+
+function updateScaleOptionHighlight() {
+  const cs = getScaleForPage(currentPage);
+  document.querySelectorAll('.scale-option').forEach(btn => {
+    btn.classList.remove('selected');
+    if (cs && btn.dataset.type === cs.type && btn.dataset.ratio == cs.ratio && cs.type !== 'custom') {
+      btn.classList.add('selected');
+    }
+  });
+}
+
+function updateScaleLabel() {
+  const cs = getScaleForPage(currentPage);
+  const label = document.getElementById('scaleLabelText');
+  if (!cs) {
+    label.textContent = 'No Scale';
+    label.style.color = '#a0a0c0';
+  } else {
+    label.textContent = cs.label;
+    label.style.color = '#00ff88';
+  }
+}
+
+// Scale option clicks
+document.querySelectorAll('.scale-option[data-type="arch"], .scale-option[data-type="eng"]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.dataset.type;
+    const ratio = parseFloat(btn.dataset.ratio);
+    pageScales[currentPage] = { type, ratio, label: btn.textContent.trim() };
+    scalePopover.classList.remove('open');
+    updateScaleLabel();
+    drawMeasureOverlay();
+  });
+});
+
+document.getElementById('customScaleBtn').addEventListener('click', () => {
+  scalePopover.classList.remove('open');
+  startCalibration();
+});
+
+function startCalibration() {
+  calibrationMode = true;
+  calibrationPoints = [];
+  document.getElementById('calibrationBanner').classList.add('active');
+  viewer.classList.add('measuring');
+}
+
+window.cancelCalibration = function() {
+  calibrationMode = false;
+  calibrationPoints = [];
+  document.getElementById('calibrationBanner').classList.remove('active');
+  document.getElementById('customLengthPopup').classList.remove('open');
+  if (!measureMode) viewer.classList.remove('measuring');
+  drawMeasureOverlay();
+};
+
+function showCustomLengthPopup() {
+  const popup = document.getElementById('customLengthPopup');
+  // Position near center of screen
+  const rect = viewer.getBoundingClientRect();
+  popup.style.left = (rect.width / 2 - 110) + 'px';
+  popup.style.top = (rect.height / 2 - 60) + 'px';
+  popup.classList.add('open');
+  const input = document.getElementById('customLengthInput');
+  input.value = '';
+  input.focus();
+}
+
+window.confirmCustomLength = function() {
+  const input = document.getElementById('customLengthInput').value.trim();
+  if (!input) return;
+  
+  const parsed = parseDistanceInput(input);
+  if (!parsed) { alert('Could not parse distance. Try formats like: 10ft, 20\'-6", 5m, 300cm'); return; }
+  
+  // Compute pixel distance of calibration line
+  const pxDist = computeSegmentLength(calibrationPoints[0], calibrationPoints[1]);
+  if (pxDist < 1) { alert('Calibration line too short.'); cancelCalibration(); return; }
+  
+  const pxPerUnit = pxDist / parsed.value; // px per foot or px per meter
+  pageScales[currentPage] = {
+    type: 'custom',
+    pxPerUnit,
+    customUnit: parsed.unit, // 'ft' or 'm'
+    label: `Custom (${input})`
+  };
+  
+  document.getElementById('customLengthPopup').classList.remove('open');
+  calibrationMode = false;
+  calibrationPoints = [];
+  document.getElementById('calibrationBanner').classList.remove('active');
+  if (!measureMode) viewer.classList.remove('measuring');
+  updateScaleLabel();
+  drawMeasureOverlay();
+};
+
+window.cancelCustomLength = function() {
+  cancelCalibration();
+};
+
+function parseDistanceInput(str) {
+  str = str.trim().toLowerCase();
+  
+  // Try feet-inches: 20'-6" or 20'6" or 20ft 6in
+  let m = str.match(/^(\d+)['\u2019]?\s*-?\s*(\d+)["\u201d]?$/);
+  if (m) return { value: parseInt(m[1]) + parseInt(m[2]) / 12, unit: 'ft' };
+  
+  // Try just feet: 10' or 10ft or 10 ft
+  m = str.match(/^([\d.]+)\s*(?:['\u2019]|ft|feet)$/);
+  if (m) return { value: parseFloat(m[1]), unit: 'ft' };
+  
+  // Try just inches: 120" or 120in
+  m = str.match(/^([\d.]+)\s*(?:["\u201d]|in|inches)$/);
+  if (m) return { value: parseFloat(m[1]) / 12, unit: 'ft' };
+
+  // Meters
+  m = str.match(/^([\d.]+)\s*m(?:eters?)?$/);
+  if (m) return { value: parseFloat(m[1]), unit: 'm' };
+  
+  // Centimeters
+  m = str.match(/^([\d.]+)\s*cm$/);
+  if (m) return { value: parseFloat(m[1]) / 100, unit: 'm' };
+  
+  // Plain number — assume feet
+  m = str.match(/^([\d.]+)$/);
+  if (m) return { value: parseFloat(m[1]), unit: 'ft' };
+  
+  return null;
+}
+
+// ---- Measure mode ----
+window.toggleMeasureMode = function() {
+  measureMode = !measureMode;
+  const btn = document.getElementById('measureBtn');
+  btn.classList.toggle('active', measureMode);
+  viewer.classList.toggle('measuring', measureMode);
+  if (!measureMode) {
+    measPoints = [];
+    drawMeasureOverlay();
+  }
+};
+
+function finishMeasurement() {
+  if (measPoints.length < 2) return;
+  
+  const scale = getScaleForPage(currentPage);
+  const pxLen = computePolylineLength(measPoints);
+  const dist = computeRealDistance(pxLen, scale);
+  
+  const meas = {
+    id: ++measureIdCounter,
+    page: currentPage,
+    points: [...measPoints],
+    scale: scale ? { ...scale } : null,
+    pxLength: pxLen,
+    distance: dist,
+    duct: null
+  };
+  
+  if (!pageMeasurements[currentPage]) pageMeasurements[currentPage] = [];
+  pageMeasurements[currentPage].push(meas);
+  
+  pendingMeasurementId = meas.id;
+  measPoints = [];
+  
+  showDuctPopup(meas);
+  drawMeasureOverlay();
+  updatePanel();
+}
+
+// ---- Duct popup ----
+function showDuctPopup(meas) {
+  const popup = document.getElementById('ductPopup');
+  // Position near the last point of measurement
+  const lastPt = meas.points[meas.points.length - 1];
+  const screenPt = pdfToScreen(lastPt.x, lastPt.y);
+  
+  const rect = viewer.getBoundingClientRect();
+  let left = Math.min(screenPt.x + 10, rect.width - 260);
+  let top = Math.min(screenPt.y + 10, rect.height - 250);
+  left = Math.max(10, left);
+  top = Math.max(10, top);
+  
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+  
+  document.getElementById('ductTypeSelect').value = '';
+  document.getElementById('ductRectDims').value = '';
+  document.getElementById('ductRoundDiam').value = '';
+  document.getElementById('ductDimsRect').classList.remove('show');
+  document.getElementById('ductDimsRound').classList.remove('show');
+  popup.classList.add('open');
+}
+
+window.onDuctTypeChange = function() {
+  const val = document.getElementById('ductTypeSelect').value;
+  document.getElementById('ductDimsRect').classList.toggle('show', val === 'rect' || val === 'oval');
+  document.getElementById('ductDimsRound').classList.toggle('show', val === 'round');
+};
+
+window.finishDuct = function(save) {
+  const popup = document.getElementById('ductPopup');
+  popup.classList.remove('open');
+  
+  if (save && pendingMeasurementId) {
+    const type = document.getElementById('ductTypeSelect').value;
+    if (type) {
+      const meas = findMeasurement(pendingMeasurementId);
+      if (meas) {
+        let dims = '';
+        if (type === 'rect' || type === 'oval') {
+          dims = document.getElementById('ductRectDims').value.trim();
+        } else if (type === 'round') {
+          dims = document.getElementById('ductRoundDiam').value.trim();
+        }
+        const symbols = { rect: '▬', oval: '⬭', round: '●' };
+        meas.duct = { type, dims, symbol: symbols[type] };
+      }
+    }
+  }
+  
+  pendingMeasurementId = null;
+  drawMeasureOverlay();
+  updatePanel();
+};
+
+function findMeasurement(id) {
+  for (const page in pageMeasurements) {
+    const m = pageMeasurements[page].find(m => m.id === id);
+    if (m) return m;
+  }
+  return null;
+}
+
+// ---- Drawing overlay ----
+function drawMeasureOverlay() {
+  mCanvas.width = canvas.width;
+  mCanvas.height = canvas.height;
+  mCanvas.style.transform = canvas.style.transform;
+  
+  mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
+  
+  const scale = getScaleForPage(currentPage);
+  
+  // Draw saved measurements for current page
+  const saved = pageMeasurements[currentPage] || [];
+  for (const m of saved) {
+    drawMeasurementLine(m.points, m.distance.formatted, m.duct, '#00ff88', false);
+  }
+  
+  // Draw calibration line
+  if (calibrationMode && calibrationPoints.length > 0) {
+    const pts = [...calibrationPoints];
+    if (mousePos && pts.length < 2) pts.push(mousePos);
+    drawSimpleLine(pts, '#ffaa00');
+  }
+  
+  // Draw in-progress measurement
+  if (measureMode && measPoints.length > 0) {
+    const pts = [...measPoints];
+    if (mousePos) pts.push(mousePos);
+    
+    // Calculate live distance
+    const pxLen = computePolylineLength(pts);
+    const dist = computeRealDistance(pxLen, scale);
+    
+    drawMeasurementLine(pts, dist.formatted, null, '#00ff88', true);
+  }
+}
+
+function drawSimpleLine(points, color) {
+  if (points.length < 1) return;
+  mCtx.strokeStyle = color;
+  mCtx.lineWidth = 2;
+  mCtx.setLineDash([6, 4]);
+  mCtx.beginPath();
+  mCtx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    mCtx.lineTo(points[i].x, points[i].y);
+  }
+  mCtx.stroke();
+  mCtx.setLineDash([]);
+  
+  // Dots
+  for (const p of points) {
+    mCtx.fillStyle = color;
+    mCtx.beginPath();
+    mCtx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    mCtx.fill();
+  }
+}
+
+function drawMeasurementLine(points, label, duct, color, isDashed) {
+  if (points.length < 2) {
+    // Draw single point
+    if (points.length === 1) {
+      mCtx.fillStyle = color;
+      mCtx.beginPath();
+      mCtx.arc(points[0].x, points[0].y, 5, 0, Math.PI * 2);
+      mCtx.fill();
+    }
+    return;
+  }
+  
+  mCtx.strokeStyle = color;
+  mCtx.lineWidth = 2.5;
+  if (isDashed) mCtx.setLineDash([8, 4]);
+  else mCtx.setLineDash([]);
+  
+  mCtx.beginPath();
+  mCtx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    mCtx.lineTo(points[i].x, points[i].y);
+  }
+  mCtx.stroke();
+  mCtx.setLineDash([]);
+  
+  // Endpoint dots
+  for (const p of points) {
+    mCtx.fillStyle = color;
+    mCtx.beginPath();
+    mCtx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    mCtx.fill();
+    mCtx.strokeStyle = '#1a1a2e';
+    mCtx.lineWidth = 1;
+    mCtx.stroke();
+  }
+  
+  // Label at midpoint of total line
+  const midIdx = Math.floor(points.length / 2);
+  const p1 = points[midIdx - 1] || points[0];
+  const p2 = points[midIdx] || points[points.length - 1];
+  const mx = (p1.x + p2.x) / 2;
+  const my = (p1.y + p2.y) / 2;
+  
+  let text = label;
+  if (duct) {
+    text += ` ${duct.symbol} ${duct.dims}`;
+  }
+  
+  // Background for label
+  const fontSize = 14 * baseScale;
+  mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  const textWidth = mCtx.measureText(text).width;
+  const padding = 4 * baseScale;
+  
+  // Angle of line segment for rotation
+  const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+  const displayAngle = (angle > Math.PI/2 || angle < -Math.PI/2) ? angle + Math.PI : angle;
+  
+  mCtx.save();
+  mCtx.translate(mx, my);
+  mCtx.rotate(displayAngle);
+  
+  // Background pill
+  mCtx.fillStyle = 'rgba(22, 33, 62, 0.9)';
+  const bgHeight = fontSize + padding * 2;
+  mCtx.beginPath();
+  mCtx.roundRect(-textWidth/2 - padding, -bgHeight/2, textWidth + padding*2, bgHeight, 4 * baseScale);
+  mCtx.fill();
+  
+  // Border
+  mCtx.strokeStyle = color;
+  mCtx.lineWidth = 1;
+  mCtx.stroke();
+  
+  // Text
+  mCtx.fillStyle = '#ffffff';
+  mCtx.textAlign = 'center';
+  mCtx.textBaseline = 'middle';
+  mCtx.fillText(text, 0, 0);
+  
+  mCtx.restore();
+}
+
+// ---- Side panel ----
+window.togglePanel = function() {
+  sidePanel.classList.toggle('open');
+  const btn = document.getElementById('panelBtn');
+  btn.classList.toggle('active', sidePanel.classList.contains('open'));
+  const toggle = document.getElementById('panelToggle');
+  toggle.textContent = sidePanel.classList.contains('open') ? '▶' : '◀';
+  updatePanel();
+};
+
+function updatePanel() {
+  const content = document.getElementById('panelContent');
+  const allPages = Object.keys(pageMeasurements).map(Number).sort((a,b) => a-b);
+  
+  if (allPages.length === 0 || allPages.every(p => pageMeasurements[p].length === 0)) {
+    content.innerHTML = '<div class="meas-empty">No measurements yet.<br>Use 📐 Measure to start.</div>';
+    return;
+  }
+  
+  let html = '';
+  for (const page of allPages) {
+    const measurements = pageMeasurements[page];
+    if (!measurements || measurements.length === 0) continue;
+    
+    html += `<div class="meas-group">`;
+    html += `<div class="meas-group-title">Page ${page}</div>`;
+    
+    for (const m of measurements) {
+      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}</div>` : '';
+      html += `<div class="meas-item" data-id="${m.id}">
+        <div class="meas-info">
+          <div class="meas-length">${m.distance.formatted}</div>
+          ${ductInfo}
+        </div>
+        <button class="meas-delete" onclick="deleteMeasurement(${m.id})" title="Delete">×</button>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  
+  content.innerHTML = html;
+}
+
+window.deleteMeasurement = function(id) {
+  for (const page in pageMeasurements) {
+    const idx = pageMeasurements[page].findIndex(m => m.id === id);
+    if (idx !== -1) {
+      pageMeasurements[page].splice(idx, 1);
+      break;
+    }
+  }
+  drawMeasureOverlay();
+  updatePanel();
+};
+
+window.clearAllMeasurements = function() {
+  for (const page in pageMeasurements) {
+    pageMeasurements[page] = [];
+  }
+  drawMeasureOverlay();
+  updatePanel();
+};
+
+// ---- Core PDF viewer functions ----
 
 async function loadPDF(file) {
   const arrayBuffer = await file.arrayBuffer();
@@ -161,12 +1013,13 @@ async function loadPDF(file) {
   dropZone.classList.add('hidden');
   await renderPage();
   fitToScreen();
+  updateScaleLabel();
 }
 
 async function renderPage() {
   if (!pdfDoc) return;
   const page = await pdfDoc.getPage(currentPage);
-  const viewport = page.getViewport({ scale: 2 }); // render at 2x for sharpness
+  const viewport = page.getViewport({ scale: 2 });
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   baseScale = 2;
@@ -175,11 +1028,15 @@ async function renderPage() {
   
   document.getElementById('pageInfo').textContent = `Page ${currentPage} / ${pdfDoc.numPages}`;
   applyTransform();
+  updateScaleLabel();
+  drawMeasureOverlay();
 }
 
 function applyTransform() {
   const displayScale = currentScale / baseScale;
-  canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${displayScale})`;
+  const transform = `translate(${panX}px, ${panY}px) scale(${displayScale})`;
+  canvas.style.transform = transform;
+  mCanvas.style.transform = transform;
 }
 
 function updateZoomDisplay() {
@@ -202,6 +1059,7 @@ window.zoom = function(dir) {
   panY = centerY - ratio * (centerY - panY);
   
   applyTransform();
+  drawMeasureOverlay();
   updateZoomDisplay();
 };
 
@@ -218,6 +1076,7 @@ window.fitToScreen = function() {
   panY = (rect.height - canvas.height * displayScale) / 2;
   
   applyTransform();
+  drawMeasureOverlay();
   updateZoomDisplay();
 };
 
