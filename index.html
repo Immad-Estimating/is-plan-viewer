@@ -28,6 +28,10 @@
   .toolbar .zoom-display { font-size: 13px; min-width: 50px; text-align: center; color: #a0a0c0; }
   .toolbar .separator { width: 1px; height: 24px; background: #0f3460; }
   .toolbar .page-info { font-size: 13px; color: #a0a0c0; }
+  .page-name-editable { font-size: 13px; color: #e0e0e0; cursor: pointer; padding: 2px 6px; border-radius: 3px; border: 1px solid transparent; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .page-name-editable:hover { border-color: #0f3460; }
+  .page-name-editable:empty::before { content: '+ Name'; color: #555; font-style: italic; }
+  .page-name-editable[contenteditable="true"] { outline: none; border-color: #e94560; color: #fff; max-width: 300px; }
   
   #fileInput { display: none; }
   .upload-btn { background: #e94560 !important; border-color: #e94560 !important; font-weight: 600; }
@@ -371,6 +375,7 @@
     <div class="separator"></div>
     <button onclick="prevPage()" title="Previous Page">◀</button>
     <span class="page-info" id="pageInfo">No PDF loaded</span>
+    <span class="page-name-editable" id="pageName" title="Click to name this page"></span>
     <button onclick="nextPage()" title="Next Page">▶</button>
     <div class="separator"></div>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)">📐 Measure</button>
@@ -1635,7 +1640,8 @@ async function doDuplicate(originalDrawing, includeTakeoff) {
         drawingId: newId,
         pageNum: pd.pageNum,
         scale: pd.scale ? { ...pd.scale } : null,
-        measurements: pd.measurements ? pd.measurements.map(m => ({ ...m, id: ++window._measIdCounter })) : []
+        measurements: pd.measurements ? pd.measurements.map(m => ({ ...m, id: ++window._measIdCounter })) : [],
+        pageName: pd.pageName || ''
       };
       await idbPut('pageData', newPd);
     }
@@ -1688,6 +1694,7 @@ let pendingMeasurementId = null;
 // Per-page state
 const pageScales = {};
 const pageMeasurements = {};
+const pageNames = {};
 let measureIdCounter = 0;
 window._measIdCounter = 0;
 
@@ -1733,7 +1740,8 @@ async function saveCurrentPageData() {
     drawingId: activeDrawingId,
     pageNum,
     scale,
-    measurements
+    measurements,
+    pageName: pageNames[pageNum] || ''
   });
   
   // Update project modifiedAt
@@ -1753,7 +1761,9 @@ async function loadPageDataForDrawing(drawingId) {
   for (const k in pageMeasurements) delete pageMeasurements[k];
   measureIdCounter = 0;
   
+  for (const k in pageNames) delete pageNames[k];
   for (const pd of allPageData) {
+    if (pd.pageName) pageNames[pd.pageNum] = pd.pageName;
     if (pd.scale) pageScales[pd.pageNum] = pd.scale;
     if (pd.measurements && pd.measurements.length > 0) {
       pageMeasurements[pd.pageNum] = pd.measurements;
@@ -2529,6 +2539,48 @@ window.clearAllMeasurements = function() {
 
 // ---- Core PDF viewer functions ----
 
+// ---- Page name display/edit ----
+function updatePageNameDisplay() {
+  const el = document.getElementById('pageName');
+  if (!el) return;
+  const name = pageNames[currentPage] || '';
+  el.textContent = name;
+  el.title = name ? 'Click to edit page name' : 'Click to name this page';
+}
+
+(function setupPageNameEdit() {
+  const el = document.getElementById('pageName');
+  if (!el) return;
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (el.contentEditable === 'true') return;
+    el.contentEditable = 'true';
+    el.focus();
+    // Select all text if there is any
+    if (el.textContent) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  });
+  el.addEventListener('blur', () => {
+    el.contentEditable = 'false';
+    const newName = el.textContent.trim();
+    pageNames[currentPage] = newName;
+    updatePageNameDisplay();
+    scheduleSave();
+  });
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+    if (e.key === 'Escape') {
+      el.textContent = pageNames[currentPage] || '';
+      el.blur();
+    }
+  });
+})();
+
 async function renderPage() {
   if (!pdfDoc) return;
   const page = await pdfDoc.getPage(currentPage);
@@ -2539,7 +2591,8 @@ async function renderPage() {
   
   await page.render({ canvasContext: ctx, viewport }).promise;
   
-  document.getElementById('pageInfo').textContent = `Page ${currentPage} / ${pdfDoc.numPages}`;
+  document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+  updatePageNameDisplay();
   applyTransform();
   updateScaleLabel();
   drawMeasureOverlay();
