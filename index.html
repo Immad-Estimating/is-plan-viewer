@@ -1432,10 +1432,11 @@ async function handleDrawingFiles(files) {
   for (const file of files) {
     if (file.type !== 'application/pdf') continue;
     
-    // Get page count without storing the full blob yet in memory long
-    const arrayBuffer = await file.arrayBuffer();
+    // Store the blob from the original file BEFORE pdf.js detaches the buffer
+    const pdfBlob = file.slice(0, file.size, 'application/pdf');
     let pageCount = 0;
     try {
+      const arrayBuffer = await file.arrayBuffer();
       const tempDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       pageCount = tempDoc.numPages;
     } catch (e) {
@@ -1445,7 +1446,7 @@ async function handleDrawingFiles(files) {
     const drawing = {
       projectId: currentManagerProjectId,
       fileName: file.name,
-      pdfBlob: new Blob([arrayBuffer], { type: 'application/pdf' }),
+      pdfBlob: pdfBlob,
       fileSize: file.size,
       pageCount,
       uploadedAt: Date.now()
