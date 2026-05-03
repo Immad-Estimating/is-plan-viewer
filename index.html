@@ -1901,7 +1901,7 @@ function pdfToScreen(px, py) {
 viewer.addEventListener('mousedown', (e) => {
   if (!pdfDoc) return;
   if (calibrationMode) return;
-  if (e.target.closest('.anno-controls')) return;
+  if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar')) return;
   if (measureMode && !e.shiftKey) return;
   isPanning = true;
   startX = e.clientX - panX;
