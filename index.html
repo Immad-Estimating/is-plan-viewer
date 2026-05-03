@@ -48,8 +48,8 @@
   
   .dashboard-content { flex: 1; overflow-y: auto; padding: 20px; }
   .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-  .project-card { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 16px; cursor: pointer; transition: border-color 0.15s, transform 0.1s; }
-  .project-card:hover { border-color: #e94560; transform: translateY(-2px); }
+  a.project-card, .project-card { display: block; text-decoration: none; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 16px; cursor: pointer; transition: border-color 0.15s, transform 0.1s; color: inherit; }
+  a.project-card:hover, .project-card:hover { border-color: #e94560; transform: translateY(-2px); }
   .project-card .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
   .project-card .card-name { font-size: 15px; font-weight: 600; color: #e0e0e0; word-break: break-word; }
   .project-card .card-name input { background: #1a1a2e; border: 1px solid #e94560; color: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-size: 15px; font-weight: 600; width: 100%; }
@@ -100,7 +100,9 @@
   
   /* ===== Drawing Manager View ===== */
   .drawing-manager-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #0f3460; flex-shrink: 0; background: #16213e; }
-  .drawing-manager-header .project-title { font-size: 16px; font-weight: 600; flex: 1; }
+  .drawing-manager-header .project-title { font-size: 16px; font-weight: 600; flex: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px; border: 1px solid transparent; }
+  .drawing-manager-header .project-title:hover { border-color: #0f3460; }
+  .drawing-manager-header .project-title input { background: #1a1a2e; border: 1px solid #e94560; color: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-size: 16px; font-weight: 600; width: 100%; outline: none; }
   .drawing-manager-content { flex: 1; overflow-y: auto; padding: 20px; }
   
   .upload-zone { border: 2px dashed #0f3460; border-radius: 8px; padding: 30px; text-align: center; margin-bottom: 20px; transition: border-color 0.15s, background 0.15s; cursor: pointer; }
@@ -251,7 +253,7 @@
 <div class="view" id="drawingManagerView">
   <div class="drawing-manager-header">
     <button class="back-btn" onclick="navigateTo('#/')">← Back to Projects</button>
-    <span class="project-title" id="dmProjectTitle"></span>
+    <span class="project-title" id="dmProjectTitle" title="Click to rename"></span>
   </div>
   <div class="drawing-manager-content" id="drawingManagerContent"></div>
   <input type="file" id="drawingFileInput" accept="application/pdf" multiple style="display:none">
@@ -595,6 +597,12 @@ async function handleRoute() {
 
 window.addEventListener('hashchange', handleRoute);
 
+// Block <a> navigation on project cards while renaming
+document.addEventListener('click', (e) => {
+  const card = e.target.closest('.project-card[data-renaming]');
+  if (card) { e.preventDefault(); }
+});
+
 // =====================================================
 // Dashboard
 // =====================================================
@@ -650,12 +658,12 @@ function renderProjectCard(project, drawingCount) {
   const stageBadge = project.stage ? `<span class="stage-badge ${getStageCssClass(project.stage)}">${escapeHtml(project.stage)}</span>` : '';
   const clientLine = project.client ? `<div class="card-meta">${escapeHtml(project.client)}${project.builder ? ' / ' + escapeHtml(project.builder) : ''}</div>` : '';
   
-  return `<div class="project-card" onclick="openProject(${project.id})" data-project-id="${project.id}">
+  return `<a class="project-card" href="#/project/${project.id}" data-project-id="${project.id}">
     <div class="card-header">
       <div class="card-name" id="cardName-${project.id}">${escapeHtml(project.name)} ${stageBadge}</div>
       <div class="card-actions">
-        <button onclick="event.stopPropagation(); renameProject(${project.id})" title="Rename">✏️</button>
-        <button onclick="event.stopPropagation(); deleteProject(${project.id}, '${escapeHtml(project.name).replace(/'/g, "\\'")}')" title="Delete">🗑️</button>
+        <button onclick="event.stopPropagation(); event.preventDefault(); renameProject(${project.id})" title="Rename">✏️</button>
+        <button onclick="event.stopPropagation(); event.preventDefault(); deleteProject(${project.id}, '${escapeHtml(project.name).replace(/'/g, "\\'")}')" title="Delete">🗑️</button>
       </div>
     </div>
     ${clientLine}
@@ -663,7 +671,7 @@ function renderProjectCard(project, drawingCount) {
       <span>📄 ${drawingCount} drawing${drawingCount !== 1 ? 's' : ''}</span>
       <span>📅 ${date}</span>
     </div>
-  </div>`;
+  </a>`;
 }
 
 function renderQBSuggestions(qbMatches) {
@@ -793,19 +801,31 @@ window.renameProject = async function(id) {
   const project = await idbGet('projects', id);
   if (!project) return;
   
+  // Mark the parent <a> to disable navigation while renaming
+  const cardEl = card.closest('.project-card');
+  if (cardEl) cardEl.dataset.renaming = 'true';
+  
   const currentName = project.name;
-  card.innerHTML = `<input type="text" value="${escapeHtml(currentName)}" id="renameInput-${id}" style="background:#1a1a2e;border:1px solid #e94560;color:#e0e0e0;padding:2px 6px;border-radius:3px;font-size:15px;font-weight:600;width:100%">`;
+  card.innerHTML = `<input type="text" value="${escapeHtml(currentName)}" id="renameInput-${id}">`;
   const input = document.getElementById(`renameInput-${id}`);
   input.focus();
   input.select();
   
+  // Stop clicks on the input from navigating the <a>
+  input.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); });
+  input.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+  
+  let saved = false;
   const save = async () => {
+    if (saved) return;
+    saved = true;
     const newName = input.value.trim();
     if (newName && newName !== currentName) {
       project.name = newName;
       project.modifiedAt = Date.now();
       await idbPut('projects', project);
     }
+    if (cardEl) delete cardEl.dataset.renaming;
     renderDashboard();
   };
   
@@ -828,6 +848,36 @@ window.deleteProject = function(id, name) {
     // Delete project
     await idbDelete('projects', id);
     renderDashboard();
+  });
+};
+
+// ===== Inline rename in Drawing Manager =====
+window.renameProjectInline = async function(projectId, el) {
+  const project = await idbGet('projects', projectId);
+  if (!project) return;
+  const currentName = project.name;
+  el.innerHTML = `<input type="text" value="${escapeHtml(currentName)}">`;
+  const input = el.querySelector('input');
+  input.focus();
+  input.select();
+  
+  let saved = false;
+  const save = async () => {
+    if (saved) return;
+    saved = true;
+    const newName = input.value.trim();
+    if (newName && newName !== currentName) {
+      project.name = newName;
+      project.modifiedAt = Date.now();
+      await idbPut('projects', project);
+    }
+    el.textContent = newName || currentName;
+    el.onclick = () => renameProjectInline(projectId, el);
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = currentName; input.blur(); }
   });
 };
 
@@ -860,7 +910,9 @@ async function renderDrawingManager(projectId) {
   const project = await idbGet('projects', projectId);
   if (!project) { navigateTo('#/'); return; }
   
-  document.getElementById('dmProjectTitle').textContent = project.name;
+  const titleEl = document.getElementById('dmProjectTitle');
+  titleEl.textContent = project.name;
+  titleEl.onclick = () => renameProjectInline(projectId, titleEl);
   
   const drawings = await idbGetAllByIndex('drawings', 'projectId', projectId);
   const content = document.getElementById('drawingManagerContent');
