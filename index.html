@@ -2429,25 +2429,25 @@ function drawSpiralDuct(points, duct, color) {
     mCtx.lineTo(bx - nx, by - ny);
     mCtx.stroke();
     
-    // Continuous spiral seam — sinusoidal wave from wall to wall
-    // Wavelength = ~1.5x duct diameter (tighter = more realistic spiral pitch)
-    const waveLen = ductHalfWidth * 3.0;
-    const steps = Math.max(4, Math.ceil(len / (waveLen * 0.25))); // ~4 points per wave
+    // Spiral seam — parallel diagonal lines all angled the same direction
+    // Like a barber pole: each line goes from one wall to the other at the same pitch
+    const pitch = ductHalfWidth * 2.5; // spacing along the duct between seam lines
+    const numSeams = Math.floor(len / pitch);
     mCtx.lineWidth = 1.5;
     mCtx.globalAlpha = 0.8;
-    mCtx.beginPath();
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      const px = ax + dx * t;
-      const py = ay + dy * t;
-      // Sine wave oscillating between +ductHalfWidth and -ductHalfWidth
-      const wave = Math.sin((t * len / waveLen) * Math.PI * 2) * ductHalfWidth * 0.95;
-      const wx = px + (-uy) * wave;
-      const wy = py + ux * wave;
-      if (s === 0) mCtx.moveTo(wx, wy);
-      else mCtx.lineTo(wx, wy);
+    for (let s = 1; s <= numSeams; s++) {
+      // Start point on one wall, end point on the other wall, offset by one pitch
+      const t1 = (s - 0.5) / (numSeams + 1); // start position along duct
+      const t2 = (s + 0.5) / (numSeams + 1); // end position (shifted forward)
+      const x1 = ax + dx * t1 + nx; // start on top wall
+      const y1 = ay + dy * t1 + ny;
+      const x2 = ax + dx * t2 - nx; // end on bottom wall
+      const y2 = ay + dy * t2 - ny;
+      mCtx.beginPath();
+      mCtx.moveTo(x1, y1);
+      mCtx.lineTo(x2, y2);
+      mCtx.stroke();
     }
-    mCtx.stroke();
     mCtx.globalAlpha = 1.0;
     
     // End caps
