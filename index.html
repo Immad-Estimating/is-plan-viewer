@@ -1267,31 +1267,46 @@ window.deleteProject = function(id, name) {
 };
 
 // ===== Inline rename in Drawing Manager =====
-window.renameProjectInline = async function(projectId, el) {
-  const project = await idbGet('projects', projectId);
-  if (!project) return;
-  const currentName = project.name;
-  el.innerHTML = `<input type="text" value="${escapeHtml(currentName)}">`;
-  const input = el.querySelector('input');
-  input.focus();
-  input.select();
+window.renameProjectInline = function(projectId, el) {
+  // Already editing — don't re-trigger
+  if (el.contentEditable === 'true') return;
+  
+  const currentName = el.textContent.trim();
+  el.contentEditable = 'true';
+  el.style.outline = '1px solid #e94560';
+  el.style.borderRadius = '3px';
+  el.style.padding = '2px 6px';
+  el.focus();
+  
+  // Select all text
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
   
   let saved = false;
   const save = async () => {
     if (saved) return;
     saved = true;
-    const newName = input.value.trim();
+    el.contentEditable = 'false';
+    el.style.outline = '';
+    el.style.padding = '';
+    const newName = el.textContent.trim();
     if (newName && newName !== currentName) {
-      project.name = newName;
-      project.modifiedAt = Date.now();
-      await idbPut('projects', project);
+      const project = await idbGet('projects', projectId);
+      if (project) {
+        project.name = newName;
+        project.modifiedAt = Date.now();
+        await idbPut('projects', project);
+      }
     }
     el.textContent = newName || currentName;
-    el.onclick = () => renameProjectInline(projectId, el);
   };
-  input.addEventListener('blur', save);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+  el.addEventListener('blur', save, { once: true });
+  el.addEventListener('keydown', function handler(e) {
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); el.removeEventListener('keydown', handler); }
+    if (e.key === 'Escape') { el.textContent = currentName; el.blur(); el.removeEventListener('keydown', handler); }
     if (e.key === 'Escape') { input.value = currentName; input.blur(); }
   });
 };
