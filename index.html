@@ -34,8 +34,15 @@
   .page-name-editable[contenteditable="true"] { outline: none; border-color: #e94560; color: #fff; max-width: 300px; }
   
   /* Annotation controls */
-  .duct-draw-bar { display: none; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 55; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 6px 14px; gap: 10px; align-items: center; box-shadow: 0 4px 16px rgba(0,0,0,0.4); font-size: 13px; white-space: nowrap; }
+  .duct-draw-bar { display: none; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 55; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 6px 14px; gap: 10px; align-items: center; box-shadow: 0 4px 16px rgba(0,0,0,0.4); font-size: 13px; white-space: nowrap; cursor: default; }
   .duct-draw-bar.active { display: flex; }
+  .duct-draw-bar.pinned { transform: none; }
+  .tool-drag-handle { cursor: grab; color: #555; font-size: 14px; margin-right: 4px; user-select: none; }
+  .tool-drag-handle:active { cursor: grabbing; }
+  .tool-pin-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 12px; padding: 2px 4px; margin-left: 4px; }
+  .tool-pin-btn:hover { color: #e94560; }
+  .tool-pin-btn.pinned { color: #00ff88; }
+  .anno-popover.pinned { transform: none; }
   .duct-draw-bar label { color: #a0a0c0; font-size: 12px; }
   .duct-draw-bar select, .duct-draw-bar input { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-size: 13px; }
   .duct-draw-bar select:focus, .duct-draw-bar input:focus { outline: none; border-color: #e94560; }
@@ -45,7 +52,7 @@
   .anno-controls.panel-open { right: 316px; }
   .anno-btn { background: #16213e; border: 1px solid #0f3460; color: #a0a0c0; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; transition: background 0.15s; }
   .anno-btn:hover { background: #0f3460; color: #e0e0e0; }
-  .anno-popover { display: none; position: absolute; top: 36px; right: 0; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 14px; min-width: 220px; z-index: 55; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  .anno-popover { display: none; position: absolute; top: 36px; right: 0; cursor: default; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 14px; min-width: 220px; z-index: 55; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
   .anno-popover.open { display: block; }
   .anno-popover label { display: block; font-size: 11px; color: #a0a0c0; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
   .anno-popover .slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -502,6 +509,7 @@
       <!-- Panel toggle -->
       <!-- Duct draw config bar -->
     <div class="duct-draw-bar" id="ductDrawBar">
+      <span class="tool-drag-handle" id="ddDragHandle">⠿</span>
       <select id="ddType" onchange="ddTypeChanged()">
         <option value="spiral">◎ Spiral</option>
         <option value="round">● Round</option>
@@ -511,11 +519,17 @@
       <span id="ddDiamGroup"><label>⌀</label><input type="text" id="ddDiam" class="dd-dim" value="14"></span>
       <span id="ddRectGroup" style="display:none"><label>W</label><input type="text" id="ddW" class="dd-dim" value="24"><label>×</label><input type="text" id="ddH" class="dd-dim" value="12"></span>
       <span class="dd-hint">Click to draw · Enter to finish</span>
+      <button class="tool-pin-btn" id="ddPinBtn" onclick="event.stopPropagation(); togglePinDuctBar()" title="Pin position">📌</button>
     </div>
     <!-- Annotation controls -->
     <div class="anno-controls" id="annoControls">
       <button class="anno-btn" id="annoBtn" onclick="toggleAnnoPopover()">🏷️ Labels</button>
       <div class="anno-popover" id="annoPopover">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span class="tool-drag-handle" id="annoDragHandle">⠿</span>
+          <span style="font-size:12px;color:#a0a0c0;flex:1;text-align:center">Labels</span>
+          <button class="tool-pin-btn" id="annoPinBtn" onclick="event.stopPropagation(); togglePinAnnoBar()" title="Pin position">📌</button>
+        </div>
         <label>Label Size</label>
         <div class="slider-row">
           <input type="range" id="annoSizeSlider" min="2" max="28" value="14" step="1" oninput="updateAnnoGlobals()">
@@ -2025,6 +2039,47 @@ window.addEventListener('keydown', (e) => {
   // Only handle shortcuts when viewer is active
   if (currentRoute.view !== 'viewer') return;
   if (!pdfDoc) return;
+  
+  // In duct draw mode: number keys, x, and backspace edit dimensions
+  if (ductDrawMode && measPoints.length === 0) {
+    const dimInput = document.getElementById('ddDiam');
+    const wInput = document.getElementById('ddW');
+    const hInput = document.getElementById('ddH');
+    const type = document.getElementById('ddType').value;
+    const isRect = (type === 'rect' || type === 'oval');
+    const activeInput = isRect ? (document.activeElement === hInput ? hInput : wInput) : dimInput;
+    
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      // If input isn't focused yet, clear and start typing
+      if (document.activeElement !== activeInput) {
+        activeInput.value = '';
+        activeInput.focus();
+      }
+      activeInput.value += e.key;
+      return;
+    }
+    if (e.key === 'x' || e.key === 'X') {
+      if (isRect) { e.preventDefault(); hInput.value = ''; hInput.focus(); }
+      return;
+    }
+    if (e.key === 'Backspace' && document.activeElement === activeInput) {
+      // Let default input behavior handle it
+      return;
+    }
+    if (e.key === 'Enter' && document.activeElement === activeInput) {
+      e.preventDefault();
+      activeInput.blur(); // confirm dimension
+      return;
+    }
+    if (e.key === 'Tab' && isRect) {
+      e.preventDefault();
+      if (document.activeElement === wInput) hInput.focus();
+      else wInput.focus();
+      return;
+    }
+  }
+  
   if (e.key === '+' || e.key === '=') { e.preventDefault(); window.zoom(1); }
   else if (e.key === '-') { e.preventDefault(); window.zoom(-1); }
   else if (e.key === '0' || e.key === 'f' || e.key === 'F') { e.preventDefault(); window.fitToScreen(); }
@@ -2704,6 +2759,89 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
 }
 
 // ---- Side panel ----
+// ---- Draggable tool bars ----
+function setupDragHandle(handleId, barId) {
+  const handle = document.getElementById(handleId);
+  const bar = document.getElementById(barId);
+  if (!handle || !bar) return;
+  let startX, startY, origLeft, origTop;
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = bar.getBoundingClientRect();
+    const parentRect = bar.offsetParent ? bar.offsetParent.getBoundingClientRect() : { left: 0, top: 0 };
+    origLeft = rect.left - parentRect.left;
+    origTop = rect.top - parentRect.top;
+    startX = e.clientX;
+    startY = e.clientY;
+    // Remove centering transform on first drag
+    bar.style.left = origLeft + 'px';
+    bar.style.top = origTop + 'px';
+    bar.style.transform = 'none';
+    bar.classList.add('pinned');
+    const onMove = (e) => {
+      bar.style.left = (origLeft + e.clientX - startX) + 'px';
+      bar.style.top = (origTop + e.clientY - startY) + 'px';
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+}
+
+// Init drag handles after DOM
+setTimeout(() => {
+  setupDragHandle('ddDragHandle', 'ductDrawBar');
+  setupDragHandle('annoDragHandle', 'annoPopover');
+}, 0);
+
+window.togglePinDuctBar = function() {
+  const bar = document.getElementById('ductDrawBar');
+  const btn = document.getElementById('ddPinBtn');
+  if (bar.classList.contains('pinned')) {
+    // Unpin: reset to center
+    bar.style.left = '';
+    bar.style.top = '';
+    bar.style.transform = '';
+    bar.classList.remove('pinned');
+    btn.classList.remove('pinned');
+  } else {
+    // Pin at current position
+    const rect = bar.getBoundingClientRect();
+    const parentRect = bar.offsetParent ? bar.offsetParent.getBoundingClientRect() : { left: 0, top: 0 };
+    bar.style.left = (rect.left - parentRect.left) + 'px';
+    bar.style.top = (rect.top - parentRect.top) + 'px';
+    bar.style.transform = 'none';
+    bar.classList.add('pinned');
+    btn.classList.add('pinned');
+  }
+};
+
+window.togglePinAnnoBar = function() {
+  const bar = document.getElementById('annoPopover');
+  const btn = document.getElementById('annoPinBtn');
+  if (bar.classList.contains('pinned')) {
+    bar.style.left = '';
+    bar.style.top = '';
+    bar.style.right = '0';
+    bar.style.transform = '';
+    bar.classList.remove('pinned');
+    btn.classList.remove('pinned');
+  } else {
+    const rect = bar.getBoundingClientRect();
+    const parentRect = bar.offsetParent ? bar.offsetParent.getBoundingClientRect() : { left: 0, top: 0 };
+    bar.style.left = (rect.left - parentRect.left) + 'px';
+    bar.style.top = (rect.top - parentRect.top) + 'px';
+    bar.style.right = 'auto';
+    bar.style.transform = 'none';
+    bar.classList.add('pinned');
+    btn.classList.add('pinned');
+  }
+};
+
 // ---- Annotation controls ----
 window.toggleAnnoPopover = function() {
   document.getElementById('annoPopover').classList.toggle('open');
