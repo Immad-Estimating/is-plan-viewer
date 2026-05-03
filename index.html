@@ -1792,12 +1792,19 @@ async function loadDrawingIntoViewer(projectId, drawingId) {
     dropZone.classList.add('hidden');
     await renderPage();
     console.log('[viewer] renderPage done, canvas:', canvas.width, 'x', canvas.height);
-    // Wait for layout to settle before fitting (viewer may have just become visible)
+    // Wait for layout to settle, then restore view or fit to screen
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const rect = viewer.getBoundingClientRect();
-        console.log('[viewer] viewer rect:', rect.width, 'x', rect.height);
-        fitToScreen();
+        if (drawing.lastView) {
+          // Restore saved view state
+          currentScale = drawing.lastView.scale;
+          panX = drawing.lastView.panX;
+          panY = drawing.lastView.panY;
+          applyTransform();
+          updateZoomDisplay();
+        } else {
+          fitToScreen();
+        }
         updateScaleLabel();
       });
     });
@@ -1851,6 +1858,7 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', () => {
+  if (isPanning) scheduleViewSave();
   isPanning = false;
   viewer.classList.remove('grabbing');
 });
@@ -1911,6 +1919,7 @@ viewer.addEventListener('wheel', (e) => {
   applyTransform();
   drawMeasureOverlay();
   updateZoomDisplay();
+  scheduleViewSave();
 }, { passive: false });
 
 // Keyboard shortcuts
@@ -2564,6 +2573,7 @@ window.zoom = function(dir) {
   applyTransform();
   drawMeasureOverlay();
   updateZoomDisplay();
+  scheduleViewSave();
 };
 
 window.fitToScreen = function() {
@@ -2581,7 +2591,15 @@ window.fitToScreen = function() {
   applyTransform();
   drawMeasureOverlay();
   updateZoomDisplay();
+  scheduleViewSave();
 };
+
+// Debounced save of view state (zoom/pan)
+let viewSaveTimer = null;
+function scheduleViewSave() {
+  if (viewSaveTimer) clearTimeout(viewSaveTimer);
+  viewSaveTimer = setTimeout(() => { saveLastPage(); }, 1000);
+}
 
 window.prevPage = async function() {
   if (!pdfDoc || currentPage <= 1) return;
@@ -2601,13 +2619,14 @@ window.nextPage = async function() {
   saveLastPage();
 };
 
-// Save last viewed page to the drawing record
+// Save last viewed page and view state to the drawing record
 async function saveLastPage() {
   if (!activeDrawingId) return;
   try {
     const drawing = await idbGet('drawings', activeDrawingId);
-    if (drawing && drawing.lastPage !== currentPage) {
+    if (drawing) {
       drawing.lastPage = currentPage;
+      drawing.lastView = { scale: currentScale, panX, panY };
       await idbPut('drawings', drawing);
     }
   } catch (e) { /* non-critical */ }
