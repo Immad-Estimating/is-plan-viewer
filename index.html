@@ -2681,37 +2681,68 @@ function drawFitting(points, fit, duct, color) {
 
   const halfW = getDuctHalfWidthPx(duct);
   const CLR = getElbowCLRPx(duct);
-
-  // Clamp for sanity
   const clrPx = Math.max(halfW * 1.5, Math.min(CLR, 200));
-  const innerR = Math.max(2, clrPx - halfW); // throat
-  const outerR = clrPx + halfW;                // heel
+  const innerR = Math.max(2, clrPx - halfW);
+  const outerR = clrPx + halfW;
 
-  // Incoming / outgoing direction vectors
-  const inAngle = Math.atan2(p.y - prev.y, p.x - prev.x);
-  const outAngle = Math.atan2(next.y - p.y, next.x - p.x);
+  // Direction vectors: incoming TO the vertex, outgoing FROM the vertex
+  const inDx = p.x - prev.x, inDy = p.y - prev.y;
+  const inLen = Math.sqrt(inDx*inDx + inDy*inDy) || 1;
+  const inUx = inDx/inLen, inUy = inDy/inLen; // unit vector of incoming
+  
+  const outDx = next.x - p.x, outDy = next.y - p.y;
+  const outLen = Math.sqrt(outDx*outDx + outDy*outDy) || 1;
+  const outUx = outDx/outLen, outUy = outDy/outLen; // unit vector of outgoing
 
-  // Sweep angle for this fitting type
-  const sweepMap = { '90el': Math.PI / 2, '45el': Math.PI / 4, '22el': Math.PI / 8 };
-  const sweep = sweepMap[fit.type] || Math.PI / 2;
+  // Cross product determines turn direction
+  const cross = inUx * outUy - inUy * outUx;
+  const turnSign = cross > 0 ? 1 : -1; // +1 = right turn, -1 = left turn
 
-  // Determine turn direction: cross product tells us CW vs CCW
-  const cross = (p.x - prev.x) * (next.y - p.y) - (p.y - prev.y) * (next.x - p.x);
-  const turnSign = cross > 0 ? 1 : -1; // +1 = turning right (CW on screen), -1 = left
+  // Arc center: perpendicular to incoming direction, on the inside of the turn
+  // Perpendicular to incoming, toward the turn center
+  const perpX = -inUy * turnSign;
+  const perpY = inUx * turnSign;
+  
+  // Tangent point on incoming side (where duct meets elbow)
+  // This is CLR distance back from vertex along incoming, then offset to arc center
+  const tanInX = p.x; // the vertex IS the tangent point for incoming
+  const tanInY = p.y;
+  
+  // Arc center
+  const cx = tanInX + perpX * clrPx;
+  const cy = tanInY + perpY * clrPx;
 
-  // Arc center is offset from the vertex point perpendicular to incoming direction
-  const perpAngle = inAngle + turnSign * Math.PI / 2;
-  const cx = p.x + Math.cos(perpAngle) * clrPx;
-  const cy = p.y + Math.sin(perpAngle) * clrPx;
+  // Actual sweep: use the real angle between incoming and outgoing
+  const inAngle = Math.atan2(inUy, inUx);
+  const outAngle = Math.atan2(outUy, outUx);
+  let actualSweep = outAngle - inAngle;
+  // Normalize to [-PI, PI]
+  while (actualSweep > Math.PI) actualSweep -= 2*Math.PI;
+  while (actualSweep < -Math.PI) actualSweep += 2*Math.PI;
+  const sweep = Math.abs(actualSweep);
 
-  // Arc start angle (from center back to the vertex tangent point)
-  const arcStart = Math.atan2(p.y - cy, p.x - cx);
-  // Arc end angle = start rotated by sweep in the turn direction
+  // Arc start angle: from center to the incoming tangent point
+  const arcStart = Math.atan2(tanInY - cy, tanInX - cx);
+  // Arc end: sweep in the turn direction
   const arcEnd = arcStart - turnSign * sweep;
-  const ccw = turnSign > 0; // canvas arc direction
+  const ccw = turnSign > 0;
 
+  // Calculate the actual tangent endpoints (nodal connections)
+  // Incoming node: inner and outer points at arc start
+  const inInnerX = cx + Math.cos(arcStart) * innerR;
+  const inInnerY = cy + Math.sin(arcStart) * innerR;
+  const inOuterX = cx + Math.cos(arcStart) * outerR;
+  const inOuterY = cy + Math.sin(arcStart) * outerR;
+  
+  // Outgoing node: inner and outer points at arc end
+  const outInnerX = cx + Math.cos(arcEnd) * innerR;
+  const outInnerY = cy + Math.sin(arcEnd) * innerR;
+  const outOuterX = cx + Math.cos(arcEnd) * outerR;
+  const outOuterY = cy + Math.sin(arcEnd) * outerR;
+
+  // Draw the elbow
   mCtx.save();
-  mCtx.strokeStyle = color; // #00ff88 — matches duct
+  mCtx.strokeStyle = color;
   mCtx.lineWidth = 2.5;
   mCtx.setLineDash([]);
   mCtx.globalAlpha = 1.0;
@@ -2726,42 +2757,46 @@ function drawFitting(points, fit, duct, color) {
   mCtx.arc(cx, cy, outerR, arcStart, arcEnd, ccw);
   mCtx.stroke();
 
-  // Tangent connection lines at start of elbow (connecting inner/outer arcs to duct walls)
-  const innerStartX = cx + Math.cos(arcStart) * innerR;
-  const innerStartY = cy + Math.sin(arcStart) * innerR;
-  const outerStartX = cx + Math.cos(arcStart) * outerR;
-  const outerStartY = cy + Math.sin(arcStart) * outerR;
-
+  // Inlet connection (tangent line connecting inner/outer at entry node)
   mCtx.beginPath();
-  mCtx.moveTo(innerStartX, innerStartY);
-  mCtx.lineTo(outerStartX, outerStartY);
+  mCtx.moveTo(inInnerX, inInnerY);
+  mCtx.lineTo(inOuterX, inOuterY);
   mCtx.stroke();
 
-  // Tangent connection lines at end of elbow
-  const innerEndX = cx + Math.cos(arcEnd) * innerR;
-  const innerEndY = cy + Math.sin(arcEnd) * innerR;
-  const outerEndX = cx + Math.cos(arcEnd) * outerR;
-  const outerEndY = cy + Math.sin(arcEnd) * outerR;
-
+  // Outlet connection (tangent line connecting inner/outer at exit node)
   mCtx.beginPath();
-  mCtx.moveTo(innerEndX, innerEndY);
-  mCtx.lineTo(outerEndX, outerEndY);
+  mCtx.moveTo(outInnerX, outInnerY);
+  mCtx.lineTo(outOuterX, outOuterY);
   mCtx.stroke();
+
+  // Draw nodal connection dots (snap points where duct meets elbow)
+  const nodeRadius = 3;
+  // Inlet center node
+  mCtx.fillStyle = color;
+  mCtx.beginPath();
+  mCtx.arc(tanInX, tanInY, nodeRadius, 0, Math.PI*2);
+  mCtx.fill();
+  // Outlet center node
+  const outTanX = cx + Math.cos(arcEnd) * clrPx;
+  const outTanY = cy + Math.sin(arcEnd) * clrPx;
+  mCtx.beginPath();
+  mCtx.arc(outTanX, outTanY, nodeRadius, 0, Math.PI*2);
+  mCtx.fill();
 
   // Fitting label
   const effSize = (_currentRenderMeas && _currentRenderMeas.labelSize != null) ? _currentRenderMeas.labelSize : annoSize;
   const effTextOpacity = (_currentRenderMeas && _currentRenderMeas.labelTextOpacity != null) ? _currentRenderMeas.labelTextOpacity : annoTextOpacity;
   const effFillOpacity = (_currentRenderMeas && _currentRenderMeas.labelFillOpacity != null) ? _currentRenderMeas.labelFillOpacity : annoFillOpacity;
-  const labelSize = effSize * 0.7 * baseScale;
-  const renderSize = Math.max(28, labelSize);
-  const lScale = labelSize / renderSize;
-  mCtx.font = `bold ${renderSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  const labelSz = effSize * 0.7 * baseScale;
+  const renderSz = Math.max(28, labelSz);
+  const lScale = labelSz / renderSz;
+  mCtx.font = `bold ${renderSz}px -apple-system, BlinkMacSystemFont, sans-serif`;
   const ftLabel = getFittingLabel(fit.type);
   const tw = mCtx.measureText(ftLabel).width;
 
-  // Position label near the center of the arc, offset outward
+  // Label at the outer midpoint of the arc
   const midArcAngle = arcStart - turnSign * sweep / 2;
-  const labelR = outerR + 10 / lScale;
+  const labelR = outerR + 12 / lScale;
   const lx = cx + Math.cos(midArcAngle) * labelR;
   const ly = cy + Math.sin(midArcAngle) * labelR;
 
@@ -2772,7 +2807,7 @@ function drawFitting(points, fit, duct, color) {
   mCtx.fillStyle = 'rgba(22, 33, 62, 0.9)';
   const pad = 3;
   mCtx.beginPath();
-  mCtx.roundRect(-tw/2 - pad, -renderSize/2 - pad, tw + pad*2, renderSize + pad*2, 3);
+  mCtx.roundRect(-tw/2 - pad, -renderSz/2 - pad, tw + pad*2, renderSz + pad*2, 3);
   mCtx.fill();
   mCtx.globalAlpha = effTextOpacity;
   mCtx.fillStyle = '#00ff88';
