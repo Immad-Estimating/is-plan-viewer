@@ -187,8 +187,8 @@
         <div class="divider"></div>
         <h4>Custom Scale</h4>
         <div class="custom-scale-section">
-          <p>Draw a line of known distance on the plan, then enter the real-world length.</p>
-          <button class="scale-option" id="customScaleBtn" data-type="custom">✏️ Calibrate Custom Scale…</button>
+          <div id="savedCustomScales"></div>
+          <button class="scale-option" id="customScaleBtn" data-type="custom">✏️ Calibrate New Scale…</button>
         </div>
       </div>
     </div>
@@ -656,12 +656,15 @@ window.confirmCustomLength = function() {
   if (pxDist < 1) { alert('Calibration line too short.'); cancelCalibration(); return; }
   
   const pxPerUnit = pxDist / parsed.value; // px per foot or px per meter
-  pageScales[currentPage] = {
+  const label = computeCustomScaleLabel(pxPerUnit, parsed.unit);
+  const scaleObj = {
     type: 'custom',
     pxPerUnit,
-    customUnit: parsed.unit, // 'ft' or 'm'
-    label: `Custom (${input})`
+    customUnit: parsed.unit,
+    label
   };
+  pageScales[currentPage] = scaleObj;
+  saveCustomScale(scaleObj);
   
   document.getElementById('customLengthPopup').classList.remove('open');
   calibrationMode = false;
@@ -669,6 +672,7 @@ window.confirmCustomLength = function() {
   document.getElementById('calibrationBanner').classList.remove('active');
   if (!measureMode) viewer.classList.remove('measuring');
   updateScaleLabel();
+  renderSavedCustomScales();
   drawMeasureOverlay();
 };
 
@@ -677,33 +681,97 @@ window.cancelCustomLength = function() {
 };
 
 function parseDistanceInput(str) {
-  str = str.trim().toLowerCase();
+  str = str.trim();
+  const s = str.toLowerCase();
   
-  // Try feet-inches: 20'-6" or 20'6" or 20ft 6in
-  let m = str.match(/^(\d+)['\u2019]?\s*-?\s*(\d+)["\u201d]?$/);
-  if (m) return { value: parseInt(m[1]) + parseInt(m[2]) / 12, unit: 'ft' };
+  // Feet-inches: 20'-6", 20' 6", 20'6", 1\u2019-5\u201d, etc.
+  let m = s.match(/^(\d+)\s*['\u2019]\s*-?\s*(\d+(?:\.\d+)?)\s*["\u201d]?$/);
+  if (m) return { value: parseInt(m[1]) + parseFloat(m[2]) / 12, unit: 'ft' };
   
-  // Try just feet: 10' or 10ft or 10 ft
-  m = str.match(/^([\d.]+)\s*(?:['\u2019]|ft|feet)$/);
+  // Feet-inches with ft/in: 20ft 6in, 20 ft 6 in
+  m = s.match(/^(\d+)\s*ft\s*(\d+(?:\.\d+)?)\s*in$/);
+  if (m) return { value: parseInt(m[1]) + parseFloat(m[2]) / 12, unit: 'ft' };
+  
+  // Just feet: 10', 10\u2019, 10ft, 10 ft, 10feet
+  m = s.match(/^([\d.]+)\s*(?:['\u2019]|ft|feet)$/);
   if (m) return { value: parseFloat(m[1]), unit: 'ft' };
   
-  // Try just inches: 120" or 120in
-  m = str.match(/^([\d.]+)\s*(?:["\u201d]|in|inches)$/);
+  // Just inches: 120", 120\u201d, 120in, 120 inches
+  m = s.match(/^([\d.]+)\s*(?:["\u201d]|in(?:ches?)?)$/);
   if (m) return { value: parseFloat(m[1]) / 12, unit: 'ft' };
 
   // Meters
-  m = str.match(/^([\d.]+)\s*m(?:eters?)?$/);
+  m = s.match(/^([\d.]+)\s*m(?:eters?)?$/);
   if (m) return { value: parseFloat(m[1]), unit: 'm' };
   
   // Centimeters
-  m = str.match(/^([\d.]+)\s*cm$/);
+  m = s.match(/^([\d.]+)\s*cm$/);
   if (m) return { value: parseFloat(m[1]) / 100, unit: 'm' };
   
+  // Millimeters
+  m = s.match(/^([\d.]+)\s*mm$/);
+  if (m) return { value: parseFloat(m[1]) / 1000, unit: 'm' };
+  
   // Plain number — assume feet
-  m = str.match(/^([\d.]+)$/);
+  m = s.match(/^([\d.]+)$/);
   if (m) return { value: parseFloat(m[1]), unit: 'ft' };
   
   return null;
+}
+
+// ---- Custom scale label & history ----
+const savedCustomScalesList = []; // { pxPerUnit, customUnit, label }
+
+function computeCustomScaleLabel(pxPerUnit, unit) {
+  // Compute what 1 drawing inch represents in real-world units
+  // 1 drawing inch = 72 * baseScale canvas px
+  const drawingInchPx = 72 * baseScale;
+  if (unit === 'ft') {
+    const realFeet = drawingInchPx / pxPerUnit;
+    if (realFeet < 1) {
+      // Sub-foot: show as inches
+      const realInches = realFeet * 12;
+      return `1\" = ${realInches.toFixed(1)}\"`;
+    }
+    const feet = Math.floor(realFeet);
+    const inches = Math.round((realFeet - feet) * 12);
+    if (inches === 0) return `1\" = ${feet}'-0\"`;
+    if (inches === 12) return `1\" = ${feet + 1}'-0\"`;
+    return `1\" = ${feet}'-${inches}\"`;
+  } else {
+    // Metric
+    const realMeters = drawingInchPx / pxPerUnit;
+    if (realMeters >= 1) return `1\" = ${realMeters.toFixed(1)}m`;
+    return `1\" = ${(realMeters * 100).toFixed(0)}cm`;
+  }
+}
+
+function saveCustomScale(scaleObj) {
+  // Avoid duplicates (same label)
+  const existing = savedCustomScalesList.findIndex(s => s.label === scaleObj.label);
+  if (existing !== -1) savedCustomScalesList.splice(existing, 1);
+  // Most recent first, keep max 5
+  savedCustomScalesList.unshift({ pxPerUnit: scaleObj.pxPerUnit, customUnit: scaleObj.customUnit, label: scaleObj.label });
+  if (savedCustomScalesList.length > 5) savedCustomScalesList.pop();
+}
+
+function renderSavedCustomScales() {
+  const container = document.getElementById('savedCustomScales');
+  if (savedCustomScalesList.length === 0) { container.innerHTML = ''; return; }
+  container.innerHTML = savedCustomScalesList.map((s, i) =>
+    `<button class="scale-option" data-custom-idx="${i}">${s.label}</button>`
+  ).join('');
+  // Bind clicks
+  container.querySelectorAll('.scale-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.customIdx);
+      const s = savedCustomScalesList[idx];
+      pageScales[currentPage] = { type: 'custom', pxPerUnit: s.pxPerUnit, customUnit: s.customUnit, label: s.label };
+      scalePopover.classList.remove('open');
+      updateScaleLabel();
+      drawMeasureOverlay();
+    });
+  });
 }
 
 // ---- Measure mode ----
