@@ -2590,10 +2590,16 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   const effSize = (measObj && measObj.labelSize != null) ? measObj.labelSize : annoSize;
   const effTextOpacity = (measObj && measObj.labelTextOpacity != null) ? measObj.labelTextOpacity : annoTextOpacity;
   const effFillOpacity = (measObj && measObj.labelFillOpacity != null) ? measObj.labelFillOpacity : annoFillOpacity;
-  const fontSize = effSize * baseScale;
-  mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  
+  // Render text at high resolution then scale down for crispness at small sizes
+  const minRenderSize = 28; // always render at least this many canvas px
+  const targetFontSize = effSize * baseScale;
+  const renderFontSize = Math.max(minRenderSize, targetFontSize);
+  const labelScale = targetFontSize / renderFontSize; // <1 when size is small
+  
+  mCtx.font = `bold ${renderFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
   const textWidth = mCtx.measureText(text).width;
-  const padding = 4 * baseScale;
+  const padding = 4 * (renderFontSize / 14);
   
   const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
   const displayAngle = (angle > Math.PI/2 || angle < -Math.PI/2) ? angle + Math.PI : angle;
@@ -2601,16 +2607,17 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   mCtx.save();
   mCtx.translate(mx, my);
   mCtx.rotate(displayAngle);
+  mCtx.scale(labelScale, labelScale);
   
   mCtx.globalAlpha = effFillOpacity;
   mCtx.fillStyle = 'rgb(22, 33, 62)';
-  const bgHeight = fontSize + padding * 2;
+  const bgHeight = renderFontSize + padding * 2;
   mCtx.beginPath();
-  mCtx.roundRect(-textWidth/2 - padding, -bgHeight/2, textWidth + padding*2, bgHeight, 4 * baseScale);
+  mCtx.roundRect(-textWidth/2 - padding, -bgHeight/2, textWidth + padding*2, bgHeight, 4);
   mCtx.fill();
   
   mCtx.strokeStyle = color;
-  mCtx.lineWidth = 1;
+  mCtx.lineWidth = 1 / labelScale; // keep border consistent regardless of scale
   mCtx.stroke();
   
   mCtx.globalAlpha = effTextOpacity;
