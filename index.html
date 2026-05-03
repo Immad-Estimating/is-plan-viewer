@@ -2673,8 +2673,9 @@ function getElbowCLRPx(duct) {
 }
 
 function drawFitting(points, fit, duct, color) {
-  // Revit-style elbow: duct walls curve continuously through the turn
-  // No separate fitting symbol — just inner/outer arcs connecting the wall lines
+  // Revit-style: duct walls curve through the turn using bezier curves
+  // The wall endpoints from incoming segment connect to wall startpoints of outgoing segment
+  // with smooth curves. Control point = the corner where the walls would meet if extended.
   if (fit.pointIdx < 1 || fit.pointIdx >= points.length - 1) return;
   const V = points[fit.pointIdx];
   const A = points[fit.pointIdx - 1];
@@ -2682,68 +2683,48 @@ function drawFitting(points, fit, duct, color) {
   if (!A || !B) return;
 
   const halfW = getDuctHalfWidthPx(duct);
-  const CLR = getElbowCLRPx(duct);
-  const clrPx = Math.max(halfW * 1.2, Math.min(CLR, 200));
-  const innerR = Math.max(2, clrPx - halfW);
-  const outerR = clrPx + halfW;
 
-  // Unit vectors along each leg
+  // Incoming segment direction (A → V)
   const dIn = { x: V.x - A.x, y: V.y - A.y };
   const lIn = Math.sqrt(dIn.x*dIn.x + dIn.y*dIn.y) || 1;
   const uIn = { x: dIn.x/lIn, y: dIn.y/lIn };
+  // Perpendicular to incoming (left side = -uy, ux; right side = uy, -ux)
+  const nInL = { x: -uIn.y, y: uIn.x };  // left normal
+  const nInR = { x: uIn.y, y: -uIn.x };  // right normal
+
+  // Outgoing segment direction (V → B)
   const dOut = { x: B.x - V.x, y: B.y - V.y };
   const lOut = Math.sqrt(dOut.x*dOut.x + dOut.y*dOut.y) || 1;
   const uOut = { x: dOut.x/lOut, y: dOut.y/lOut };
+  const nOutL = { x: -uOut.y, y: uOut.x };
+  const nOutR = { x: uOut.y, y: -uOut.x };
 
-  // Cross product to determine turn side
-  const cross = uIn.x * uOut.y - uIn.y * uOut.x;
-  if (Math.abs(cross) < 0.01) return; // nearly straight
+  // Wall endpoints at the vertex for incoming segment
+  // (where the straight walls of incoming segment end)
+  const inWallL = { x: V.x + nInL.x * halfW, y: V.y + nInL.y * halfW };
+  const inWallR = { x: V.x + nInR.x * halfW, y: V.y + nInR.y * halfW };
 
-  // Normal vectors pointing to the INSIDE of the turn
-  // If cross > 0 (left turn), inside is to the right of incoming = (uIn.y, -uIn.x)
-  // If cross < 0 (right turn), inside is to the left = (-uIn.y, uIn.x)
-  const nIn = cross > 0 
-    ? { x: uIn.y, y: -uIn.x }   // right side of incoming
-    : { x: -uIn.y, y: uIn.x };  // left side of incoming
-  const nOut = cross > 0
-    ? { x: uOut.y, y: -uOut.x }
-    : { x: -uOut.y, y: uOut.x };
+  // Wall startpoints at the vertex for outgoing segment
+  // (where the straight walls of outgoing segment begin)
+  const outWallL = { x: V.x + nOutL.x * halfW, y: V.y + nOutL.y * halfW };
+  const outWallR = { x: V.x + nOutR.x * halfW, y: V.y + nOutR.y * halfW };
 
-  // Arc center: offset from vertex along the inside normal by clrPx
-  // Use average of the two normals (bisector direction) for positioning
-  const bisNx = nIn.x + nOut.x;
-  const bisNy = nIn.y + nOut.y;
-  const bisNlen = Math.sqrt(bisNx*bisNx + bisNy*bisNy) || 1;
+  // Control points for the bezier curves:
+  // The "corner" where each wall would intersect if extended straight through the vertex.
+  // For the left wall: extend incoming left wall forward and outgoing left wall backward, find intersection.
+  // For simplicity and reliability, use the vertex offset by halfW along the bisector of the two normals.
+  // But even simpler: quadratic bezier with control point at the extended corner.
   
-  // Half-angle of the turn
-  const dot = uIn.x*uOut.x + uIn.y*uOut.y;
-  const halfAngle = Math.acos(Math.max(-1, Math.min(1, dot))) / 2;
-  const sinHA = Math.sin(halfAngle);
-  if (sinHA < 0.01) return;
-  
-  // Center distance from vertex
-  const cDist = clrPx / sinHA;
-  const cx = V.x + (bisNx/bisNlen) * cDist;
-  const cy = V.y + (bisNy/bisNlen) * cDist;
-
-  // Tangent points: perpendicular from center onto each leg
-  // Incoming tangent: foot of perpendicular from C onto line through A→V
-  const dotCI = (cx - A.x)*uIn.x + (cy - A.y)*uIn.y;
-  const tInX = A.x + uIn.x * dotCI;
-  const tInY = A.y + uIn.y * dotCI;
-  // Outgoing tangent: foot of perpendicular from C onto line through V→B  
-  const dotCO = (cx - V.x)*uOut.x + (cy - V.y)*uOut.y;
-  const tOutX = V.x + uOut.x * dotCO;
-  const tOutY = V.y + uOut.y * dotCO;
-
-  // Arc angles
-  const aStart = Math.atan2(tInY - cy, tInX - cx);
-  const aEnd = Math.atan2(tOutY - cy, tOutX - cx);
-  
-  // Determine short-way arc direction
-  let cw = aStart - aEnd; while (cw < 0) cw += 2*Math.PI;
-  let ccw = aEnd - aStart; while (ccw < 0) ccw += 2*Math.PI;
-  const goCounterCW = ccw < cw;
+  // Left wall corner: intersection of incoming-left-wall line and outgoing-left-wall line
+  const cpL = lineIntersect(
+    inWallL.x, inWallL.y, inWallL.x + uIn.x, inWallL.y + uIn.y,
+    outWallL.x, outWallL.y, outWallL.x - uOut.x, outWallL.y - uOut.y
+  );
+  // Right wall corner
+  const cpR = lineIntersect(
+    inWallR.x, inWallR.y, inWallR.x + uIn.x, inWallR.y + uIn.y,
+    outWallR.x, outWallR.y, outWallR.x - uOut.x, outWallR.y - uOut.y
+  );
 
   mCtx.save();
   mCtx.strokeStyle = color;
@@ -2751,17 +2732,27 @@ function drawFitting(points, fit, duct, color) {
   mCtx.setLineDash([]);
   mCtx.globalAlpha = 1.0;
 
-  // Inner wall arc (throat)
-  mCtx.beginPath();
-  mCtx.arc(cx, cy, innerR, aStart, aEnd, goCounterCW);
-  mCtx.stroke();
+  // Left wall curve
+  if (cpL) {
+    mCtx.beginPath();
+    mCtx.moveTo(inWallL.x, inWallL.y);
+    mCtx.quadraticCurveTo(cpL.x, cpL.y, outWallL.x, outWallL.y);
+    mCtx.stroke();
+  } else {
+    mCtx.beginPath(); mCtx.moveTo(inWallL.x, inWallL.y); mCtx.lineTo(outWallL.x, outWallL.y); mCtx.stroke();
+  }
 
-  // Outer wall arc (heel)
-  mCtx.beginPath();
-  mCtx.arc(cx, cy, outerR, aStart, aEnd, goCounterCW);
-  mCtx.stroke();
+  // Right wall curve
+  if (cpR) {
+    mCtx.beginPath();
+    mCtx.moveTo(inWallR.x, inWallR.y);
+    mCtx.quadraticCurveTo(cpR.x, cpR.y, outWallR.x, outWallR.y);
+    mCtx.stroke();
+  } else {
+    mCtx.beginPath(); mCtx.moveTo(inWallR.x, inWallR.y); mCtx.lineTo(outWallR.x, outWallR.y); mCtx.stroke();
+  }
 
-  // Fitting label — small, near the outside of the bend
+  // Fitting label
   const effSize = (_currentRenderMeas && _currentRenderMeas.labelSize != null) ? _currentRenderMeas.labelSize : annoSize;
   const effTextOp = (_currentRenderMeas && _currentRenderMeas.labelTextOpacity != null) ? _currentRenderMeas.labelTextOpacity : annoTextOpacity;
   const effFillOp = (_currentRenderMeas && _currentRenderMeas.labelFillOpacity != null) ? _currentRenderMeas.labelFillOpacity : annoFillOpacity;
@@ -2771,13 +2762,11 @@ function drawFitting(points, fit, duct, color) {
   mCtx.font = `bold ${renderSz}px -apple-system, BlinkMacSystemFont, sans-serif`;
   const ftLabel = getFittingLabel(fit.type);
   const tw = mCtx.measureText(ftLabel).width;
-  // Mid-arc angle
-  let midA;
-  if (goCounterCW) { let d = aEnd - aStart; while (d < 0) d += 2*Math.PI; midA = aStart + d/2; }
-  else { let d = aStart - aEnd; while (d < 0) d += 2*Math.PI; midA = aStart - d/2; }
-  const lblR = outerR + 10 / lsc;
-  const lx = cx + Math.cos(midA) * lblR;
-  const ly = cy + Math.sin(midA) * lblR;
+  // Label outside the bend
+  const cross = uIn.x * uOut.y - uIn.y * uOut.x;
+  const outsideCP = cross > 0 ? cpR : cpL; // the outside wall corner
+  const lx = outsideCP ? outsideCP.x : V.x;
+  const ly = outsideCP ? outsideCP.y : V.y;
   mCtx.save();
   mCtx.translate(lx, ly); mCtx.scale(lsc, lsc);
   mCtx.globalAlpha = effFillOp;
@@ -2789,6 +2778,17 @@ function drawFitting(points, fit, duct, color) {
   mCtx.restore();
 
   mCtx.restore();
+}
+
+// Line intersection helper: two lines defined by point+direction
+// Line 1: (x1,y1) toward (x2,y2); Line 2: (x3,y3) toward (x4,y4)
+function lineIntersect(x1,y1,x2,y2, x3,y3,x4,y4) {
+  const dx1 = x2-x1, dy1 = y2-y1;
+  const dx2 = x4-x3, dy2 = y4-y3;
+  const denom = dx1*dy2 - dy1*dx2;
+  if (Math.abs(denom) < 0.0001) return null; // parallel
+  const t = ((x3-x1)*dy2 - (y3-y1)*dx2) / denom;
+  return { x: x1 + dx1*t, y: y1 + dy1*t };
 }
 
 function drawSpiralDuct(points, duct, color, trimPoints) {
