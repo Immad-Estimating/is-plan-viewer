@@ -33,6 +33,27 @@
   .page-name-editable:empty::before { content: '+ Name'; color: #555; font-style: italic; }
   .page-name-editable[contenteditable="true"] { outline: none; border-color: #e94560; color: #fff; max-width: 300px; }
   
+  /* Annotation controls */
+  .anno-controls { position: absolute; top: 8px; right: 16px; z-index: 50; display: flex; gap: 8px; align-items: center; }
+  .anno-controls.panel-open { right: 316px; }
+  .anno-btn { background: #16213e; border: 1px solid #0f3460; color: #a0a0c0; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 5px; transition: background 0.15s; }
+  .anno-btn:hover { background: #0f3460; color: #e0e0e0; }
+  .anno-popover { display: none; position: absolute; top: 36px; right: 0; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 14px; min-width: 220px; z-index: 55; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  .anno-popover.open { display: block; }
+  .anno-popover label { display: block; font-size: 11px; color: #a0a0c0; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .anno-popover .slider-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .anno-popover .slider-row input[type="range"] { flex: 1; accent-color: #e94560; height: 4px; }
+  .anno-popover .slider-row .slider-val { font-size: 12px; color: #e0e0e0; min-width: 32px; text-align: right; }
+  .meas-item .meas-edit-btn { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 13px; padding: 0 4px; opacity: 0.5; }
+  .meas-item .meas-edit-btn:hover { opacity: 1; color: #e94560; }
+  .meas-edit-inline { margin-top: 6px; padding-top: 6px; border-top: 1px solid #0f3460; }
+  .meas-edit-inline label { font-size: 10px; color: #a0a0c0; display: block; margin-bottom: 2px; }
+  .meas-edit-inline input[type="text"] { width: 100%; background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 4px 6px; border-radius: 3px; font-size: 11px; margin-bottom: 6px; }
+  .meas-edit-inline input[type="text"]:focus { outline: none; border-color: #e94560; }
+  .meas-edit-inline .slider-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .meas-edit-inline .slider-row input[type="range"] { flex: 1; accent-color: #e94560; height: 3px; }
+  .meas-edit-inline .slider-row .slider-val { font-size: 10px; color: #a0a0c0; min-width: 28px; text-align: right; }
+  
   #fileInput { display: none; }
   .upload-btn { background: #e94560 !important; border-color: #e94560 !important; font-weight: 600; }
   .upload-btn:hover { background: #c73550 !important; }
@@ -471,7 +492,23 @@
       </div>
 
       <!-- Panel toggle -->
-      <button class="panel-toggle-btn" id="panelToggle" onclick="togglePanel()" title="Toggle Measurements Panel">◀</button>
+      <!-- Annotation controls -->
+    <div class="anno-controls" id="annoControls">
+      <button class="anno-btn" id="annoBtn" onclick="toggleAnnoPopover()">🏷️ Labels</button>
+      <div class="anno-popover" id="annoPopover">
+        <label>Label Size</label>
+        <div class="slider-row">
+          <input type="range" id="annoSizeSlider" min="8" max="28" value="14" step="1" oninput="updateAnnoGlobals()">
+          <span class="slider-val" id="annoSizeVal">14</span>
+        </div>
+        <label>Label Opacity</label>
+        <div class="slider-row">
+          <input type="range" id="annoOpacitySlider" min="10" max="100" value="100" step="5" oninput="updateAnnoGlobals()">
+          <span class="slider-val" id="annoOpacityVal">100%</span>
+        </div>
+      </div>
+    </div>
+    <button class="panel-toggle-btn" id="panelToggle" onclick="togglePanel()" title="Toggle Measurements Panel">◀</button>
     </div>
 
     <!-- Side Panel -->
@@ -1696,6 +1733,10 @@ let pendingMeasurementId = null;
 const pageScales = {};
 const pageMeasurements = {};
 const pageNames = {};
+
+// Global annotation defaults (per page)
+let annoSize = 14;   // font size in px (before baseScale)
+let annoOpacity = 1.0; // 0-1
 let measureIdCounter = 0;
 window._measIdCounter = 0;
 
@@ -1742,7 +1783,9 @@ async function saveCurrentPageData() {
     pageNum,
     scale,
     measurements,
-    pageName: pageNames[pageNum] || ''
+    pageName: pageNames[pageNum] || '',
+    annoSize: annoSize,
+    annoOpacity: annoOpacity
   });
   
   // Update project modifiedAt
@@ -1765,6 +1808,9 @@ async function loadPageDataForDrawing(drawingId) {
   for (const k in pageNames) delete pageNames[k];
   for (const pd of allPageData) {
     if (pd.pageName) pageNames[pd.pageNum] = pd.pageName;
+    // Restore anno settings from the last loaded page (will be overwritten per-page)
+    if (pd.annoSize != null) annoSize = pd.annoSize;
+    if (pd.annoOpacity != null) annoOpacity = pd.annoOpacity;
     if (pd.scale) pageScales[pd.pageNum] = pd.scale;
     if (pd.measurements && pd.measurements.length > 0) {
       pageMeasurements[pd.pageNum] = pd.measurements;
@@ -2266,7 +2312,10 @@ function finishMeasurement() {
     scale: scale ? { ...scale } : null,
     pxLength: pxLen,
     distance: dist,
-    duct: null
+    duct: null,
+    labelText: null,     // custom label (null = auto-generated)
+    labelSize: null,     // per-measurement override (null = use global)
+    labelOpacity: null   // per-measurement override (null = use global)
   };
   
   if (!pageMeasurements[currentPage]) pageMeasurements[currentPage] = [];
@@ -2346,6 +2395,8 @@ function findMeasurement(id) {
 }
 
 // ---- Drawing overlay ----
+let _currentRenderMeas = null;
+
 function drawMeasureOverlay() {
   mCanvas.width = canvas.width;
   mCanvas.height = canvas.height;
@@ -2357,6 +2408,7 @@ function drawMeasureOverlay() {
   
   const saved = pageMeasurements[currentPage] || [];
   for (const m of saved) {
+    _currentRenderMeas = m;
     drawMeasurementLine(m.points, m.distance.formatted, m.duct, '#00ff88', false);
   }
   
@@ -2373,6 +2425,7 @@ function drawMeasureOverlay() {
     const pxLen = computePolylineLength(pts);
     const dist = computeRealDistance(pxLen, scale);
     
+    _currentRenderMeas = null;
     drawMeasurementLine(pts, dist.formatted, null, '#00ff88', true);
   }
 }
@@ -2517,12 +2570,16 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   const mx = (p1.x + p2.x) / 2;
   const my = (p1.y + p2.y) / 2;
   
-  let text = label;
-  if (duct) {
+  // Determine label text, size, opacity (per-measurement overrides or globals)
+  const measObj = _currentRenderMeas;
+  let text = (measObj && measObj.labelText) ? measObj.labelText : label;
+  if ((!measObj || !measObj.labelText) && duct) {
     text += ` ${duct.symbol} ${duct.dims}`;
   }
   
-  const fontSize = 14 * baseScale;
+  const effSize = (measObj && measObj.labelSize != null) ? measObj.labelSize : annoSize;
+  const effOpacity = (measObj && measObj.labelOpacity != null) ? measObj.labelOpacity : annoOpacity;
+  const fontSize = effSize * baseScale;
   mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
   const textWidth = mCtx.measureText(text).width;
   const padding = 4 * baseScale;
@@ -2534,6 +2591,7 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   mCtx.translate(mx, my);
   mCtx.rotate(displayAngle);
   
+  mCtx.globalAlpha = effOpacity;
   mCtx.fillStyle = 'rgba(22, 33, 62, 0.9)';
   const bgHeight = fontSize + padding * 2;
   mCtx.beginPath();
@@ -2548,11 +2606,77 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   mCtx.textAlign = 'center';
   mCtx.textBaseline = 'middle';
   mCtx.fillText(text, 0, 0);
+  mCtx.globalAlpha = 1.0;
   
   mCtx.restore();
 }
 
 // ---- Side panel ----
+// ---- Annotation controls ----
+window.toggleAnnoPopover = function() {
+  document.getElementById('annoPopover').classList.toggle('open');
+};
+
+window.updateAnnoGlobals = function() {
+  annoSize = parseInt(document.getElementById('annoSizeSlider').value);
+  annoOpacity = parseInt(document.getElementById('annoOpacitySlider').value) / 100;
+  document.getElementById('annoSizeVal').textContent = annoSize;
+  document.getElementById('annoOpacityVal').textContent = Math.round(annoOpacity * 100) + '%';
+  drawMeasureOverlay();
+  scheduleSave();
+};
+
+// Close anno popover on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#annoPopover') && !e.target.closest('#annoBtn')) {
+    document.getElementById('annoPopover')?.classList.remove('open');
+  }
+});
+
+// Update per-measurement properties
+window.editMeasurement = function(id) {
+  const el = document.getElementById(`meas-edit-${id}`);
+  if (el) { el.remove(); updatePanel(); return; } // toggle off
+  
+  const m = findMeasurement(id);
+  if (!m) return;
+  
+  const item = document.querySelector(`.meas-item[data-id="${id}"]`);
+  if (!item) return;
+  
+  const currentLabel = m.labelText || '';
+  const currentSize = m.labelSize != null ? m.labelSize : annoSize;
+  const currentOpacity = m.labelOpacity != null ? Math.round(m.labelOpacity * 100) : Math.round(annoOpacity * 100);
+  
+  const editHtml = `<div class="meas-edit-inline" id="meas-edit-${id}">
+    <label>Custom Label</label>
+    <input type="text" id="measLabel-${id}" value="${currentLabel.replace(/"/g, '&quot;')}" placeholder="Auto: ${m.distance.formatted}${m.duct ? ' ' + m.duct.symbol + ' ' + m.duct.dims : ''}" oninput="updateMeasProp(${id},'labelText',this.value)">
+    <label>Size</label>
+    <div class="slider-row">
+      <input type="range" min="8" max="28" value="${currentSize}" step="1" oninput="updateMeasProp(${id},'labelSize',parseInt(this.value));this.nextElementSibling.textContent=this.value">
+      <span class="slider-val">${currentSize}</span>
+    </div>
+    <label>Opacity</label>
+    <div class="slider-row">
+      <input type="range" min="10" max="100" value="${currentOpacity}" step="5" oninput="updateMeasProp(${id},'labelOpacity',parseInt(this.value)/100);this.nextElementSibling.textContent=this.value+'%'">
+      <span class="slider-val">${currentOpacity}%</span>
+    </div>
+  </div>`;
+  item.insertAdjacentHTML('beforeend', editHtml);
+};
+
+window.updateMeasProp = function(id, prop, value) {
+  const m = findMeasurement(id);
+  if (!m) return;
+  if (prop === 'labelText') {
+    m[prop] = value.trim() || null; // null = auto
+  } else {
+    m[prop] = value;
+  }
+  drawMeasureOverlay();
+  scheduleSave();
+};
+
 window.togglePanel = function() {
   sidePanel.classList.toggle('open');
   const btn = document.getElementById('panelBtn');
@@ -2581,11 +2705,14 @@ function updatePanel() {
     
     for (const m of measurements) {
       const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}</div>` : '';
+      const customLabel = m.labelText ? `<div class="meas-duct" style="color:#e94560;font-style:italic">"${escapeHtml(m.labelText)}"</div>` : '';
       html += `<div class="meas-item" data-id="${m.id}">
         <div class="meas-info">
           <div class="meas-length">${m.distance.formatted}</div>
           ${ductInfo}
+          ${customLabel}
         </div>
+        <button class="meas-edit-btn" onclick="editMeasurement(${m.id})" title="Edit label">✏️</button>
         <button class="meas-delete" onclick="deleteMeasurement(${m.id})" title="Delete">×</button>
       </div>`;
     }
@@ -2620,6 +2747,13 @@ window.clearAllMeasurements = function() {
 // ---- Core PDF viewer functions ----
 
 // ---- Page name display/edit ----
+function syncAnnoSliders() {
+  const sizeSlider = document.getElementById('annoSizeSlider');
+  const opacitySlider = document.getElementById('annoOpacitySlider');
+  if (sizeSlider) { sizeSlider.value = annoSize; document.getElementById('annoSizeVal').textContent = annoSize; }
+  if (opacitySlider) { opacitySlider.value = Math.round(annoOpacity * 100); document.getElementById('annoOpacityVal').textContent = Math.round(annoOpacity * 100) + '%'; }
+}
+
 function updatePageNameDisplay() {
   const el = document.getElementById('pageName');
   if (!el) return;
@@ -2673,6 +2807,7 @@ async function renderPage() {
   
   document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
   updatePageNameDisplay();
+  syncAnnoSliders();
   applyTransform();
   updateScaleLabel();
   drawMeasureOverlay();
