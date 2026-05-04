@@ -1898,6 +1898,9 @@ const FITTINGS_BY_SHAPE = {
 };
 let selectedFittingId = null;
 let selectedMeasId = null; // selected measurement for deletion/editing in idle mode
+let selectedEndpointMeasId = null; // measurement whose endpoint is selected
+let selectedEndpointIdx = null;    // which point index is selected
+let elevationInputActive = false;  // is elevation input currently showing
 let fittingIdCounter = 0;
 let fittingMousePos = null;
 let dragMeasId = null;
@@ -2151,7 +2154,7 @@ window.addEventListener('mousemove', (e) => {
       const targets = getAllSnapTargets(dragMeasId, null);
       const snap = findBestSnap([{x: nx, y: ny}], targets, SNAP_THRESHOLD_PX);
       if (snap.snapped) { nx += snap.snapDx; ny += snap.snapDy; }
-      m.points[dragPointIdx] = { x: nx, y: ny };
+      m.points[dragPointIdx] = { x: nx, y: ny, elevation: m.points[dragPointIdx].elevation || null };
       const scale = m.scale || getScaleForPage(currentPage);
       m.pxLength = computePolylineLength(m.points);
       m.distance = computeRealDistance(m.pxLength, scale);
@@ -2307,19 +2310,34 @@ viewer.addEventListener('click', (e) => {
       updatePanel();
       return;
     }
+    // Check endpoint hit for selection (not drag — that's mousedown)
+    const epClick = hitTestEndpoint(pt.x, pt.y, hr);
+    if (epClick) {
+      selectedFittingId = null;
+      selectedMeasId = epClick.measId;
+      selectedEndpointMeasId = epClick.measId;
+      selectedEndpointIdx = epClick.pointIdx;
+      drawMeasureOverlay();
+      updatePanel();
+      return;
+    }
     // Check segment hit
     const segHit = hitTestSegment(pt.x, pt.y, hr * 1.5);
     if (segHit) {
       selectedFittingId = null;
+      selectedEndpointMeasId = null;
+      selectedEndpointIdx = null;
       selectedMeasId = segHit.measId;
       drawMeasureOverlay();
       updatePanel();
       return;
     }
     // Click on empty space: deselect
-    if (selectedMeasId || selectedFittingId) {
+    if (selectedMeasId || selectedFittingId || selectedEndpointMeasId) {
       selectedMeasId = null;
       selectedFittingId = null;
+      selectedEndpointMeasId = null;
+      selectedEndpointIdx = null;
       drawMeasureOverlay();
       updatePanel();
       return;
@@ -2448,6 +2466,10 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowRight') { e.preventDefault(); window.nextPage(); }
   else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
   else if (e.key === 's' || e.key === 'S') { e.preventDefault(); window.toggleDuctDraw(); }
+  else if ((e.key === 'e' || e.key === 'E') && selectedEndpointMeasId != null && selectedEndpointIdx != null && !elevationInputActive) {
+    e.preventDefault();
+    showElevationInput();
+  }
   else if (e.key === 't' || e.key === 'T') { e.preventDefault(); window.toggleFittingMode(); return; }
   else if (e.key === 'Escape') {
     if (calibrationMode) { cancelCalibration(); return; }
@@ -3180,6 +3202,78 @@ function findMeasurement(id) {
 }
 
 // ---- Drawing overlay ----
+// ---- Elevation system ----
+function showElevationInput() {
+  if (selectedEndpointMeasId == null || selectedEndpointIdx == null) return;
+  const m = findMeasurement(selectedEndpointMeasId);
+  if (!m || selectedEndpointIdx >= m.points.length) return;
+  
+  const pt = m.points[selectedEndpointIdx];
+  const currentElev = pt.elevation || '';
+  
+  // Create inline input on the canvas overlay area
+  const screenPt = pdfToScreen(pt.x, pt.y);
+  const viewerRect = viewer.getBoundingClientRect();
+  
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentElev;
+  input.placeholder = "e.g. 12'6\"";
+  input.style.cssText = `position:absolute;left:${screenPt.x + viewerRect.left + 15}px;top:${screenPt.y + viewerRect.top - 12}px;width:80px;padding:3px 6px;background:#1a1a2e;border:1px solid #e94560;color:#00bfff;border-radius:3px;font-size:12px;font-weight:600;z-index:200;outline:none;`;
+  document.body.appendChild(input);
+  input.focus();
+  input.select();
+  elevationInputActive = true;
+  
+  const save = () => {
+    const val = input.value.trim();
+    pt.elevation = val || null;
+    input.remove();
+    elevationInputActive = false;
+    drawMeasureOverlay();
+    updatePanel();
+    scheduleSave();
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = currentElev; input.blur(); }
+    e.stopPropagation(); // don't trigger canvas shortcuts
+  });
+}
+
+function drawElevationLabels(measurements) {
+  for (const m of measurements) {
+    for (const pt of m.points) {
+      if (!pt.elevation) continue;
+      const fontSize = 11 * baseScale;
+      const renderSz = Math.max(24, fontSize);
+      const sc = fontSize / renderSz;
+      mCtx.save();
+      mCtx.font = `bold ${renderSz}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      const text = '↕ ' + pt.elevation;
+      const tw = mCtx.measureText(text).width;
+      const pad = 3;
+      // Position below-left of the point
+      const lx = pt.x - 5;
+      const ly = pt.y + 12;
+      mCtx.translate(lx, ly);
+      mCtx.scale(sc, sc);
+      mCtx.globalAlpha = 0.85;
+      mCtx.fillStyle = 'rgba(0, 30, 60, 0.9)';
+      mCtx.beginPath();
+      mCtx.roundRect(-pad, -renderSz/2 - pad, tw + pad*2, renderSz + pad*2, 3);
+      mCtx.fill();
+      mCtx.globalAlpha = 1.0;
+      mCtx.fillStyle = '#00bfff'; // blue for elevation - distinct from green duct
+      mCtx.textAlign = 'left';
+      mCtx.textBaseline = 'middle';
+      mCtx.fillText(text, 0, 0);
+      mCtx.restore();
+    }
+  }
+}
+
 let _currentRenderMeas = null;
 
 function drawMeasureOverlay() {
@@ -3197,6 +3291,26 @@ function drawMeasureOverlay() {
     const isSelected = m.id === selectedMeasId || m.id === dragMeasId;
     const mColor = isSelected ? '#e94560' : '#00ff88';
     drawMeasurementLine(m.points, m.distance.formatted, m.duct, mColor, false);
+  }
+  
+  // Elevation labels on all endpoints that have elevation set
+  drawElevationLabels(saved);
+  
+  // Dashed circle for selected endpoint (E key target)
+  if (selectedEndpointMeasId && selectedEndpointIdx != null && !isDraggingEndpoint) {
+    const sm = findMeasurement(selectedEndpointMeasId);
+    if (sm && selectedEndpointIdx < sm.points.length) {
+      const sp = sm.points[selectedEndpointIdx];
+      mCtx.save();
+      mCtx.setLineDash([4, 4]);
+      mCtx.strokeStyle = '#00bfff';
+      mCtx.lineWidth = 1.5;
+      mCtx.beginPath();
+      mCtx.arc(sp.x, sp.y, 20, 0, Math.PI * 2);
+      mCtx.stroke();
+      mCtx.setLineDash([]);
+      mCtx.restore();
+    }
   }
   
   // Dashed circle around the endpoint being dragged
@@ -3841,13 +3955,21 @@ function updatePanel() {
     html += `<div class="meas-group-title">Page ${page}</div>`;
     
     for (const m of measurements) {
-      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}</div>` : '';
+      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}</div>` : '';
+      // Elevation info
+      let elevInfo = '';
+      const elevPoints = m.points.filter(p => p.elevation);
+      if (elevPoints.length > 0) {
+        const elevTexts = m.points.map((p, i) => p.elevation ? `P${i+1}: ↕${p.elevation}` : null).filter(Boolean);
+        elevInfo = `<div class="meas-duct" style="color:#00bfff">${elevTexts.join(' → ')}</div>`;
+      }
 
       const customLabel = m.labelText ? `<div class="meas-duct" style="color:#e94560;font-style:italic">"${escapeHtml(m.labelText)}"</div>` : '';
       html += `<div class="meas-item" data-id="${m.id}">
         <div class="meas-info">
           <div class="meas-length">${m.distance.formatted}</div>
           ${ductInfo}
+          ${elevInfo}
           ${customLabel}
         </div>
         <button class="meas-edit-btn" onclick="editMeasurement(${m.id})" title="Edit label">✏️</button>
