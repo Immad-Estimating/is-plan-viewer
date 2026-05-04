@@ -2127,12 +2127,17 @@ viewer.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('mousemove', (e) => {
-  // Endpoint dragging
+  // Endpoint dragging with snap
   if (isDraggingEndpoint && dragMeasId != null) {
     const pt = screenToPdf(e.clientX, e.clientY);
     const m = findMeasurement(dragMeasId);
     if (m && dragPointIdx >= 0 && dragPointIdx < m.points.length) {
-      m.points[dragPointIdx] = { x: pt.x, y: pt.y };
+      let nx = pt.x, ny = pt.y;
+      // Snap endpoint to nearby fitting/duct connection points
+      const targets = getAllSnapTargets(dragMeasId, null);
+      const snap = findBestSnap([{x: nx, y: ny}], targets, SNAP_THRESHOLD_PX);
+      if (snap.snapped) { nx += snap.snapDx; ny += snap.snapDy; }
+      m.points[dragPointIdx] = { x: nx, y: ny };
       const scale = m.scale || getScaleForPage(currentPage);
       m.pxLength = computePolylineLength(m.points);
       m.distance = computeRealDistance(m.pxLength, scale);
@@ -2141,27 +2146,43 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
   
-  // Fitting dragging (move entire fitting, no resize)
+  // Fitting dragging with snap
   if (isDraggingFitting && dragFittingId != null && dragFittingOrigPos) {
     const pt = screenToPdf(e.clientX, e.clientY);
     const dx = pt.x - dragFittingStart.x;
     const dy = pt.y - dragFittingStart.y;
     const f = (pageFittings[currentPage] || []).find(ff => ff.id === dragFittingId);
     if (f) {
+      // Set tentative position
       f.x = dragFittingOrigPos.x + dx;
       f.y = dragFittingOrigPos.y + dy;
+      // Check snap
+      const myConns = getFittingConnPoints(f);
+      const targets = getAllSnapTargets(null, dragFittingId);
+      const snap = findBestSnap(myConns, targets, SNAP_THRESHOLD_PX);
+      if (snap.snapped) {
+        f.x += snap.snapDx;
+        f.y += snap.snapDy;
+      }
       drawMeasureOverlay();
     }
     return;
   }
   
-  // Whole segment dragging (move entire duct/measurement)
+  // Whole segment dragging with snap
   if (isDraggingSegment && dragMeasId != null && dragSegOrigPoints) {
     const pt = screenToPdf(e.clientX, e.clientY);
-    const dx = pt.x - dragSegStartMouse.x;
-    const dy = pt.y - dragSegStartMouse.y;
+    let dx = pt.x - dragSegStartMouse.x;
+    let dy = pt.y - dragSegStartMouse.y;
     const m = findMeasurement(dragMeasId);
     if (m) {
+      // Tentative positions
+      const tentative = dragSegOrigPoints.map(p => ({ x: p.x + dx, y: p.y + dy }));
+      // Snap: check both endpoints of the moved duct
+      const myConns = [tentative[0], tentative[tentative.length - 1]];
+      const targets = getAllSnapTargets(dragMeasId, null);
+      const snap = findBestSnap(myConns, targets, SNAP_THRESHOLD_PX);
+      if (snap.snapped) { dx += snap.snapDx; dy += snap.snapDy; }
       for (let i = 0; i < m.points.length; i++) {
         m.points[i] = { x: dragSegOrigPoints[i].x + dx, y: dragSegOrigPoints[i].y + dy };
       }
@@ -2838,6 +2859,124 @@ window.finishDuct = function(save) {
   scheduleSave();
 };
 
+// ---- Snap system ----
+const SNAP_THRESHOLD_PX = 15; // snap distance in screen pixels
+
+// Get connection points for a fitting (in PDF coords)
+// Returns array of {x, y} — the openings where duct connects
+function getFittingConnPoints(f) {
+  const D = inchesToPx(parseFloat(f.sizeA) || 14);
+  const rot = (f.rotation || 0) * Math.PI / 180;
+  const cos = Math.cos(rot), sin = Math.sin(rot);
+  const stub = D * 0.5;
+  const CLR = D * 1.5;
+  const points = [];
+  
+  // Rotate a local point by the fitting's rotation around its center
+  const r = (lx, ly) => ({ x: f.x + lx * cos - ly * sin, y: f.y + lx * sin + ly * cos });
+  
+  switch (f.type) {
+    case '90el':
+      points.push(r(-stub - D*0.3, 0)); // entry
+      // exit: after 90° turn, exit stub is perpendicular
+      points.push(r(CLR * Math.cos(Math.PI/2), CLR + CLR * Math.sin(Math.PI/2) - stub*0.5)); // approximate exit
+      break;
+    case '45el':
+      points.push(r(-stub - D*0.3, 0));
+      points.push(r(CLR * 0.7, CLR * 0.7));
+      break;
+    case '22el':
+      points.push(r(-stub - D*0.3, 0));
+      points.push(r(CLR * 0.4, CLR * 0.2));
+      break;
+    case 'tee':
+    case 'saddle':
+      const halfMain = D * 1.5;
+      points.push(r(-halfMain, 0)); // main entry
+      points.push(r(halfMain, 0));  // main exit
+      points.push(r(0, -D * 1.2)); // branch (top)
+      break;
+    case 'lateral':
+      points.push(r(-D*1.5, 0));
+      points.push(r(D*1.5, 0));
+      points.push(r(D*0.7, -D*1.2));
+      break;
+    case 'wye':
+      points.push(r(-D*1.5, 0));
+      points.push(r(D*1.2, -D*0.8));
+      points.push(r(D*1.2, D*0.8));
+      break;
+    case 'reducer':
+    case 'eccReducer':
+    case 'transition':
+      points.push(r(-D*1.0, 0)); // large end
+      points.push(r(D*1.0, 0));  // small end
+      break;
+    case 'endcap':
+      points.push(r(0, 0)); // single connection
+      break;
+    default:
+      points.push(r(0, 0));
+  }
+  return points;
+}
+
+// Get connection points for a duct measurement (just the endpoints)
+function getDuctConnPoints(m) {
+  if (!m.points || m.points.length < 2) return [];
+  return [
+    { x: m.points[0].x, y: m.points[0].y },
+    { x: m.points[m.points.length - 1].x, y: m.points[m.points.length - 1].y }
+  ];
+}
+
+// Collect all snap targets on the current page EXCEPT the component being dragged
+function getAllSnapTargets(excludeMeasId, excludeFittingId) {
+  const targets = [];
+  // Duct endpoints
+  const measurements = pageMeasurements[currentPage] || [];
+  for (const m of measurements) {
+    if (m.id === excludeMeasId) continue;
+    for (const cp of getDuctConnPoints(m)) {
+      targets.push(cp);
+    }
+  }
+  // Fitting connection points
+  const fittings = pageFittings[currentPage] || [];
+  for (const f of fittings) {
+    if (f.id === excludeFittingId) continue;
+    for (const cp of getFittingConnPoints(f)) {
+      targets.push(cp);
+    }
+  }
+  return targets;
+}
+
+// Find the best snap for a set of connection points against targets
+// Returns { snapDx, snapDy, snapped } — the offset to apply for snapping
+function findBestSnap(connPoints, targets, thresholdPx) {
+  // Convert threshold from screen px to PDF px
+  const displayScale = currentScale / baseScale;
+  const threshold = thresholdPx / displayScale;
+  
+  let bestDist = Infinity;
+  let bestDx = 0, bestDy = 0;
+  
+  for (const cp of connPoints) {
+    for (const tp of targets) {
+      const dx = tp.x - cp.x;
+      const dy = tp.y - cp.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < threshold && dist < bestDist) {
+        bestDist = dist;
+        bestDx = dx;
+        bestDy = dy;
+      }
+    }
+  }
+  return bestDist < threshold ? { snapDx: bestDx, snapDy: bestDy, snapped: true } : { snapDx: 0, snapDy: 0, snapped: false };
+}
+
 function hitTestEndpoint(pdfX, pdfY, hitRadius) {
   const measurements = pageMeasurements[currentPage] || [];
   for (let mi = measurements.length - 1; mi >= 0; mi--) {
@@ -2922,6 +3061,42 @@ function drawMeasureOverlay() {
   }
   
   // Draw placed fittings
+  // Draw snap indicator if actively snapping
+  if ((isDraggingEndpoint || isDraggingSegment || isDraggingFitting) && dragMeasId != null || isDraggingFitting && dragFittingId != null) {
+    let myConns = [];
+    if (isDraggingFitting && dragFittingId) {
+      const f = (pageFittings[currentPage] || []).find(ff => ff.id === dragFittingId);
+      if (f) myConns = getFittingConnPoints(f);
+    } else if (isDraggingEndpoint && dragMeasId) {
+      const m = findMeasurement(dragMeasId);
+      if (m && dragPointIdx >= 0) myConns = [m.points[dragPointIdx]];
+    } else if (isDraggingSegment && dragMeasId) {
+      const m = findMeasurement(dragMeasId);
+      if (m) myConns = getDuctConnPoints(m);
+    }
+    const excMeas = isDraggingFitting ? null : dragMeasId;
+    const excFit = isDraggingFitting ? dragFittingId : null;
+    const targets = getAllSnapTargets(excMeas, excFit);
+    const displayScale = currentScale / baseScale;
+    const threshold = SNAP_THRESHOLD_PX / displayScale;
+    for (const cp of myConns) {
+      for (const tp of targets) {
+        const d = Math.sqrt((cp.x-tp.x)**2 + (cp.y-tp.y)**2);
+        if (d < 2) { // snapped — draw a small green circle
+          mCtx.save();
+          mCtx.strokeStyle = '#00ff88';
+          mCtx.lineWidth = 2;
+          mCtx.setLineDash([3, 3]);
+          mCtx.beginPath();
+          mCtx.arc(tp.x, tp.y, threshold * 0.4, 0, Math.PI * 2);
+          mCtx.stroke();
+          mCtx.setLineDash([]);
+          mCtx.restore();
+        }
+      }
+    }
+  }
+
   const fittingsOnPage = pageFittings[currentPage] || [];
   for (const f of fittingsOnPage) {
     drawFitting(f, f.id === selectedFittingId);
@@ -3811,10 +3986,16 @@ function handleFittingClick(e) {
   if (selectedFittingType) {
     if (!pageFittings[currentPage]) pageFittings[currentPage] = [];
     fittingIdCounter++;
+    // Snap placement to nearby connection points
+    let placeX = pt.x, placeY = pt.y;
+    const placeholderConns = [{ x: placeX, y: placeY }];
+    const placeTargets = getAllSnapTargets(null, null);
+    const placeSnap = findBestSnap(placeholderConns, placeTargets, SNAP_THRESHOLD_PX);
+    if (placeSnap.snapped) { placeX += placeSnap.snapDx; placeY += placeSnap.snapDy; }
     const f = {
       id: fittingIdCounter,
       type: selectedFittingType,
-      x: pt.x, y: pt.y,
+      x: placeX, y: placeY,
       rotation: parseFloat(document.getElementById('fpRotation').value) || 0,
       sizeA: document.getElementById('fpSizeA').value || '14',
       sizeB: document.getElementById('fpSizeB').value || '',
