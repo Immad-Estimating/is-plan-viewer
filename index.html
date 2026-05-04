@@ -1897,8 +1897,12 @@ let dragMeasId = null;
 let dragPointIdx = null;
 let isDraggingEndpoint = false;
 let isDraggingSegment = false;
-let dragSegStartMouse = null; // starting mouse position for segment drag
-let dragSegOrigPoints = null; // original points snapshot for segment drag
+let dragSegStartMouse = null;
+let dragSegOrigPoints = null;
+let isDraggingFitting = false;
+let dragFittingId = null;
+let dragFittingStart = null; // {x,y} mouse start in PDF coords
+let dragFittingOrigPos = null; // {x,y} original fitting position
 let fittingDragRotate = false;
 let fittingDragStartAngle = 0;
 const pageFittings = {};
@@ -2089,7 +2093,19 @@ viewer.addEventListener('mousedown', (e) => {
       viewer.classList.add('grabbing');
       return;
     }
-    // Priority 2: whole duct/measurement drag (click on the line itself)
+    // Priority 2: fitting drag (click on a placed fitting to move it)
+    const fitHit = hitTestFitting(pt.x, pt.y);
+    if (fitHit) {
+      isDraggingFitting = true;
+      dragFittingId = fitHit.fittingId;
+      dragFittingStart = { x: pt.x, y: pt.y };
+      const f = (pageFittings[currentPage] || []).find(ff => ff.id === fitHit.fittingId);
+      dragFittingOrigPos = f ? { x: f.x, y: f.y } : null;
+      e.preventDefault();
+      viewer.classList.add('grabbing');
+      return;
+    }
+    // Priority 3: whole duct/measurement drag (click on the line itself)
     const segHit = hitTestSegment(pt.x, pt.y, hitR * 1.5);
     if (segHit) {
       isDraggingSegment = true;
@@ -2125,6 +2141,20 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
   
+  // Fitting dragging (move entire fitting, no resize)
+  if (isDraggingFitting && dragFittingId != null && dragFittingOrigPos) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const dx = pt.x - dragFittingStart.x;
+    const dy = pt.y - dragFittingStart.y;
+    const f = (pageFittings[currentPage] || []).find(ff => ff.id === dragFittingId);
+    if (f) {
+      f.x = dragFittingOrigPos.x + dx;
+      f.y = dragFittingOrigPos.y + dy;
+      drawMeasureOverlay();
+    }
+    return;
+  }
+  
   // Whole segment dragging (move entire duct/measurement)
   if (isDraggingSegment && dragMeasId != null && dragSegOrigPoints) {
     const pt = screenToPdf(e.clientX, e.clientY);
@@ -2140,16 +2170,20 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
   
-  // Cursor: show grab on endpoint hover, move on segment hover
-  if (!isPanning && !measureMode && !fittingMode && !isDraggingEndpoint && !isDraggingSegment && pdfDoc) {
+  // Cursor: grab on endpoints, move on segments/fittings
+  if (!isPanning && !measureMode && !fittingMode && !isDraggingEndpoint && !isDraggingSegment && !isDraggingFitting && pdfDoc) {
     const hpt = screenToPdf(e.clientX, e.clientY);
     const ds = currentScale / baseScale;
     const hr = 8 / ds;
     const epHit = hitTestEndpoint(hpt.x, hpt.y, hr);
     if (epHit) { viewer.style.cursor = 'grab'; }
     else {
-      const segHit = hitTestSegment(hpt.x, hpt.y, hr * 1.5);
-      viewer.style.cursor = segHit ? 'move' : '';
+      const fitHit = hitTestFitting(hpt.x, hpt.y);
+      if (fitHit) { viewer.style.cursor = 'move'; }
+      else {
+        const segHit = hitTestSegment(hpt.x, hpt.y, hr * 1.5);
+        viewer.style.cursor = segHit ? 'move' : '';
+      }
     }
   }
   
@@ -2171,13 +2205,17 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', () => {
-  if (isDraggingEndpoint || isDraggingSegment) {
+  if (isDraggingEndpoint || isDraggingSegment || isDraggingFitting) {
     isDraggingEndpoint = false;
     isDraggingSegment = false;
+    isDraggingFitting = false;
     dragMeasId = null;
     dragPointIdx = null;
     dragSegStartMouse = null;
     dragSegOrigPoints = null;
+    dragFittingId = null;
+    dragFittingStart = null;
+    dragFittingOrigPos = null;
     viewer.classList.remove('grabbing');
     viewer.style.cursor = '';
     drawMeasureOverlay();
@@ -2825,6 +2863,18 @@ function hitTestSegment(pdfX, pdfY, hitDist) {
       const d = pointToSegmentDist(pdfX, pdfY, a.x, a.y, b.x, b.y);
       if (d < hitDist) return { measId: m.id };
     }
+  }
+  return null;
+}
+
+// Hit-test: find if click is on a placed fitting (for drag move)
+function hitTestFitting(pdfX, pdfY) {
+  const fittings = pageFittings[currentPage] || [];
+  for (let i = fittings.length - 1; i >= 0; i--) {
+    const f = fittings[i];
+    const r = getFittingBoundingRadius(f);
+    const dx = pdfX - f.x, dy = pdfY - f.y;
+    if (Math.sqrt(dx*dx + dy*dy) < r) return { fittingId: f.id };
   }
   return null;
 }
