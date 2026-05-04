@@ -4174,28 +4174,12 @@ function drawFitting(f, isSelected) {
     mCtx.save();
     mCtx.setLineDash([4, 4]);
     mCtx.strokeStyle = '#e94560';
-    mCtx.lineWidth = 1;
+    mCtx.lineWidth = 1.5;
     const r = getFittingBoundingRadius(f);
     mCtx.beginPath();
     mCtx.arc(f.x, f.y, r, 0, Math.PI * 2);
     mCtx.stroke();
     mCtx.setLineDash([]);
-    
-    // Rotation handle
-    const handleDist = r + 15;
-    const hAngle = (f.rotation - 90) * Math.PI / 180;
-    const hx = f.x + Math.cos(hAngle) * handleDist;
-    const hy = f.y + Math.sin(hAngle) * handleDist;
-    mCtx.fillStyle = '#e94560';
-    mCtx.beginPath();
-    mCtx.arc(hx, hy, 5, 0, Math.PI * 2);
-    mCtx.fill();
-    mCtx.strokeStyle = '#e94560';
-    mCtx.lineWidth = 1;
-    mCtx.beginPath();
-    mCtx.moveTo(f.x + Math.cos(hAngle) * r, f.y + Math.sin(hAngle) * r);
-    mCtx.lineTo(hx, hy);
-    mCtx.stroke();
     mCtx.restore();
   }
   
