@@ -1880,6 +1880,7 @@ const FITTINGS_BY_SHAPE = {
     { type: 'tee', label: '⊤ Tee', title: 'Tee (4)' },
     { type: 'lateral', label: '⑂ Lat', title: '45° Lateral (6)' },
     { type: 'wye', label: '⑃ Wye', title: 'Wye (7)' },
+    { type: 'sqwing', label: '┐ SqW', title: 'Square Wing Elbow' },
     { type: 'reducer', label: '⊃ Red', title: 'Reducer (8)' },
     { type: 'eccReducer', label: '⊐ Ecc', title: 'Offset (9)' },
     { type: 'endcap', label: '▫ Cap', title: 'End Cap' },
@@ -3034,6 +3035,15 @@ function getFittingConnPoints(f) {
       points.push(r(len/2, 0));
       break;
     }
+    case 'sqwing': {
+      // Square wing elbow: entry from left, exit downward
+      // Entry at (-halfW, 0), exit at (0, halfW + stub)
+      const swStub = D * 0.5;
+      const swHalf = D / 2;
+      points.push(r(-swHalf - swStub, 0)); // entry
+      points.push(r(0, swHalf + swStub));  // exit
+      break;
+    }
     case 'endcap': {
       // drawEndCap: single opening at x=0
       points.push(r(0, 0));
@@ -4076,7 +4086,7 @@ const FITTING_NAMES = {
   '90el': '90° Elbow', '45el': '45° Elbow', '22el': '22.5° Elbow',
   'tee': 'Tee', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
-  'endcap': 'End Cap', 'transition': 'Transition'
+  'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL'
 };
 
 function inchesToPx(inches) {
@@ -4151,7 +4161,7 @@ window.selectFittingType = function(type) {
   });
   document.getElementById('fpPreview').textContent = FITTING_NAMES[type] || type;
   // Show/hide sizeB based on type
-  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition'].includes(type);
+  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition'].includes(type);  // sqwing uses only sizeA (WxH)
   document.getElementById('fpSizeB').style.display = needsB ? '' : 'none';
   document.getElementById('fpSizeB').previousElementSibling.style.display = needsB ? '' : 'none';
 };
@@ -4290,6 +4300,7 @@ function drawFitting(f, isSelected) {
     case 'eccReducer': drawReducer(D, D2, true); break;
     case 'endcap': drawEndCap(D); break;
     case 'transition': drawTransition(D, D2); break;
+    case 'sqwing': drawSquareWing(D); break;
   }
   
   mCtx.restore();
@@ -4664,6 +4675,78 @@ function drawReducer(D, D2, eccentric) {
     mCtx.lineTo(len/2, halfW2);
     mCtx.stroke();
   }
+}
+
+function drawSquareWing(D) {
+  // SMACNA Square-Throat (Square Wing) 90° Elbow for rectangular duct.
+  // Entry from left, exit downward. No radius — sharp 90° outer corner.
+  // Inner diagonal with turning vanes.
+  const halfW = D / 2;
+  const stub = D * 0.5;
+  
+  // Outer wall path: entry top → sharp corner → exit right wall
+  // Entry comes from left, top wall at y = -halfW
+  // After the turn, exit goes downward, right wall at x = halfW
+  
+  // Entry stub: horizontal from left
+  // Top wall (outer wall through the turn)
+  mCtx.beginPath();
+  mCtx.moveTo(-halfW - stub, -halfW);
+  mCtx.lineTo(halfW, -halfW);        // top wall runs to the sharp corner
+  mCtx.lineTo(halfW, halfW + stub);   // outer wall turns 90° down
+  mCtx.stroke();
+  
+  // Bottom wall (inner wall through the turn) — diagonal shortcut
+  mCtx.beginPath();
+  mCtx.moveTo(-halfW - stub, halfW);  // entry bottom wall
+  mCtx.lineTo(-halfW, halfW);          // to the inner corner start
+  mCtx.stroke();
+  
+  mCtx.beginPath();
+  mCtx.moveTo(-halfW, halfW + stub);  // exit left wall
+  mCtx.lineTo(-halfW, halfW);          // up to inner corner
+  mCtx.stroke();
+  
+  // Inner diagonal (throat) connecting entry bottom to exit left
+  mCtx.beginPath();
+  mCtx.moveTo(-halfW, halfW);
+  mCtx.lineTo(-halfW, halfW);          // this is the corner point
+  mCtx.stroke();
+  // Actually the inner throat is the diagonal from entry-inner-end to exit-inner-start:
+  // From (-halfW, halfW) [end of entry bottom wall] to (-halfW, halfW) [start of exit left wall]
+  // These are the same point! The inner wall meets at the corner.
+  
+  // Turning vanes: parallel diagonal lines inside the elbow
+  // Vanes run from top-left to bottom-right across the turn
+  // Standard SMACNA: equally spaced vanes between the inner corner and outer corner
+  const numVanes = Math.max(2, Math.round(D / (D * 0.25))); // ~4 vanes
+  for (let v = 1; v <= numVanes; v++) {
+    const t = v / (numVanes + 1);
+    // Vane start: on the entry bottom wall, between (-halfW, halfW) and (halfW*(t), -halfW + ...)
+    // Actually vanes go from the inner diagonal toward the outer corner
+    // They're parallel to the inner diagonal which goes from (-halfW, halfW) to (halfW, -halfW) conceptually
+    // Each vane is at fraction t between inner and outer
+    const vx1 = -halfW + t * (halfW - (-halfW)); // = -halfW + t * D
+    const vy1 = halfW;                             // on the bottom/left inner wall
+    const vx2 = halfW;                              // on the top/right outer wall
+    const vy2 = -halfW + t * (halfW - (-halfW));   // = -halfW + t * D
+    mCtx.beginPath();
+    mCtx.moveTo(vx1, vy1);
+    mCtx.lineTo(vx2, vy2);
+    mCtx.stroke();
+  }
+  
+  // Entry end cap
+  mCtx.beginPath();
+  mCtx.moveTo(-halfW - stub, -halfW);
+  mCtx.lineTo(-halfW - stub, halfW);
+  mCtx.stroke();
+  
+  // Exit end cap
+  mCtx.beginPath();
+  mCtx.moveTo(-halfW, halfW + stub);
+  mCtx.lineTo(halfW, halfW + stub);
+  mCtx.stroke();
 }
 
 function drawEndCap(D) {
