@@ -2980,16 +2980,13 @@ function getFittingConnPoints(f) {
       break;
     }
     case 'saddle45y': {
-      // Saddle tap: only has a branch opening (straps onto existing duct)
+      // Saddle tap: branch opening only (straps onto existing duct)
       const bD45 = (D2 && D2 > 0 && D2 !== D) ? D2 : D;
-      const brLen45 = bD45 * 1.8;
-      const saddleDrop = D * 0.15;
+      const brLen45 = bD45 * 2.0;
       const a45 = Math.PI / 4;
-      const halfB45 = bD45 / 2;
-      // Branch end center
-      const bCx = ((-halfB45 * Math.cos(a45) + Math.sin(a45) * brLen45) + (halfB45 * Math.cos(a45) + Math.sin(a45) * brLen45)) / 2;
-      const bCy = ((-saddleDrop - Math.cos(a45) * brLen45) + (-saddleDrop - Math.cos(a45) * brLen45)) / 2;
-      points.push(r(bCx, bCy)); // branch opening only
+      // Branch end center: travel branchLen along 45° direction from origin
+      const dirX45 = Math.sin(a45), dirY45 = -Math.cos(a45);
+      points.push(r(dirX45 * brLen45, dirY45 * brLen45)); // branch opening
       break;
     }
     case 'lateral': {
@@ -4375,64 +4372,66 @@ function drawTee(D, branchD) {
 }
 
 function drawSaddle45Y(D, branchD) {
-  // SMACNA Saddle Tap 45° Wye — a branch collar that straps onto the main duct.
-  // No main duct walls drawn — this is a standalone takeoff fitting.
-  // D = main duct diameter (determines saddle curvature)
-  // branchD = branch diameter (if 0/empty/same as D, branch = D)
+  // SMACNA Saddle Tap 45° Wye — branch collar that straps onto main duct.
+  // D = main duct diameter (shown as straight horizontal line)
+  // branchD = branch diameter. If 0/empty/same as D → standard 45Y.
   const halfW = D / 2;
   const bD = (branchD && branchD > 0 && branchD !== D) ? branchD : D;
   const halfB = bD / 2;
-  const branchLen = bD * 1.8;
+  const branchLen = bD * 2.0; // SMACNA: branch length ~2x branch diameter
   const angle = Math.PI / 4; // 45°
   const cosA = Math.cos(angle), sinA = Math.sin(angle);
   
-  // Saddle base — curved piece that conforms to the main duct surface
-  // In 2D side view: an arc representing the curvature sitting on a round main
-  const saddleWidth = D * 0.8; // width of saddle base along main axis
-  const saddleDrop = D * 0.15; // how much the saddle curves down at the edges
-  
-  // Draw saddle base as a curved arc (concave up, simulating sitting on round duct)
+  // Main duct representation — straight horizontal line showing the diameter
+  const mainHalf = D * 1.0; // show enough of the main for context
   mCtx.beginPath();
-  mCtx.moveTo(-saddleWidth, saddleDrop);
-  mCtx.quadraticCurveTo(-saddleWidth * 0.5, -saddleDrop * 0.5, 0, -saddleDrop);
-  mCtx.quadraticCurveTo(saddleWidth * 0.5, -saddleDrop * 0.5, saddleWidth, saddleDrop);
+  mCtx.moveTo(-mainHalf, 0);
+  mCtx.lineTo(mainHalf, 0);
   mCtx.stroke();
   
-  // Saddle flared edges (small flaps at each end of the base)
-  const flapLen = D * 0.15;
+  // Small ticks at ends to indicate main duct diameter
+  const tickH = halfW * 0.3;
   mCtx.beginPath();
-  mCtx.moveTo(-saddleWidth, saddleDrop);
-  mCtx.lineTo(-saddleWidth - flapLen, saddleDrop + flapLen * 0.5);
+  mCtx.moveTo(-mainHalf, -tickH);
+  mCtx.lineTo(-mainHalf, tickH);
   mCtx.stroke();
   mCtx.beginPath();
-  mCtx.moveTo(saddleWidth, saddleDrop);
-  mCtx.lineTo(saddleWidth + flapLen, saddleDrop + flapLen * 0.5);
+  mCtx.moveTo(mainHalf, -tickH);
+  mCtx.lineTo(mainHalf, tickH);
   mCtx.stroke();
   
-  // Branch tube rising at 45° from the saddle base center
-  // Branch starts at the saddle opening (center top of the saddle)
-  const baseY = -saddleDrop; // top of saddle curve
+  // Branch takeoff at 45° from center of main line
+  // The branch walls are perpendicular to the branch direction, spaced bD apart
+  // Perpendicular to 45° direction: normal = (cosA, sinA) rotated 90° = (-sinA, cosA)... 
+  // Actually for branch going up-right at 45°: direction = (sinA, -cosA)
+  // Perpendicular to branch = (cosA, sinA)
+  const nBx = cosA; // perpendicular to branch direction
+  const nBy = sinA;
   
-  // Left branch wall
-  const blSx = -halfB * cosA, blSy = baseY;
-  const blEx = blSx + sinA * branchLen;
-  const blEy = blSy - cosA * branchLen;
+  // Branch start: at the main line (y=0), offset left/right by halfB perpendicular to branch
+  const blSx = 0 - nBx * halfB;
+  const blSy = 0 - nBy * halfB;
+  const brSx = 0 + nBx * halfB;
+  const brSy = 0 + nBy * halfB;
   
-  // Right branch wall
-  const brSx = halfB * cosA, brSy = baseY;
-  const brEx = brSx + sinA * branchLen;
-  const brEy = brSy - cosA * branchLen;
+  // Branch end: travel branchLen along 45° direction (sinA, -cosA)
+  const dirX = sinA, dirY = -cosA; // branch direction (up and to the right)
+  const blEx = blSx + dirX * branchLen;
+  const blEy = blSy + dirY * branchLen;
+  const brEx = brSx + dirX * branchLen;
+  const brEy = brSy + dirY * branchLen;
   
-  // Saddle-to-branch transition curves
+  // Saddle transition curves from main line into branch walls
+  const curveLen = halfB * 0.6;
   mCtx.beginPath();
   mCtx.moveTo(blSx, blSy);
-  mCtx.quadraticCurveTo(blSx, blSy - halfB * 0.3, blSx + sinA * halfB * 0.4, blSy - cosA * halfB * 0.4);
+  mCtx.quadraticCurveTo(blSx + dirX * curveLen, blSy + dirY * curveLen, blSx + dirX * curveLen * 1.5, blSy + dirY * curveLen * 1.5);
   mCtx.lineTo(blEx, blEy);
   mCtx.stroke();
   
   mCtx.beginPath();
   mCtx.moveTo(brSx, brSy);
-  mCtx.quadraticCurveTo(brSx, brSy - halfB * 0.3, brSx + sinA * halfB * 0.4, brSy - cosA * halfB * 0.4);
+  mCtx.quadraticCurveTo(brSx + dirX * curveLen, brSy + dirY * curveLen, brSx + dirX * curveLen * 1.5, brSy + dirY * curveLen * 1.5);
   mCtx.lineTo(brEx, brEy);
   mCtx.stroke();
   
@@ -4440,14 +4439,6 @@ function drawSaddle45Y(D, branchD) {
   mCtx.beginPath();
   mCtx.moveTo(blEx, blEy);
   mCtx.lineTo(brEx, brEy);
-  mCtx.stroke();
-  
-  // Branch collar ring (small circle at the top opening)
-  const collarCx = (blEx + brEx) / 2;
-  const collarCy = (blEy + brEy) / 2;
-  const collarR = halfB * 0.15;
-  mCtx.beginPath();
-  mCtx.arc(collarCx, collarCy, collarR, 0, Math.PI * 2);
   mCtx.stroke();
 }
 
