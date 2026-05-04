@@ -3272,13 +3272,13 @@ function drawElevationLabels(measurements) {
       mCtx.restore();
     }
     
-    // Draw elevation change offset symbols between adjacent points with different elevations
+    // Draw elevation change symbols between adjacent points with different elevations
+    // Standard MEP symbol: rectangle with X cross = duct end view (looking at the opening)
     for (let i = 0; i < m.points.length - 1; i++) {
       const p1 = m.points[i], p2 = m.points[i+1];
       if (!p1.elevation || !p2.elevation) continue;
       if (p1.elevation === p2.elevation) continue;
       
-      // Parse elevations to numbers (inches) for comparison
       const e1 = parseElevToInches(p1.elevation);
       const e2 = parseElevToInches(p2.elevation);
       if (e1 === null || e2 === null || e1 === e2) continue;
@@ -3286,7 +3286,7 @@ function drawElevationLabels(measurements) {
       const isRise = e2 > e1;
       const vertDist = Math.abs(e2 - e1);
       
-      // Draw the offset symbol at the midpoint of the segment
+      // Midpoint of segment
       const mx = (p1.x + p2.x) / 2;
       const my = (p1.y + p2.y) / 2;
       
@@ -3294,81 +3294,87 @@ function drawElevationLabels(measurements) {
       const dx = p2.x - p1.x, dy = p2.y - p1.y;
       const len = Math.sqrt(dx*dx + dy*dy) || 1;
       const ux = dx/len, uy = dy/len;
-      const nx = -uy, ny = ux; // perpendicular
+      const nx = -uy, ny = ux;
       
-      // Offset symbol size: proportional to duct width or a minimum visible size
-      const halfW = m.duct ? getDuctHalfWidthPx(m.duct) : 8;
-      const kickLen = halfW * 2.5; // length of each 45° kick along the duct
-      const kickOff = halfW * 1.5; // perpendicular offset of the jog
-      const sign = isRise ? 1 : -1; // direction of offset (perpendicular to duct)
+      // Duct size for the cross-section rectangles
+      const halfW = m.duct ? getDuctHalfWidthPx(m.duct) : 10;
+      const rectW = halfW * 2; // width of cross-section rectangle
+      const rectH = halfW * 2; // height (square for round, could vary for rect)
+      const gap = halfW * 0.3; // gap between the two rectangles
       
       mCtx.save();
+      mCtx.translate(mx, my);
+      // Rotate to align with duct direction
+      const angle = Math.atan2(uy, ux);
+      mCtx.rotate(angle);
+      
       mCtx.strokeStyle = '#00bfff';
       mCtx.lineWidth = 2;
       mCtx.setLineDash([]);
       mCtx.globalAlpha = 0.9;
       
-      // The offset Z-shape: two 45° kicks showing duct going up/down
-      // Point A: start of offset (before midpoint along duct)
-      const ax = mx - ux * kickLen;
-      const ay = my - uy * kickLen;
-      // Point B: first kick destination (offset perpendicular)
-      const bx = mx + nx * kickOff * sign;
-      const by = my + ny * kickOff * sign;
-      // Point C: end of offset (after midpoint along duct)
-      const cx = mx + ux * kickLen;
-      const cy = my + uy * kickLen;
-      
-      // Draw the Z/S offset
+      // First rectangle (left) with X cross
+      const r1x = -rectW - gap/2;
+      const r1y = -rectH/2;
+      mCtx.strokeRect(r1x, r1y, rectW, rectH);
+      // X cross inside
       mCtx.beginPath();
-      mCtx.moveTo(ax, ay);
-      mCtx.lineTo(bx - ux * kickLen * 0.3, by - uy * kickLen * 0.3);
-      mCtx.lineTo(bx + ux * kickLen * 0.3, by + uy * kickLen * 0.3);
-      mCtx.lineTo(cx, cy);
+      mCtx.moveTo(r1x, r1y); mCtx.lineTo(r1x + rectW, r1y + rectH);
+      mCtx.moveTo(r1x + rectW, r1y); mCtx.lineTo(r1x, r1y + rectH);
       mCtx.stroke();
       
-      // Arrow indicating direction (up or down)
-      const arrowX = bx;
-      const arrowY = by;
-      const arrowLen = halfW * 0.8;
-      const arrowDir = sign; // perpendicular direction
+      // Second rectangle (right) with X cross
+      const r2x = gap/2;
+      const r2y = -rectH/2;
+      mCtx.strokeRect(r2x, r2y, rectW, rectH);
+      // X cross inside
       mCtx.beginPath();
-      mCtx.moveTo(arrowX, arrowY);
-      mCtx.lineTo(arrowX + nx * arrowLen * arrowDir, arrowY + ny * arrowLen * arrowDir);
-      mCtx.stroke();
-      // Arrowhead
-      const ahx = arrowX + nx * arrowLen * arrowDir;
-      const ahy = arrowY + ny * arrowLen * arrowDir;
-      const ahSize = arrowLen * 0.4;
-      mCtx.beginPath();
-      mCtx.moveTo(ahx, ahy);
-      mCtx.lineTo(ahx - nx * ahSize * arrowDir + ux * ahSize, ahy - ny * ahSize * arrowDir + uy * ahSize);
-      mCtx.moveTo(ahx, ahy);
-      mCtx.lineTo(ahx - nx * ahSize * arrowDir - ux * ahSize, ahy - ny * ahSize * arrowDir - uy * ahSize);
+      mCtx.moveTo(r2x, r2y); mCtx.lineTo(r2x + rectW, r2y + rectH);
+      mCtx.moveTo(r2x + rectW, r2y); mCtx.lineTo(r2x, r2y + rectH);
       mCtx.stroke();
       
-      // Vertical distance label
+      // Direction arrow (up or down) above the rectangles
+      const arrowY = -rectH/2 - halfW * 0.4;
+      const arrowTip = arrowY - halfW * 0.6;
+      const arrowBase = arrowY;
+      if (isRise) {
+        // Up arrow
+        mCtx.beginPath();
+        mCtx.moveTo(0, arrowBase); mCtx.lineTo(0, arrowTip);
+        mCtx.moveTo(0, arrowTip); mCtx.lineTo(-halfW*0.3, arrowTip + halfW*0.3);
+        mCtx.moveTo(0, arrowTip); mCtx.lineTo(halfW*0.3, arrowTip + halfW*0.3);
+        mCtx.stroke();
+      } else {
+        // Down arrow (below rectangles)
+        const dBase = rectH/2 + halfW * 0.4;
+        const dTip = dBase + halfW * 0.6;
+        mCtx.beginPath();
+        mCtx.moveTo(0, dBase); mCtx.lineTo(0, dTip);
+        mCtx.moveTo(0, dTip); mCtx.lineTo(-halfW*0.3, dTip - halfW*0.3);
+        mCtx.moveTo(0, dTip); mCtx.lineTo(halfW*0.3, dTip - halfW*0.3);
+        mCtx.stroke();
+      }
+      
+      // Vertical distance label below/above the symbol
       const vFt = Math.floor(vertDist / 12);
       const vIn = Math.round(vertDist % 12);
-      const vText = isRise ? '↑' : '↓';
-      const vLabel = vText + (vFt > 0 ? vFt + "'" : '') + (vIn > 0 ? vIn + '"' : (vFt > 0 ? '' : '0"'));
-      const vFontSize = 10 * baseScale;
-      const vRender = Math.max(24, vFontSize);
-      const vSc = vFontSize / vRender;
-      mCtx.font = `bold ${vRender}px -apple-system, sans-serif`;
+      const vDir = isRise ? '↑' : '↓';
+      const vLabel = vDir + (vFt > 0 ? vFt + "'" : '') + (vIn > 0 ? vIn + '"' : (vFt > 0 ? "" : '0"'));
+      const vPos = isRise ? arrowTip - halfW * 0.5 : rectH/2 + halfW * 1.3;
+      const vFontSz = 10 * baseScale;
+      const vRndSz = Math.max(24, vFontSz);
+      const vSc = vFontSz / vRndSz;
+      mCtx.font = `bold ${vRndSz}px -apple-system, sans-serif`;
       const vtw = mCtx.measureText(vLabel).width;
-      const vlx = bx + nx * (kickOff * 0.5) * sign;
-      const vly = by + ny * (kickOff * 0.5) * sign;
       mCtx.save();
-      mCtx.translate(vlx, vly);
+      mCtx.translate(0, vPos);
       mCtx.scale(vSc, vSc);
       mCtx.fillStyle = 'rgba(0, 30, 60, 0.9)';
       mCtx.beginPath();
-      mCtx.roundRect(-vtw/2-3, -vRender/2-3, vtw+6, vRender+6, 3);
+      mCtx.roundRect(-vtw/2-3, -vRndSz/2-3, vtw+6, vRndSz+6, 3);
       mCtx.fill();
       mCtx.fillStyle = '#00bfff';
-      mCtx.textAlign = 'center';
-      mCtx.textBaseline = 'middle';
+      mCtx.textAlign = 'center'; mCtx.textBaseline = 'middle';
       mCtx.fillText(vLabel, 0, 0);
       mCtx.restore();
       
