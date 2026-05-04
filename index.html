@@ -2456,12 +2456,15 @@ window.addEventListener('keydown', (e) => {
     if (idx < types.length) selectFittingType(types[idx]);
     return;
   }
-  else if ((e.key === 'r' || e.key === 'R' || e.key === ']') && (selectedFittingId || isDraggingFitting)) {
+  else if ((e.key === 'r' || e.key === 'R' || e.key === ']') && (selectedFittingId || isDraggingFitting || (fittingMode && selectedFittingType))) {
     e.preventDefault();
     const rotId = selectedFittingId || dragFittingId;
     if (rotId) {
       const ff = (pageFittings[currentPage]||[]).find(x=>x.id===rotId);
       if (ff) { ff.rotation = ((ff.rotation||0) + 90) % 360; drawMeasureOverlay(); scheduleSave(); }
+    } else if (fittingMode && selectedFittingType) {
+      // Pre-placement: rotate the preview via the rotation input
+      rotateFittingInput(90);
     }
     else { rotateFittingInput(90); }
     return;
