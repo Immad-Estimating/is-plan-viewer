@@ -2865,55 +2865,113 @@ const SNAP_THRESHOLD_PX = 15; // snap distance in screen pixels
 // Get connection points for a fitting (in PDF coords)
 // Returns array of {x, y} — the openings where duct connects
 function getFittingConnPoints(f) {
+  // Connection points MUST match the exact geometry of each draw function.
+  // All coordinates are in local space (0,0 = fitting center), then rotated+translated.
   const D = inchesToPx(parseFloat(f.sizeA) || 14);
+  const D2 = f.sizeB ? inchesToPx(parseFloat(f.sizeB) || D * 0.7) : D * 0.7;
   const rot = (f.rotation || 0) * Math.PI / 180;
-  const cos = Math.cos(rot), sin = Math.sin(rot);
-  const stub = D * 0.5;
-  const CLR = D * 1.5;
+  const cosR = Math.cos(rot), sinR = Math.sin(rot);
   const points = [];
   
-  // Rotate a local point by the fitting's rotation around its center
-  const r = (lx, ly) => ({ x: f.x + lx * cos - ly * sin, y: f.y + lx * sin + ly * cos });
+  const r = (lx, ly) => ({ x: f.x + lx * cosR - ly * sinR, y: f.y + lx * sinR + ly * cosR });
+  
+  const stub = D * 0.5;
+  const CLR = D * 1.5;
   
   switch (f.type) {
-    case '90el':
-      points.push(r(-stub - D*0.3, 0)); // entry
-      // exit: after 90° turn, exit stub is perpendicular
-      points.push(r(CLR * Math.cos(Math.PI/2), CLR + CLR * Math.sin(Math.PI/2) - stub*0.5)); // approximate exit
+    case '90el': {
+      // Entry: center of entry end cap at x = -stub, y = 0
+      points.push(r(-stub, 0));
+      // Exit: tangent to arc at sweep angle. Arc center at (0, CLR).
+      const sweep = Math.PI / 2;
+      const eiX = CLR * Math.cos(-Math.PI/2 + sweep); // inner end
+      const eiY = CLR + CLR * Math.sin(-Math.PI/2 + sweep); // approximate centerline exit
+      const edX = -Math.sin(-Math.PI/2 + sweep);
+      const edY = Math.cos(-Math.PI/2 + sweep);
+      // Exit end cap center is at the end of the exit stub
+      points.push(r(eiX + edX * stub, eiY + edY * stub));
       break;
-    case '45el':
-      points.push(r(-stub - D*0.3, 0));
-      points.push(r(CLR * 0.7, CLR * 0.7));
+    }
+    case '45el': {
+      points.push(r(-stub, 0));
+      const sweep = Math.PI / 4;
+      const eiX = CLR * Math.cos(-Math.PI/2 + sweep);
+      const eiY = CLR + CLR * Math.sin(-Math.PI/2 + sweep);
+      const edX = -Math.sin(-Math.PI/2 + sweep);
+      const edY = Math.cos(-Math.PI/2 + sweep);
+      points.push(r(eiX + edX * stub, eiY + edY * stub));
       break;
-    case '22el':
-      points.push(r(-stub - D*0.3, 0));
-      points.push(r(CLR * 0.4, CLR * 0.2));
+    }
+    case '22el': {
+      points.push(r(-stub, 0));
+      const sweep = Math.PI / 8;
+      const eiX = CLR * Math.cos(-Math.PI/2 + sweep);
+      const eiY = CLR + CLR * Math.sin(-Math.PI/2 + sweep);
+      const edX = -Math.sin(-Math.PI/2 + sweep);
+      const edY = Math.cos(-Math.PI/2 + sweep);
+      points.push(r(eiX + edX * stub, eiY + edY * stub));
       break;
-    case 'tee':
-    case 'saddle':
-      const halfMain = D * 1.5;
-      points.push(r(-halfMain, 0)); // main entry
-      points.push(r(halfMain, 0));  // main exit
-      points.push(r(0, -D * 1.2)); // branch (top)
+    }
+    case 'tee': {
+      // drawTee: main from -mainLen to +mainLen, branch from halfW down to halfW+branchLen
+      const mainLen = D * 1.5;
+      const branchLen = D * 1.5;
+      const halfW = D / 2;
+      points.push(r(-mainLen, 0));             // main entry center
+      points.push(r(mainLen, 0));              // main exit center
+      points.push(r(0, halfW + branchLen));    // branch end center
       break;
-    case 'lateral':
-      points.push(r(-D*1.5, 0));
-      points.push(r(D*1.5, 0));
-      points.push(r(D*0.7, -D*1.2));
+    }
+    case 'saddle': {
+      // drawSaddle: main -mainLen to +mainLen, branch goes UP from -halfW
+      const mainLen = D * 1.5;
+      const branchLen = D * 1.5;
+      const halfW = D / 2;
+      points.push(r(-mainLen, 0));
+      points.push(r(mainLen, 0));
+      points.push(r(0, -(halfW + branchLen))); // branch up
       break;
-    case 'wye':
-      points.push(r(-D*1.5, 0));
-      points.push(r(D*1.2, -D*0.8));
-      points.push(r(D*1.2, D*0.8));
+    }
+    case 'lateral': {
+      // drawLateral: main -mainLen to +mainLen, branch at 45° from center
+      const mainLen = D * 1.5;
+      const branchLen = D * 1.5;
+      const halfW = D / 2;
+      const angle45 = Math.PI / 4;
+      points.push(r(-mainLen, 0));
+      points.push(r(mainLen, 0));
+      // Branch end center: starts at (0, halfW), goes at 45° for branchLen
+      points.push(r(Math.sin(angle45) * branchLen, halfW + Math.cos(angle45) * branchLen));
       break;
+    }
+    case 'wye': {
+      // drawWye: entry from -mainLen, two branches at ±30°
+      const mainLen = D * 1.5;
+      const branchLen = D * 1.5;
+      const angle30 = Math.PI / 6;
+      points.push(r(-mainLen, 0));
+      points.push(r(mainLen * Math.cos(angle30), -mainLen * Math.sin(angle30) + Math.cos(angle30) * branchLen));
+      points.push(r(mainLen * Math.cos(angle30), mainLen * Math.sin(angle30) - Math.cos(angle30) * branchLen));
+      break;
+    }
     case 'reducer':
-    case 'eccReducer':
-    case 'transition':
-      points.push(r(-D*1.0, 0)); // large end
-      points.push(r(D*1.0, 0));  // small end
+    case 'eccReducer': {
+      // drawReducer: from -len/2 to +len/2, centered
+      const len = Math.abs(D - D2) * 1.5 || D;
+      points.push(r(-len/2, 0)); // large end center
+      points.push(r(len/2, 0));  // small end center
       break;
-    case 'endcap':
-      points.push(r(0, 0)); // single connection
+    }
+    case 'transition': {
+      // drawTransition: from -len/2 to +len/2
+      const len = Math.max(D, D2) * 1.5;
+      points.push(r(-len/2, 0));
+      points.push(r(len/2, 0));
+      break;
+    }
+    case 'endcap': {
+      // drawEndCap: single opening at x=0
+      points.push(r(0, 0));
       break;
     default:
       points.push(r(0, 0));
