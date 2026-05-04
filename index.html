@@ -3218,7 +3218,7 @@ function showElevationInput() {
   const input = document.createElement('input');
   input.type = 'text';
   input.value = currentElev;
-  input.placeholder = "e.g. 12'6\"";
+  input.placeholder = "e.g. 2' drop, ↑3', +4'";
   input.style.cssText = `position:absolute;left:${screenPt.x + viewerRect.left + 15}px;top:${screenPt.y + viewerRect.top - 12}px;width:80px;padding:3px 6px;background:#1a1a2e;border:1px solid #e94560;color:#00bfff;border-radius:3px;font-size:12px;font-weight:600;z-index:200;outline:none;`;
   document.body.appendChild(input);
   input.focus();
@@ -3244,135 +3244,65 @@ function showElevationInput() {
 
 function drawElevationLabels(measurements) {
   for (const m of measurements) {
-    // Draw elevation labels on tagged points
-    for (const pt of m.points) {
-      if (!pt.elevation) continue;
-      const fontSize = 11 * baseScale;
-      const renderSz = Math.max(24, fontSize);
-      const sc = fontSize / renderSz;
-      mCtx.save();
-      mCtx.font = `bold ${renderSz}px -apple-system, BlinkMacSystemFont, sans-serif`;
-      const text = '↕ ' + pt.elevation;
-      const tw = mCtx.measureText(text).width;
-      const pad = 3;
-      const lx = pt.x - 5;
-      const ly = pt.y + 12;
-      mCtx.translate(lx, ly);
-      mCtx.scale(sc, sc);
-      mCtx.globalAlpha = 0.85;
-      mCtx.fillStyle = 'rgba(0, 30, 60, 0.9)';
-      mCtx.beginPath();
-      mCtx.roundRect(-pad, -renderSz/2 - pad, tw + pad*2, renderSz + pad*2, 3);
-      mCtx.fill();
-      mCtx.globalAlpha = 1.0;
-      mCtx.fillStyle = '#00bfff';
-      mCtx.textAlign = 'left';
-      mCtx.textBaseline = 'middle';
-      mCtx.fillText(text, 0, 0);
-      mCtx.restore();
-    }
     
-    // Draw elevation change symbols between adjacent points with different elevations
-    // Standard MEP symbol: rectangle with X cross = duct end view (looking at the opening)
-    for (let i = 0; i < m.points.length - 1; i++) {
-      const p1 = m.points[i], p2 = m.points[i+1];
-      if (!p1.elevation || !p2.elevation) continue;
-      if (p1.elevation === p2.elevation) continue;
+    // Draw elevation drop/rise symbol at each endpoint that has an elevation value
+    // Standard MEP: single rectangle with diagonal X = duct cross-section at that point
+    // Shows duct goes up or down at THIS point. No comparison between endpoints needed.
+    for (let pi = 0; pi < m.points.length; pi++) {
+      const pt = m.points[pi];
+      if (!pt.elevation) continue;
       
-      const e1 = parseElevToInches(p1.elevation);
-      const e2 = parseElevToInches(p2.elevation);
-      if (e1 === null || e2 === null || e1 === e2) continue;
+      // Parse the elevation value. Positive = rise, negative = drop. 
+      // Or prefix with ↑/↓ or +/- to indicate direction.
+      const parsed = parseElevChange(pt.elevation);
+      if (!parsed) continue;
       
-      const isRise = e2 > e1;
-      const vertDist = Math.abs(e2 - e1);
-      
-      // Midpoint of segment
-      const mx = (p1.x + p2.x) / 2;
-      const my = (p1.y + p2.y) / 2;
-      
-      // Segment direction
-      const dx = p2.x - p1.x, dy = p2.y - p1.y;
-      const len = Math.sqrt(dx*dx + dy*dy) || 1;
-      const ux = dx/len, uy = dy/len;
-      const nx = -uy, ny = ux;
-      
-      // Duct size for the cross-section rectangles
+      // Get duct half-width for sizing the symbol
       const halfW = m.duct ? getDuctHalfWidthPx(m.duct) : 10;
-      const rectW = halfW * 2; // width of cross-section rectangle
-      const rectH = halfW * 2; // height (square for round, could vary for rect)
-      const gap = halfW * 0.3; // gap between the two rectangles
+      
+      // Find the duct direction at this point for rotation
+      let ux = 1, uy = 0;
+      if (pi < m.points.length - 1) {
+        const dx = m.points[pi+1].x - pt.x, dy = m.points[pi+1].y - pt.y;
+        const l = Math.sqrt(dx*dx+dy*dy)||1; ux=dx/l; uy=dy/l;
+      } else if (pi > 0) {
+        const dx = pt.x - m.points[pi-1].x, dy = pt.y - m.points[pi-1].y;
+        const l = Math.sqrt(dx*dx+dy*dy)||1; ux=dx/l; uy=dy/l;
+      }
       
       mCtx.save();
-      mCtx.translate(mx, my);
-      // Rotate to align with duct direction
-      const angle = Math.atan2(uy, ux);
-      mCtx.rotate(angle);
+      mCtx.translate(pt.x, pt.y);
+      mCtx.rotate(Math.atan2(uy, ux));
       
       mCtx.strokeStyle = '#00bfff';
       mCtx.lineWidth = 2;
       mCtx.setLineDash([]);
       mCtx.globalAlpha = 0.9;
       
-      // First rectangle (left) with X cross
-      const r1x = -rectW - gap/2;
-      const r1y = -rectH/2;
-      mCtx.strokeRect(r1x, r1y, rectW, rectH);
-      // X cross inside
-      mCtx.beginPath();
-      mCtx.moveTo(r1x, r1y); mCtx.lineTo(r1x + rectW, r1y + rectH);
-      mCtx.moveTo(r1x + rectW, r1y); mCtx.lineTo(r1x, r1y + rectH);
-      mCtx.stroke();
-      
-      // Second rectangle (right) with X cross
-      const r2x = gap/2;
-      const r2y = -rectH/2;
-      mCtx.strokeRect(r2x, r2y, rectW, rectH);
-      // X cross inside
-      mCtx.beginPath();
-      mCtx.moveTo(r2x, r2y); mCtx.lineTo(r2x + rectW, r2y + rectH);
-      mCtx.moveTo(r2x + rectW, r2y); mCtx.lineTo(r2x, r2y + rectH);
-      mCtx.stroke();
-      
-      // Direction arrow (up or down) above the rectangles
-      const arrowY = -rectH/2 - halfW * 0.4;
-      const arrowTip = arrowY - halfW * 0.6;
-      const arrowBase = arrowY;
-      if (isRise) {
-        // Up arrow
-        mCtx.beginPath();
-        mCtx.moveTo(0, arrowBase); mCtx.lineTo(0, arrowTip);
-        mCtx.moveTo(0, arrowTip); mCtx.lineTo(-halfW*0.3, arrowTip + halfW*0.3);
-        mCtx.moveTo(0, arrowTip); mCtx.lineTo(halfW*0.3, arrowTip + halfW*0.3);
-        mCtx.stroke();
+      // Single rectangle with single diagonal line (standard MEP duct cross-section)
+      const rW = halfW * 2;
+      const rH = halfW * 2;
+      mCtx.strokeRect(-rW/2, -rH/2, rW, rH);
+      // Single diagonal (not X — cleaner, shows direction)
+      if (parsed.isRise) {
+        mCtx.beginPath(); mCtx.moveTo(-rW/2, rH/2); mCtx.lineTo(rW/2, -rH/2); mCtx.stroke(); // bottom-left to top-right = rise
       } else {
-        // Down arrow (below rectangles)
-        const dBase = rectH/2 + halfW * 0.4;
-        const dTip = dBase + halfW * 0.6;
-        mCtx.beginPath();
-        mCtx.moveTo(0, dBase); mCtx.lineTo(0, dTip);
-        mCtx.moveTo(0, dTip); mCtx.lineTo(-halfW*0.3, dTip - halfW*0.3);
-        mCtx.moveTo(0, dTip); mCtx.lineTo(halfW*0.3, dTip - halfW*0.3);
-        mCtx.stroke();
+        mCtx.beginPath(); mCtx.moveTo(-rW/2, -rH/2); mCtx.lineTo(rW/2, rH/2); mCtx.stroke(); // top-left to bottom-right = drop
       }
       
-      // Vertical distance label below/above the symbol
-      const vFt = Math.floor(vertDist / 12);
-      const vIn = Math.round(vertDist % 12);
-      const vDir = isRise ? '↑' : '↓';
-      const vLabel = vDir + (vFt > 0 ? vFt + "'" : '') + (vIn > 0 ? vIn + '"' : (vFt > 0 ? "" : '0"'));
-      const vPos = isRise ? arrowTip - halfW * 0.5 : rectH/2 + halfW * 1.3;
+      // Label: shows the amount and direction
+      const vLabel = (parsed.isRise ? '↑' : '↓') + parsed.label;
       const vFontSz = 10 * baseScale;
       const vRndSz = Math.max(24, vFontSz);
       const vSc = vFontSz / vRndSz;
       mCtx.font = `bold ${vRndSz}px -apple-system, sans-serif`;
       const vtw = mCtx.measureText(vLabel).width;
+      const lblY = -rH/2 - halfW * 0.6;
       mCtx.save();
-      mCtx.translate(0, vPos);
+      mCtx.translate(0, lblY);
       mCtx.scale(vSc, vSc);
       mCtx.fillStyle = 'rgba(0, 30, 60, 0.9)';
-      mCtx.beginPath();
-      mCtx.roundRect(-vtw/2-3, -vRndSz/2-3, vtw+6, vRndSz+6, 3);
-      mCtx.fill();
+      mCtx.beginPath(); mCtx.roundRect(-vtw/2-3, -vRndSz/2-3, vtw+6, vRndSz+6, 3); mCtx.fill();
       mCtx.fillStyle = '#00bfff';
       mCtx.textAlign = 'center'; mCtx.textBaseline = 'middle';
       mCtx.fillText(vLabel, 0, 0);
@@ -3383,23 +3313,42 @@ function drawElevationLabels(measurements) {
   }
 }
 
-// Parse elevation string to inches (supports 12'6", 12.5, 150", 12ft 6in, etc.)
-function parseElevToInches(str) {
+// Parse elevation change: "2' drop", "↓2'", "-2'", "2' rise", "↑4'", "+3'", "2'", etc.
+// Returns { isRise: bool, inches: number, label: string } or null
+function parseElevChange(str) {
   if (!str) return null;
-  str = str.trim().toLowerCase();
-  // Try feet-inches: 12'6", 12'-6"
-  let m = str.match(/^(\d+)['’]\s*-?\s*(\d+(?:\.\d+)?)["\u201d]?$/);
-  if (m) return parseInt(m[1]) * 12 + parseFloat(m[2]);
-  // Just feet: 12', 12ft
-  m = str.match(/^([\d.]+)\s*(?:['’]|ft|feet)$/);
-  if (m) return parseFloat(m[1]) * 12;
-  // Just inches: 150", 150in
-  m = str.match(/^([\d.]+)\s*(?:["\u201d]|in)$/);
-  if (m) return parseFloat(m[1]);
-  // Plain number — assume feet
-  m = str.match(/^([\d.]+)$/);
-  if (m) return parseFloat(m[1]) * 12;
-  return null;
+  const raw = str.trim();
+  let s = raw.toLowerCase();
+  
+  // Detect direction
+  let isRise = true; // default to rise if no direction specified
+  if (s.startsWith('↓') || s.startsWith('-') || s.includes('drop') || s.includes('down')) {
+    isRise = false;
+    s = s.replace(/^[↓\-]\s*/, '').replace(/\s*(drop|down)\s*/g, '');
+  } else if (s.startsWith('↑') || s.startsWith('+') || s.includes('rise') || s.includes('up')) {
+    isRise = true;
+    s = s.replace(/^[↑\+]\s*/, '').replace(/\s*(rise|up)\s*/g, '');
+  }
+  s = s.trim();
+  
+  // Parse the numeric value
+  let inches = 0;
+  let label = raw;
+  // Feet-inches: 2'6"
+  let m = s.match(/^(\d+)['’]\s*-?\s*(\d+(?:\.\d+)?)["\u201d]?$/);
+  if (m) { inches = parseInt(m[1])*12 + parseFloat(m[2]); label = m[1]+"'"+m[2]+'"'; }
+  else {
+    // Just feet: 2', 2ft
+    m = s.match(/^([\d.]+)\s*(?:['’]|ft|feet)?$/);
+    if (m) { inches = parseFloat(m[1])*12; label = m[1]+"'"; }
+    else {
+      // Just inches: 24", 24in
+      m = s.match(/^([\d.]+)\s*(?:["\u201d]|in)$/);
+      if (m) { inches = parseFloat(m[1]); label = m[1]+'"'; }
+    }
+  }
+  if (inches <= 0) return null;
+  return { isRise, inches, label };
 }
 
 let _currentRenderMeas = null;
@@ -4084,12 +4033,16 @@ function updatePanel() {
     
     for (const m of measurements) {
       const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}</div>` : '';
-      // Elevation info
+      // Elevation info + auto fittings
       let elevInfo = '';
-      const elevPoints = m.points.filter(p => p.elevation);
-      if (elevPoints.length > 0) {
-        const elevTexts = m.points.map((p, i) => p.elevation ? `P${i+1}: ↕${p.elevation}` : null).filter(Boolean);
-        elevInfo = `<div class="meas-duct" style="color:#00bfff">${elevTexts.join(' → ')}</div>`;
+      const elevChanges = m.points.filter(p => p.elevation && parseElevChange(p.elevation));
+      if (elevChanges.length > 0) {
+        const parts = elevChanges.map(p => {
+          const ec = parseElevChange(p.elevation);
+          return ec ? (ec.isRise ? '↑' : '↓') + ec.label : p.elevation;
+        });
+        const elbowCount = elevChanges.length * 2; // 2 elbows per elevation change (top + bottom)
+        elevInfo = `<div class="meas-duct" style="color:#00bfff">${parts.join(', ')} • ${elbowCount}× EL for drops</div>`;
       }
 
       const customLabel = m.labelText ? `<div class="meas-duct" style="color:#e94560;font-style:italic">"${escapeHtml(m.labelText)}"</div>` : '';
