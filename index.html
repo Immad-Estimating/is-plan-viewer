@@ -68,6 +68,40 @@
   .meas-edit-inline .slider-row input[type="range"] { flex: 1; accent-color: #e94560; height: 3px; }
   .meas-edit-inline .slider-row .slider-val { font-size: 10px; color: #a0a0c0; min-width: 28px; text-align: right; }
   
+  /* ===== Fitting Palette ===== */
+  .fitting-palette { display: none; position: absolute; top: 50px; left: 16px; z-index: 55; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); width: 280px; cursor: default; }
+  .fitting-palette.active { display: block; }
+  .fitting-palette h4 { font-size: 12px; color: #a0a0c0; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .fitting-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 10px; }
+  .fitting-grid button { background: #1a1a2e; border: 1px solid #0f3460; color: #a0a0c0; padding: 6px 2px; border-radius: 4px; cursor: pointer; font-size: 10px; text-align: center; transition: background 0.15s, border-color 0.15s; line-height: 1.2; }
+  .fitting-grid button:hover { background: #0f3460; color: #e0e0e0; }
+  .fitting-grid button.selected { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.1); }
+  .fitting-dims { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .fitting-dims label { font-size: 11px; color: #a0a0c0; white-space: nowrap; }
+  .fitting-dims input { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 4px 6px; border-radius: 4px; font-size: 12px; width: 60px; text-align: center; }
+  .fitting-dims input:focus { outline: none; border-color: #e94560; }
+  .fitting-rotation { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .fitting-rotation label { font-size: 11px; color: #a0a0c0; }
+  .fitting-rotation input { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 4px 6px; border-radius: 4px; font-size: 12px; width: 50px; text-align: center; }
+  .fitting-rotation input:focus { outline: none; border-color: #e94560; }
+  .fitting-rotation button { background: #0f3460; border: 1px solid #1a4080; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .fitting-rotation button:hover { background: #1a4080; }
+  .fitting-palette .fp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .fitting-palette .fp-header span { font-size: 12px; color: #a0a0c0; }
+  .fitting-palette .fp-preview { font-size: 11px; color: #00ff88; margin-bottom: 6px; }
+  .fitting-selected-highlight { stroke: #e94560 !important; }
+  .fittings-section { margin-top: 12px; border-top: 1px solid #0f3460; padding-top: 8px; }
+  .fittings-section h4 { font-size: 11px; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .fitting-group { margin-bottom: 4px; }
+  .fitting-group-title { font-size: 12px; color: #e0e0e0; padding: 4px 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #1a1a2e; border-radius: 3px; }
+  .fitting-group-title:hover { background: #0f3460; }
+  .fitting-group-items { padding-left: 8px; }
+  .fitting-item { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; font-size: 11px; color: #a0a0c0; border-bottom: 1px solid rgba(15,52,96,0.3); }
+  .fitting-item .fi-delete { background: none; border: none; color: #e94560; cursor: pointer; font-size: 14px; padding: 0 4px; opacity: 0.6; }
+  .fitting-item .fi-delete:hover { opacity: 1; }
+  .clear-fittings-btn { width: 100%; background: #e94560; color: #fff; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; margin-top: 8px; }
+  .clear-fittings-btn:hover { background: #c73550; }
+
   #fileInput { display: none; }
   .upload-btn { background: #e94560 !important; border-color: #e94560 !important; font-weight: 600; }
   .upload-btn:hover { background: #c73550 !important; }
@@ -171,6 +205,7 @@
   .viewer-container.grabbing { cursor: grabbing; }
   .viewer-container.measuring { cursor: crosshair; }
   .viewer-container.measuring.grabbing { cursor: crosshair; }
+  .viewer-container.fitting-mode { cursor: crosshair; }
   .viewer-container canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
   #measureCanvas { pointer-events: none; z-index: 5; }
   
@@ -416,6 +451,7 @@
     <div class="separator"></div>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)">📐 Measure</button>
     <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (S)">◎ Duct</button>
+    <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)">🔩 Fittings</button>
     <button id="panelBtn" onclick="togglePanel()" title="Measurements Panel">📋</button>
   </div>
 
@@ -521,6 +557,39 @@
       <span id="ddRectGroup" style="display:none"><label>W</label><input type="text" id="ddW" class="dd-dim" value="24"><label>×</label><input type="text" id="ddH" class="dd-dim" value="12"></span>
       <span class="dd-hint">Click to draw · Enter to finish</span>
       <button class="tool-pin-btn" id="ddPinBtn" onclick="event.stopPropagation(); togglePinDuctBar()" title="Pin position">📌</button>
+    </div>
+    <!-- Fitting palette -->
+    <div class="fitting-palette" id="fittingPalette">
+      <div class="fp-header">
+        <h4>Fittings</h4>
+        <span class="fp-preview" id="fpPreview">Select a fitting</span>
+      </div>
+      <div class="fitting-grid" id="fittingGrid">
+        <button data-type="90el" onclick="selectFittingType('90el')" title="90° Elbow (1)">↱ 90°</button>
+        <button data-type="45el" onclick="selectFittingType('45el')" title="45° Elbow (2)">↗ 45°</button>
+        <button data-type="22el" onclick="selectFittingType('22el')" title="22.5° Elbow (3)">↗ 22.5°</button>
+        <button data-type="tee" onclick="selectFittingType('tee')" title="Tee (4)">⊤ Tee</button>
+        <button data-type="saddle" onclick="selectFittingType('saddle')" title="Saddle Tee (5)">⌓ Saddle</button>
+        <button data-type="lateral" onclick="selectFittingType('lateral')" title="45° Lateral (6)">⑂ Lat</button>
+        <button data-type="wye" onclick="selectFittingType('wye')" title="Wye (7)">⑃ Wye</button>
+        <button data-type="reducer" onclick="selectFittingType('reducer')" title="Reducer (8)">⊃ Red</button>
+        <button data-type="eccReducer" onclick="selectFittingType('eccReducer')" title="Ecc Reducer (9)">⊐ Ecc</button>
+        <button data-type="endcap" onclick="selectFittingType('endcap')" title="End Cap">▫ Cap</button>
+        <button data-type="transition" onclick="selectFittingType('transition')" title="Transition">◇ Trans</button>
+      </div>
+      <div class="fitting-dims">
+        <label>A:</label>
+        <input type="text" id="fpSizeA" value="14" placeholder="14">
+        <label>B:</label>
+        <input type="text" id="fpSizeB" value="" placeholder="opt">
+      </div>
+      <div class="fitting-rotation">
+        <label>Rot:</label>
+        <button onclick="rotateFittingInput(-90)">↶</button>
+        <input type="text" id="fpRotation" value="0">
+        <button onclick="rotateFittingInput(90)">↷</button>
+        <label>°</label>
+      </div>
     </div>
     <!-- Annotation controls -->
     <div class="anno-controls" id="annoControls">
@@ -1782,6 +1851,16 @@ let annoFillOpacity = 0.9;  // background fill opacity 0-1
 let measureIdCounter = 0;
 window._measIdCounter = 0;
 
+// Fitting mode state
+let fittingMode = false;
+let selectedFittingType = null;
+let selectedFittingId = null;
+let fittingIdCounter = 0;
+let fittingMousePos = null;
+let fittingDragRotate = false;
+let fittingDragStartAngle = 0;
+const pageFittings = {};
+
 // Current drawing context for auto-save
 let activeDrawingId = null;
 let activeProjectId = null;
@@ -1819,12 +1898,18 @@ async function saveCurrentPageData() {
     duct: m.duct,
   }));
   
+  const fittings = (pageFittings[pageNum] || []).map(f => ({
+    id: f.id, type: f.type, x: f.x, y: f.y,
+    rotation: f.rotation, sizeA: f.sizeA, sizeB: f.sizeB, label: f.label
+  }));
+
   await idbPut('pageData', {
     id: key,
     drawingId: activeDrawingId,
     pageNum,
     scale,
     measurements,
+    fittings,
     pageName: pageNames[pageNum] || '',
     annoSize: annoSize,
     annoTextOpacity: annoTextOpacity,
@@ -1846,7 +1931,9 @@ async function loadPageDataForDrawing(drawingId) {
   // Clear existing
   for (const k in pageScales) delete pageScales[k];
   for (const k in pageMeasurements) delete pageMeasurements[k];
+  for (const k in pageFittings) delete pageFittings[k];
   measureIdCounter = 0;
+  fittingIdCounter = 0;
   
   for (const k in pageNames) delete pageNames[k];
   for (const pd of allPageData) {
@@ -1860,6 +1947,12 @@ async function loadPageDataForDrawing(drawingId) {
       pageMeasurements[pd.pageNum] = pd.measurements;
       for (const m of pd.measurements) {
         if (m.id > measureIdCounter) measureIdCounter = m.id;
+      }
+    }
+    if (pd.fittings && pd.fittings.length > 0) {
+      pageFittings[pd.pageNum] = pd.fittings;
+      for (const f of pd.fittings) {
+        if (f.id > fittingIdCounter) fittingIdCounter = f.id;
       }
     }
   }
@@ -1937,8 +2030,8 @@ function pdfToScreen(px, py) {
 viewer.addEventListener('mousedown', (e) => {
   if (!pdfDoc) return;
   if (calibrationMode) return;
-  if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar')) return;
-  if (measureMode && !e.shiftKey) return;
+  if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette')) return;
+  if ((measureMode || fittingMode) && !e.shiftKey) return;
   isPanning = true;
   startX = e.clientX - panX;
   startY = e.clientY - panY;
@@ -1957,6 +2050,10 @@ window.addEventListener('mousemove', (e) => {
     mousePos = screenToPdf(e.clientX, e.clientY);
     drawMeasureOverlay();
   }
+  if (fittingMode && pdfDoc) {
+    fittingMousePos = screenToPdf(e.clientX, e.clientY);
+    drawMeasureOverlay();
+  }
 });
 
 window.addEventListener('mouseup', () => {
@@ -1969,7 +2066,7 @@ viewer.addEventListener('click', (e) => {
   if (!pdfDoc) return;
   if (isPanning) return;
   
-  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar')) {
+  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette')) {
     return;
   }
 
@@ -1988,6 +2085,11 @@ viewer.addEventListener('click', (e) => {
     return;
   }
 
+  if (fittingMode) {
+    handleFittingClick(e);
+    return;
+  }
+
   if (!measureMode) return;
   
   const pt = screenToPdf(e.clientX, e.clientY);
@@ -1996,6 +2098,27 @@ viewer.addEventListener('click', (e) => {
 });
 
 viewer.addEventListener('dblclick', (e) => {
+  // Fitting double-click: edit dimensions
+  if (fittingMode) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const fittings = pageFittings[currentPage] || [];
+    for (let i = fittings.length - 1; i >= 0; i--) {
+      const f = fittings[i];
+      const r = getFittingBoundingRadius(f);
+      const dx = pt.x - f.x, dy = pt.y - f.y;
+      if (Math.sqrt(dx*dx + dy*dy) < r) {
+        e.preventDefault();
+        const newA = prompt('Size A:', f.sizeA);
+        if (newA !== null) f.sizeA = newA;
+        const newB = prompt('Size B (leave empty for none):', f.sizeB || '');
+        if (newB !== null) f.sizeB = newB;
+        drawMeasureOverlay();
+        updatePanel();
+        scheduleSave();
+        return;
+      }
+    }
+  }
   if (!measureMode || measPoints.length < 2) return;
   e.preventDefault();
   finishMeasurement();
@@ -2088,9 +2211,36 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowRight') { e.preventDefault(); window.nextPage(); }
   else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
   else if (e.key === 's' || e.key === 'S') { e.preventDefault(); window.toggleDuctDraw(); }
+  else if (e.key === 't' || e.key === 'T') { e.preventDefault(); window.toggleFittingMode(); return; }
   else if (e.key === 'Escape') {
     if (calibrationMode) { cancelCalibration(); return; }
+    if (fittingMode && selectedFittingId) { selectedFittingId = null; drawMeasureOverlay(); updatePanel(); return; }
+    if (fittingMode) { toggleFittingMode(); return; }
     if (measPoints.length > 0) { measPoints = []; drawMeasureOverlay(); }
+  }
+  else if (fittingMode && /^[1-9]$/.test(e.key)) {
+    e.preventDefault();
+    const types = ['90el','45el','22el','tee','saddle','lateral','wye','reducer','eccReducer'];
+    const idx = parseInt(e.key) - 1;
+    if (idx < types.length) selectFittingType(types[idx]);
+    return;
+  }
+  else if (fittingMode && (e.key === 'r' || e.key === 'R' || e.key === ']')) {
+    e.preventDefault();
+    if (selectedFittingId) { rotateFittingSelected(90); }
+    else { rotateFittingInput(90); }
+    return;
+  }
+  else if (fittingMode && e.key === '[') {
+    e.preventDefault();
+    if (selectedFittingId) { rotateFittingSelected(-90); }
+    else { rotateFittingInput(-90); }
+    return;
+  }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && fittingMode && selectedFittingId) {
+    e.preventDefault();
+    deleteFitting(selectedFittingId);
+    return;
   }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && measPoints.length > 0) {
     e.preventDefault();
@@ -2554,6 +2704,26 @@ function drawMeasureOverlay() {
     drawSimpleLine(pts, '#ffaa00');
   }
   
+  // Draw placed fittings
+  const fittingsOnPage = pageFittings[currentPage] || [];
+  for (const f of fittingsOnPage) {
+    drawFitting(f, f.id === selectedFittingId);
+  }
+  
+  // Draw fitting ghost preview
+  if (fittingMode && selectedFittingType && fittingMousePos) {
+    const ghost = {
+      type: selectedFittingType,
+      x: fittingMousePos.x, y: fittingMousePos.y,
+      rotation: parseFloat(document.getElementById('fpRotation').value) || 0,
+      sizeA: document.getElementById('fpSizeA').value || '14',
+      sizeB: document.getElementById('fpSizeB').value || '',
+    };
+    mCtx.globalAlpha = 0.5;
+    drawFitting(ghost, false);
+    mCtx.globalAlpha = 1.0;
+  }
+
   if (measureMode && measPoints.length > 0) {
     const pts = [...measPoints];
     if (mousePos) pts.push(mousePos);
@@ -3028,7 +3198,8 @@ function updatePanel() {
   const content = document.getElementById('panelContent');
   const allPages = Object.keys(pageMeasurements).map(Number).sort((a,b) => a-b);
   
-  if (allPages.length === 0 || allPages.every(p => pageMeasurements[p].length === 0)) {
+  const hasFittingsAny = Object.keys(pageFittings).some(p => (pageFittings[p] || []).length > 0);
+  if ((allPages.length === 0 || allPages.every(p => pageMeasurements[p].length === 0)) && !hasFittingsAny) {
     content.innerHTML = '<div class="meas-empty">No measurements yet.<br>Use 📐 Measure to start.</div>';
     return;
   }
@@ -3058,7 +3229,42 @@ function updatePanel() {
     html += `</div>`;
   }
   
-  content.innerHTML = html;
+  // Add fittings section
+  const allFittingPages = Object.keys(pageFittings).map(Number).sort((a,b) => a-b);
+  const hasFittings = allFittingPages.some(p => (pageFittings[p] || []).length > 0);
+  if (hasFittings) {
+    html += `<div class="fittings-section"><h4>🔩 Fittings</h4>`;
+    for (const page of allFittingPages) {
+      const fittings = pageFittings[page] || [];
+      if (fittings.length === 0) continue;
+      html += `<div class="meas-group-title">Page ${page}</div>`;
+      // Group by type
+      const groups = {};
+      for (const f of fittings) {
+        if (!groups[f.type]) groups[f.type] = [];
+        groups[f.type].push(f);
+      }
+      for (const [type, items] of Object.entries(groups)) {
+        const name = FITTING_NAMES[type] || type;
+        html += `<div class="fitting-group">`;
+        html += `<div class="fitting-group-title">${name} × ${items.length}</div>`;
+        html += `<div class="fitting-group-items">`;
+        for (const f of items) {
+          const dims = f.sizeA + (f.sizeB ? '/' + f.sizeB : '');
+          const sel = f.id === selectedFittingId ? ' style="background:rgba(233,69,96,0.15)"' : '';
+          html += `<div class="fitting-item"${sel}>`;
+          html += `<span>${dims} @ ${f.rotation}°</span>`;
+          html += `<button class="fi-delete" onclick="deleteFitting(${f.id})" title="Delete">×</button>`;
+          html += `</div>`;
+        }
+        html += `</div></div>`;
+      }
+    }
+    html += `<button class="clear-fittings-btn" onclick="clearAllFittings()">Clear All Fittings</button>`;
+    html += `</div>`;
+  }
+
+  content.innerHTML = html || '<div class="meas-empty">No measurements yet.<br>Use 📏 Measure to start.</div>';
 }
 
 window.deleteMeasurement = function(id) {
@@ -3244,6 +3450,594 @@ async function saveLastPage() {
 }
 
 // =====================================================
+// =====================================================
+// Fitting Palette System
+// =====================================================
+
+const FITTING_NAMES = {
+  '90el': '90° Elbow', '45el': '45° Elbow', '22el': '22.5° Elbow',
+  'tee': 'Tee', 'saddle': 'Saddle Tee', 'lateral': '45° Lateral',
+  'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
+  'endcap': 'End Cap', 'transition': 'Transition'
+};
+
+function inchesToPx(inches) {
+  const scale = getScaleForPage(currentPage);
+  if (scale) {
+    const pxPerFoot = getPxPerRealFoot(scale);
+    if (pxPerFoot) return (inches / 12) * pxPerFoot;
+  }
+  // Fallback: reasonable visual size
+  return Math.max(8, inches * 1.4) * (baseScale / 2);
+}
+
+function parseDimension(dimStr) {
+  if (!dimStr) return 14;
+  if (dimStr.includes('x')) {
+    return Math.max(...dimStr.split('x').map(Number).filter(n => !isNaN(n))) || 14;
+  }
+  return parseFloat(dimStr) || 14;
+}
+
+window.toggleFittingMode = function() {
+  fittingMode = !fittingMode;
+  const btn = document.getElementById('fittingBtn');
+  const palette = document.getElementById('fittingPalette');
+  btn.classList.toggle('active', fittingMode);
+  palette.classList.toggle('active', fittingMode);
+  viewer.classList.toggle('fitting-mode', fittingMode);
+  if (!fittingMode) {
+    selectedFittingId = null;
+    fittingMousePos = null;
+  }
+  if (fittingMode && measureMode) { toggleMeasureMode(); }
+  if (fittingMode && ductDrawMode) { toggleDuctDraw(); }
+  drawMeasureOverlay();
+  updatePanel();
+};
+
+window.selectFittingType = function(type) {
+  selectedFittingType = type;
+  selectedFittingId = null;
+  document.querySelectorAll('.fitting-grid button').forEach(b => {
+    b.classList.toggle('selected', b.dataset.type === type);
+  });
+  document.getElementById('fpPreview').textContent = FITTING_NAMES[type] || type;
+  // Show/hide sizeB based on type
+  const needsB = ['tee','saddle','lateral','wye','reducer','eccReducer','transition'].includes(type);
+  document.getElementById('fpSizeB').style.display = needsB ? '' : 'none';
+  document.getElementById('fpSizeB').previousElementSibling.style.display = needsB ? '' : 'none';
+};
+
+window.rotateFittingInput = function(deg) {
+  const input = document.getElementById('fpRotation');
+  let val = (parseFloat(input.value) || 0) + deg;
+  val = ((val % 360) + 360) % 360;
+  input.value = val;
+  drawMeasureOverlay();
+};
+
+function rotateFittingSelected(deg) {
+  if (!selectedFittingId) return;
+  const fittings = pageFittings[currentPage] || [];
+  const f = fittings.find(f => f.id === selectedFittingId);
+  if (!f) return;
+  f.rotation = ((f.rotation + deg) % 360 + 360) % 360;
+  drawMeasureOverlay();
+  scheduleSave();
+}
+
+function handleFittingClick(e) {
+  const pt = screenToPdf(e.clientX, e.clientY);
+  
+  // Check if clicking on a rotation handle of selected fitting
+  if (selectedFittingId) {
+    const f = (pageFittings[currentPage] || []).find(f => f.id === selectedFittingId);
+    if (f) {
+      const handleDist = getFittingBoundingRadius(f) + 15;
+      const hx = f.x + Math.cos((f.rotation - 90) * Math.PI / 180) * handleDist;
+      const hy = f.y + Math.sin((f.rotation - 90) * Math.PI / 180) * handleDist;
+      const dx = pt.x - hx, dy = pt.y - hy;
+      if (Math.sqrt(dx*dx + dy*dy) < 10) {
+        // Start drag rotation
+        fittingDragRotate = true;
+        fittingDragStartAngle = Math.atan2(pt.y - f.y, pt.x - f.x) * 180 / Math.PI - f.rotation;
+        return;
+      }
+    }
+  }
+  
+  // Check if clicking on an existing fitting
+  const fittings = pageFittings[currentPage] || [];
+  for (let i = fittings.length - 1; i >= 0; i--) {
+    const f = fittings[i];
+    const r = getFittingBoundingRadius(f);
+    const dx = pt.x - f.x, dy = pt.y - f.y;
+    if (Math.sqrt(dx*dx + dy*dy) < r) {
+      selectedFittingId = f.id;
+      drawMeasureOverlay();
+      updatePanel();
+      return;
+    }
+  }
+  
+  // Place new fitting if a type is selected
+  if (selectedFittingType) {
+    if (!pageFittings[currentPage]) pageFittings[currentPage] = [];
+    fittingIdCounter++;
+    const f = {
+      id: fittingIdCounter,
+      type: selectedFittingType,
+      x: pt.x, y: pt.y,
+      rotation: parseFloat(document.getElementById('fpRotation').value) || 0,
+      sizeA: document.getElementById('fpSizeA').value || '14',
+      sizeB: document.getElementById('fpSizeB').value || '',
+      label: null
+    };
+    pageFittings[currentPage].push(f);
+    selectedFittingId = null;
+    drawMeasureOverlay();
+    updatePanel();
+    scheduleSave();
+  } else {
+    selectedFittingId = null;
+    drawMeasureOverlay();
+    updatePanel();
+  }
+}
+
+function getFittingBoundingRadius(f) {
+  const D = inchesToPx(parseDimension(f.sizeA));
+  return D * 1.5 + 10;
+}
+
+window.deleteFitting = function(id) {
+  const fittings = pageFittings[currentPage] || [];
+  const idx = fittings.findIndex(f => f.id === id);
+  if (idx !== -1) fittings.splice(idx, 1);
+  if (selectedFittingId === id) selectedFittingId = null;
+  drawMeasureOverlay();
+  updatePanel();
+  scheduleSave();
+};
+
+window.clearAllFittings = function() {
+  pageFittings[currentPage] = [];
+  selectedFittingId = null;
+  drawMeasureOverlay();
+  updatePanel();
+  scheduleSave();
+};
+
+// ---- Fitting rendering functions ----
+
+function drawFitting(f, isSelected) {
+  const D = inchesToPx(parseDimension(f.sizeA));
+  const D2 = f.sizeB ? inchesToPx(parseDimension(f.sizeB)) : D * 0.7;
+  const rot = (f.rotation || 0) * Math.PI / 180;
+  
+  mCtx.save();
+  mCtx.translate(f.x, f.y);
+  mCtx.rotate(rot);
+  mCtx.strokeStyle = isSelected ? '#e94560' : '#00ff88';
+  mCtx.lineWidth = 2.5;
+  mCtx.setLineDash([]);
+  mCtx.lineJoin = 'round';
+  mCtx.lineCap = 'round';
+  
+  switch (f.type) {
+    case '90el': drawElbow(D, Math.PI / 2); break;
+    case '45el': drawElbow(D, Math.PI / 4); break;
+    case '22el': drawElbow(D, Math.PI / 8); break;
+    case 'tee': drawTee(D, D2); break;
+    case 'saddle': drawSaddle(D, D2); break;
+    case 'lateral': drawLateral(D, D2); break;
+    case 'wye': drawWye(D, D2); break;
+    case 'reducer': drawReducer(D, D2, false); break;
+    case 'eccReducer': drawReducer(D, D2, true); break;
+    case 'endcap': drawEndCap(D); break;
+    case 'transition': drawTransition(D, D2); break;
+  }
+  
+  mCtx.restore();
+  
+  // Draw selection indicators
+  if (isSelected) {
+    mCtx.save();
+    mCtx.setLineDash([4, 4]);
+    mCtx.strokeStyle = '#e94560';
+    mCtx.lineWidth = 1;
+    const r = getFittingBoundingRadius(f);
+    mCtx.beginPath();
+    mCtx.arc(f.x, f.y, r, 0, Math.PI * 2);
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+    
+    // Rotation handle
+    const handleDist = r + 15;
+    const hAngle = (f.rotation - 90) * Math.PI / 180;
+    const hx = f.x + Math.cos(hAngle) * handleDist;
+    const hy = f.y + Math.sin(hAngle) * handleDist;
+    mCtx.fillStyle = '#e94560';
+    mCtx.beginPath();
+    mCtx.arc(hx, hy, 5, 0, Math.PI * 2);
+    mCtx.fill();
+    mCtx.strokeStyle = '#e94560';
+    mCtx.lineWidth = 1;
+    mCtx.beginPath();
+    mCtx.moveTo(f.x + Math.cos(hAngle) * r, f.y + Math.sin(hAngle) * r);
+    mCtx.lineTo(hx, hy);
+    mCtx.stroke();
+    mCtx.restore();
+  }
+  
+  // Label
+  const labelText = f.label || (FITTING_NAMES[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : ''));
+  const fontSize = Math.max(8, D * 0.3);
+  mCtx.save();
+  mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  mCtx.textAlign = 'center';
+  mCtx.textBaseline = 'top';
+  const labelY = f.y + getFittingBoundingRadius(f) * 0.6;
+  const tw = mCtx.measureText(labelText).width;
+  mCtx.fillStyle = 'rgba(22, 33, 62, 0.85)';
+  mCtx.beginPath();
+  mCtx.roundRect(f.x - tw/2 - 3, labelY - 2, tw + 6, fontSize + 4, 3);
+  mCtx.fill();
+  mCtx.fillStyle = '#e0e0e0';
+  mCtx.fillText(labelText, f.x, labelY);
+  mCtx.restore();
+}
+
+function drawElbow(D, sweep) {
+  const halfW = D / 2;
+  const CLR = D * 1.5;
+  const innerR = CLR - halfW;
+  const outerR = CLR + halfW;
+  const stub = D * 0.5;
+  
+  // Entry stub (left, going right)
+  mCtx.beginPath();
+  mCtx.moveTo(-stub, -halfW);
+  mCtx.lineTo(0, -halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-stub, halfW);
+  mCtx.lineTo(0, halfW);
+  mCtx.stroke();
+  
+  // Entry end cap
+  mCtx.beginPath();
+  mCtx.moveTo(-stub, -halfW);
+  mCtx.lineTo(-stub, halfW);
+  mCtx.stroke();
+  
+  // Arc center is at (0, -CLR) relative to fitting center shifted
+  // Actually, let's center on the arc. Entry comes from left.
+  // Arc center at (0, halfW + innerR) = (0, halfW + CLR - halfW) = (0, CLR)
+  // Nah, simpler: arc center below entry point
+  const cx = 0, cy = halfW;
+  // Inner arc from angle -PI/2 sweeping by -sweep
+  mCtx.beginPath();
+  mCtx.arc(cx, cy, innerR, -Math.PI/2, -Math.PI/2 + sweep, false);
+  mCtx.stroke();
+  
+  // Outer arc
+  mCtx.beginPath();
+  mCtx.arc(cx, cy, outerR, -Math.PI/2, -Math.PI/2 + sweep, false);
+  mCtx.stroke();
+  
+  // Exit stub
+  const exitAngle = -Math.PI/2 + sweep;
+  const exitDirX = Math.cos(exitAngle);
+  const exitDirY = Math.sin(exitAngle);
+  const exitPerpX = -exitDirY;
+  const exitPerpY = exitDirX;
+  
+  const exitInnerX = cx + innerR * Math.cos(exitAngle);
+  const exitInnerY = cy + innerR * Math.sin(exitAngle);
+  const exitOuterX = cx + outerR * Math.cos(exitAngle);
+  const exitOuterY = cy + outerR * Math.sin(exitAngle);
+  
+  mCtx.beginPath();
+  mCtx.moveTo(exitInnerX, exitInnerY);
+  mCtx.lineTo(exitInnerX + exitDirX * stub, exitInnerY + exitDirY * stub);
+  mCtx.stroke();
+  
+  mCtx.beginPath();
+  mCtx.moveTo(exitOuterX, exitOuterY);
+  mCtx.lineTo(exitOuterX + exitDirX * stub, exitOuterY + exitDirY * stub);
+  mCtx.stroke();
+  
+  // Exit end cap
+  mCtx.beginPath();
+  mCtx.moveTo(exitInnerX + exitDirX * stub, exitInnerY + exitDirY * stub);
+  mCtx.lineTo(exitOuterX + exitDirX * stub, exitOuterY + exitDirY * stub);
+  mCtx.stroke();
+}
+
+function drawTee(D, branchD) {
+  const halfW = D / 2;
+  const halfB = branchD / 2;
+  const mainLen = D * 1.5;
+  const branchLen = D * 1.5;
+  
+  // Main duct
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, -halfW);
+  mCtx.lineTo(mainLen, -halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, halfW);
+  mCtx.lineTo(-halfB, halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(halfB, halfW);
+  mCtx.lineTo(mainLen, halfW);
+  mCtx.stroke();
+  
+  // End caps on main
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, -halfW);
+  mCtx.lineTo(-mainLen, halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(mainLen, -halfW);
+  mCtx.lineTo(mainLen, halfW);
+  mCtx.stroke();
+  
+  // Branch going down
+  mCtx.beginPath();
+  mCtx.moveTo(-halfB, halfW);
+  mCtx.lineTo(-halfB, halfW + branchLen);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(halfB, halfW);
+  mCtx.lineTo(halfB, halfW + branchLen);
+  mCtx.stroke();
+  
+  // Branch end cap
+  mCtx.beginPath();
+  mCtx.moveTo(-halfB, halfW + branchLen);
+  mCtx.lineTo(halfB, halfW + branchLen);
+  mCtx.stroke();
+}
+
+function drawSaddle(D, branchD) {
+  const halfW = D / 2;
+  const halfB = branchD / 2;
+  const mainLen = D * 1.5;
+  const branchLen = D * 1.2;
+  
+  // Main duct (unbroken)
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, -halfW);
+  mCtx.lineTo(mainLen, -halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, halfW);
+  mCtx.lineTo(mainLen, halfW);
+  mCtx.stroke();
+  
+  // End caps
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, -halfW);
+  mCtx.lineTo(-mainLen, halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(mainLen, -halfW);
+  mCtx.lineTo(mainLen, halfW);
+  mCtx.stroke();
+  
+  // Branch on top with saddle curve
+  mCtx.beginPath();
+  mCtx.moveTo(-halfB, -halfW);
+  mCtx.quadraticCurveTo(-halfB * 1.3, -halfW - halfB * 0.4, -halfB, -halfW - halfB * 0.5);
+  mCtx.lineTo(-halfB, -halfW - branchLen);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(halfB, -halfW);
+  mCtx.quadraticCurveTo(halfB * 1.3, -halfW - halfB * 0.4, halfB, -halfW - halfB * 0.5);
+  mCtx.lineTo(halfB, -halfW - branchLen);
+  mCtx.stroke();
+  
+  // Branch end cap
+  mCtx.beginPath();
+  mCtx.moveTo(-halfB, -halfW - branchLen);
+  mCtx.lineTo(halfB, -halfW - branchLen);
+  mCtx.stroke();
+}
+
+function drawLateral(D, branchD) {
+  const halfW = D / 2;
+  const halfB = branchD / 2;
+  const mainLen = D * 1.5;
+  const branchLen = D * 1.5;
+  const angle = Math.PI / 4; // 45°
+  
+  // Main duct
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, -halfW);
+  mCtx.lineTo(mainLen, -halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, halfW);
+  mCtx.lineTo(mainLen, halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, -halfW);
+  mCtx.lineTo(-mainLen, halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(mainLen, -halfW);
+  mCtx.lineTo(mainLen, halfW);
+  mCtx.stroke();
+  
+  // Branch departing at 45° from center bottom
+  const bx = Math.cos(angle) * branchLen;
+  const by = Math.sin(angle) * branchLen;
+  const perpX = -Math.sin(angle) * halfB;
+  const perpY = Math.cos(angle) * halfB;
+  
+  mCtx.beginPath();
+  mCtx.moveTo(perpX, halfW);
+  mCtx.lineTo(perpX + bx, halfW + by + perpY);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-perpX, halfW);
+  mCtx.lineTo(-perpX + bx, halfW + by - perpY);
+  mCtx.stroke();
+  
+  // Branch end cap
+  mCtx.beginPath();
+  mCtx.moveTo(perpX + bx, halfW + by + perpY);
+  mCtx.lineTo(-perpX + bx, halfW + by - perpY);
+  mCtx.stroke();
+}
+
+function drawWye(D, branchD) {
+  const halfW = D / 2;
+  const halfB = branchD / 2;
+  const entryLen = D * 0.8;
+  const branchLen = D * 1.5;
+  const angle = Math.PI / 6; // 30° each side
+  
+  // Entry stub
+  mCtx.beginPath();
+  mCtx.moveTo(-entryLen, -halfW);
+  mCtx.lineTo(0, -halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-entryLen, halfW);
+  mCtx.lineTo(0, halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-entryLen, -halfW);
+  mCtx.lineTo(-entryLen, halfW);
+  mCtx.stroke();
+  
+  // Upper branch
+  const cosA = Math.cos(angle), sinA = Math.sin(angle);
+  mCtx.beginPath();
+  mCtx.moveTo(0, -halfW);
+  mCtx.lineTo(cosA * branchLen, -halfW - sinA * branchLen);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(0, -halfW + halfB * 2 * cosA);
+  mCtx.lineTo(cosA * branchLen, -halfW + halfB * 2 * cosA - sinA * branchLen);
+  mCtx.stroke();
+  
+  // Lower branch
+  mCtx.beginPath();
+  mCtx.moveTo(0, halfW);
+  mCtx.lineTo(cosA * branchLen, halfW + sinA * branchLen);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(0, halfW - halfB * 2 * cosA);
+  mCtx.lineTo(cosA * branchLen, halfW - halfB * 2 * cosA + sinA * branchLen);
+  mCtx.stroke();
+  
+  // Branch end caps
+  mCtx.beginPath();
+  mCtx.moveTo(cosA * branchLen, -halfW - sinA * branchLen);
+  mCtx.lineTo(cosA * branchLen, -halfW + halfB * 2 * cosA - sinA * branchLen);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(cosA * branchLen, halfW + sinA * branchLen);
+  mCtx.lineTo(cosA * branchLen, halfW - halfB * 2 * cosA + sinA * branchLen);
+  mCtx.stroke();
+}
+
+function drawReducer(D, D2, eccentric) {
+  const halfW = D / 2;
+  const halfW2 = D2 / 2;
+  const len = Math.abs(D - D2) * 1.5 || D;
+  
+  if (eccentric) {
+    // Bottom flat, top tapers
+    mCtx.beginPath();
+    mCtx.moveTo(-len/2, halfW);  // bottom-left
+    mCtx.lineTo(len/2, halfW);   // bottom-right
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.moveTo(-len/2, -halfW);  // top-left
+    mCtx.lineTo(len/2, halfW - halfW2 * 2);  // top-right (tapered)
+    mCtx.stroke();
+  } else {
+    // Symmetric taper
+    mCtx.beginPath();
+    mCtx.moveTo(-len/2, -halfW);
+    mCtx.lineTo(len/2, -halfW2);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.moveTo(-len/2, halfW);
+    mCtx.lineTo(len/2, halfW2);
+    mCtx.stroke();
+  }
+  
+  // End caps
+  mCtx.beginPath();
+  mCtx.moveTo(-len/2, -halfW);
+  mCtx.lineTo(-len/2, halfW);
+  mCtx.stroke();
+  if (eccentric) {
+    mCtx.beginPath();
+    mCtx.moveTo(len/2, halfW);
+    mCtx.lineTo(len/2, halfW - halfW2 * 2);
+    mCtx.stroke();
+  } else {
+    mCtx.beginPath();
+    mCtx.moveTo(len/2, -halfW2);
+    mCtx.lineTo(len/2, halfW2);
+    mCtx.stroke();
+  }
+}
+
+function drawEndCap(D) {
+  const halfW = D / 2;
+  const depth = D * 0.25;
+  mCtx.beginPath();
+  mCtx.moveTo(0, -halfW);
+  mCtx.lineTo(0, halfW);
+  mCtx.lineTo(depth, halfW);
+  mCtx.lineTo(depth, -halfW);
+  mCtx.closePath();
+  mCtx.stroke();
+}
+
+function drawTransition(D, D2) {
+  const halfW = D / 2;
+  const halfW2 = D2 / 2;
+  const len = Math.max(D, D2) * 1.5;
+  
+  // Rect end (left)
+  mCtx.beginPath();
+  mCtx.moveTo(-len/2, -halfW);
+  mCtx.lineTo(-len/2, halfW);
+  mCtx.stroke();
+  
+  // Round end (right, shown as narrower rect in 2D)
+  mCtx.beginPath();
+  mCtx.moveTo(len/2, -halfW2);
+  mCtx.lineTo(len/2, halfW2);
+  mCtx.stroke();
+  
+  // Taper lines
+  mCtx.beginPath();
+  mCtx.moveTo(-len/2, -halfW);
+  mCtx.lineTo(len/2, -halfW2);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-len/2, halfW);
+  mCtx.lineTo(len/2, halfW2);
+  mCtx.stroke();
+  
+  // Small circle at round end to indicate round
+  mCtx.beginPath();
+  mCtx.arc(len/2, 0, halfW2, 0, Math.PI * 2);
+  mCtx.stroke();
+}
+
 // App Init
 // =====================================================
 async function init() {
