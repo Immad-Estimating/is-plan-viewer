@@ -4384,15 +4384,7 @@ function drawSaddle45Y(D, branchD) {
   const mainHalf = D * 1.2;
   const tickH = halfW * 0.3;
   
-  // Main duct line — gap where branch walls meet the main
-  // Wall starts will be at lSx and rSx (computed below), so use halfB as gap estimate
-  const gapLeft = halfB; // approximate gap; exact positions set after branch calc
-  
-  // Main duct line — LEFT side (up to gap)
-  mCtx.beginPath(); mCtx.moveTo(-mainHalf, 0); mCtx.lineTo(-gapLeft, 0); mCtx.stroke();
-  // Main duct line — RIGHT side (after gap)
-  mCtx.beginPath(); mCtx.moveTo(gapLeft, 0); mCtx.lineTo(mainHalf, 0); mCtx.stroke();
-  // End ticks
+  // End ticks on main
   mCtx.beginPath(); mCtx.moveTo(-mainHalf, -tickH); mCtx.lineTo(-mainHalf, tickH); mCtx.stroke();
   mCtx.beginPath(); mCtx.moveTo(mainHalf, -tickH); mCtx.lineTo(mainHalf, tickH); mCtx.stroke();
   
@@ -4419,17 +4411,31 @@ function drawSaddle45Y(D, branchD) {
   const rEx = rSx + dirX * branchLen;
   const rEy = rSy + dirY * branchLen;
   
-  // Left branch wall
-  mCtx.beginPath(); mCtx.moveTo(lSx, lSy); mCtx.lineTo(lEx, lEy); mCtx.stroke();
+  // Where each branch wall intersects the main line (y=0):
+  // Left wall goes from (lSx, lSy) at 45°. Find where it crosses y=0 going backwards.
+  // lSy is negative (below center), so the wall already starts below y=0.
+  // We need the x-position where each wall line crosses y=0.
+  // Left wall line: point (lSx, lSy) + t*(dirX, dirY). At y=0: lSy + t*dirY = 0 → t = -lSy/dirY
+  const tL = -lSy / dirY;
+  const lMainX = lSx + tL * dirX; // where left wall meets main line
+  // Right wall: same calc
+  const tR = -rSy / dirY;
+  const rMainX = rSx + tR * dirX; // where right wall meets main line
   
-  // Right branch wall
-  mCtx.beginPath(); mCtx.moveTo(rSx, rSy); mCtx.lineTo(rEx, rEy); mCtx.stroke();
+  // Main duct line: continuous but trimmed at the branch opening
+  // Left side: from left end to where left branch wall meets main
+  mCtx.beginPath(); mCtx.moveTo(-mainHalf, 0); mCtx.lineTo(lMainX, 0); mCtx.stroke();
+  // Right side: from where right branch wall meets main to right end
+  mCtx.beginPath(); mCtx.moveTo(rMainX, 0); mCtx.lineTo(mainHalf, 0); mCtx.stroke();
   
-  // Branch end cap (perpendicular to branch)
+  // Left branch wall: from its intersection on the main line up to branch end
+  mCtx.beginPath(); mCtx.moveTo(lMainX, 0); mCtx.lineTo(lEx, lEy); mCtx.stroke();
+  
+  // Right branch wall: from its intersection on the main line up to branch end
+  mCtx.beginPath(); mCtx.moveTo(rMainX, 0); mCtx.lineTo(rEx, rEy); mCtx.stroke();
+  
+  // Branch end cap
   mCtx.beginPath(); mCtx.moveTo(lEx, lEy); mCtx.lineTo(rEx, rEy); mCtx.stroke();
-  
-  // Connection lines from wall starts to main line (close the saddle opening)
-  mCtx.beginPath(); mCtx.moveTo(lSx, lSy); mCtx.lineTo(rSx, rSy); mCtx.stroke();
 }
 
 function drawLateral(D, branchD) {
