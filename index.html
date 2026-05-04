@@ -541,6 +541,10 @@
           <label>Diameter (inches)</label>
           <input type="text" id="ductRoundDiam" placeholder="e.g. 14" />
         </div>
+        <div class="duct-dims" id="ductDimsLiner">
+          <label>Liner thickness (inches, 0 = none)</label>
+          <input type="text" id="ductLiner" placeholder="e.g. 1" value="0" />
+        </div>
         <div class="duct-btns">
           <button class="skip-btn" onclick="finishDuct(false)">Skip</button>
           <button class="save-btn" onclick="finishDuct(true)">Save</button>
@@ -559,6 +563,7 @@
       </select>
       <span id="ddDiamGroup"><label>⌀</label><input type="text" id="ddDiam" class="dd-dim" value="14"></span>
       <span id="ddRectGroup" style="display:none"><label>W</label><input type="text" id="ddW" class="dd-dim" value="24"><label>×</label><input type="text" id="ddH" class="dd-dim" value="12"></span>
+      <span id="ddLinerGroup" style="display:none"><label>Liner</label><input type="text" id="ddLiner" class="dd-dim" value="1" style="width:35px" title="Liner thickness (inches)"><label>"</label></span>
       <span class="dd-hint">Click to draw · Enter to finish</span>
       <button class="tool-pin-btn" id="ddPinBtn" onclick="event.stopPropagation(); togglePinDuctBar()" title="Pin position">📌</button>
     </div>
@@ -2802,6 +2807,7 @@ window.ddTypeChanged = function() {
   const isRect = (t === 'rect' || t === 'oval');
   document.getElementById('ddDiamGroup').style.display = isRect ? 'none' : '';
   document.getElementById('ddRectGroup').style.display = isRect ? '' : 'none';
+  document.getElementById('ddLinerGroup').style.display = (t === 'rect') ? '' : 'none';
 };
 
 function getDuctDrawConfig() {
@@ -2810,10 +2816,11 @@ function getDuctDrawConfig() {
   if (type === 'rect' || type === 'oval') {
     const w = document.getElementById('ddW').value.trim() || '24';
     const h = document.getElementById('ddH').value.trim() || '12';
-    return { type, dims: w + 'x' + h, symbol: symbols[type] };
+    const liner = (type === 'rect') ? (parseFloat(document.getElementById('ddLiner').value) || 0) : 0;
+    return { type, dims: w + 'x' + h, symbol: symbols[type], liner };
   }
   const d = document.getElementById('ddDiam').value.trim() || '14';
-  return { type, dims: d, symbol: symbols[type] };
+  return { type, dims: d, symbol: symbols[type], liner: 0 };
 };
 
 
@@ -2887,6 +2894,7 @@ window.onDuctTypeChange = function() {
   const val = document.getElementById('ductTypeSelect').value;
   document.getElementById('ductDimsRect').classList.toggle('show', val === 'rect' || val === 'oval');
   document.getElementById('ductDimsRound').classList.toggle('show', val === 'round' || val === 'spiral');
+  document.getElementById('ductDimsLiner').classList.toggle('show', val === 'rect');
 };
 
 window.finishDuct = function(save) {
@@ -2905,7 +2913,8 @@ window.finishDuct = function(save) {
           dims = document.getElementById('ductRoundDiam').value.trim();
         }
         const symbols = { rect: '▬', oval: '⬭', round: '●', spiral: '◎' };
-        meas.duct = { type, dims, symbol: symbols[type] };
+        const liner = (type === 'rect') ? (parseFloat(document.getElementById('ductLiner').value) || 0) : 0;
+        meas.duct = { type, dims, symbol: symbols[type], liner };
       }
     }
   }
@@ -3458,6 +3467,80 @@ function drawDuctRun(points, duct, color) {
       }
     }
     mCtx.globalAlpha = 1.0;
+  }
+
+  // Step 5: Internal liner for rectangular duct
+  const linerInches = (duct.liner && duct.type === 'rect') ? duct.liner : 0;
+  if (linerInches > 0) {
+    const linerPx = inchesToPx(linerInches);
+    if (linerPx > 1) {
+      const innerHalfW = halfW - linerPx;
+      if (innerHalfW > 1) {
+        // Build inner wall paths (same logic as outer but with reduced offset)
+        const innerLeftPath = [];
+        const innerRightPath = [];
+        const s0i = segs[0];
+        innerLeftPath.push({ type: 'M', x: points[0].x + s0i.nx * innerHalfW, y: points[0].y + s0i.ny * innerHalfW });
+        innerRightPath.push({ type: 'M', x: points[0].x - s0i.nx * innerHalfW, y: points[0].y - s0i.ny * innerHalfW });
+        
+        for (let i = 0; i < segs.length; i++) {
+          const seg = segs[i];
+          const endLi = { x: points[i+1].x + seg.nx * innerHalfW, y: points[i+1].y + seg.ny * innerHalfW };
+          const endRi = { x: points[i+1].x - seg.nx * innerHalfW, y: points[i+1].y - seg.ny * innerHalfW };
+          innerLeftPath.push({ type: 'L', x: endLi.x, y: endLi.y });
+          innerRightPath.push({ type: 'L', x: endRi.x, y: endRi.y });
+          if (i < segs.length - 1) {
+            const ns = segs[i+1];
+            const outLi = { x: points[i+1].x + ns.nx * innerHalfW, y: points[i+1].y + ns.ny * innerHalfW };
+            const outRi = { x: points[i+1].x - ns.nx * innerHalfW, y: points[i+1].y - ns.ny * innerHalfW };
+            const cpLi = lineLineIntersect(endLi, {x:seg.ux,y:seg.uy}, outLi, {x:-ns.ux,y:-ns.uy});
+            const cpRi = lineLineIntersect(endRi, {x:seg.ux,y:seg.uy}, outRi, {x:-ns.ux,y:-ns.uy});
+            innerLeftPath.push(cpLi ? { type:'Q', cpx:cpLi.x, cpy:cpLi.y, x:outLi.x, y:outLi.y } : { type:'L', x:outLi.x, y:outLi.y });
+            innerRightPath.push(cpRi ? { type:'Q', cpx:cpRi.x, cpy:cpRi.y, x:outRi.x, y:outRi.y } : { type:'L', x:outRi.x, y:outRi.y });
+          }
+        }
+        
+        // Draw inner walls (thinner line)
+        mCtx.lineWidth = 1.5;
+        mCtx.globalAlpha = 0.9;
+        renderPath(innerLeftPath);
+        renderPath(innerRightPath);
+        
+        // Inner end caps
+        const fiL = innerLeftPath[0], fiR = innerRightPath[0];
+        mCtx.beginPath(); mCtx.moveTo(fiL.x, fiL.y); mCtx.lineTo(fiR.x, fiR.y); mCtx.stroke();
+        const liL = innerLeftPath[innerLeftPath.length-1], liR = innerRightPath[innerRightPath.length-1];
+        mCtx.beginPath(); mCtx.moveTo(liL.x, liL.y); mCtx.lineTo(liR.x, liR.y); mCtx.stroke();
+        
+        // Cross-hatch between outer and inner walls per segment
+        // Standard drafting: diagonal lines at ~45° in the liner zone
+        mCtx.lineWidth = 0.8;
+        mCtx.globalAlpha = 0.5;
+        for (let i = 0; i < segs.length; i++) {
+          const seg = segs[i];
+          const sw = segWalls[i];
+          const hatchSpacing = linerPx * 2.5;
+          const numH = Math.max(1, Math.floor(seg.len / hatchSpacing));
+          for (let h = 0; h <= numH; h++) {
+            const t = h / (numH + 1);
+            // Left wall hatch: outer to inner
+            const oLx = sw.startL.x + (sw.endL.x - sw.startL.x) * t;
+            const oLy = sw.startL.y + (sw.endL.y - sw.startL.y) * t;
+            const iLx = oLx - seg.nx * linerPx;
+            const iLy = oLy - seg.ny * linerPx;
+            mCtx.beginPath(); mCtx.moveTo(oLx, oLy); mCtx.lineTo(iLx + seg.ux * linerPx * 0.7, iLy + seg.uy * linerPx * 0.7); mCtx.stroke();
+            // Right wall hatch: outer to inner
+            const oRx = sw.startR.x + (sw.endR.x - sw.startR.x) * t;
+            const oRy = sw.startR.y + (sw.endR.y - sw.startR.y) * t;
+            const iRx = oRx + seg.nx * linerPx;
+            const iRy = oRy + seg.ny * linerPx;
+            mCtx.beginPath(); mCtx.moveTo(oRx, oRy); mCtx.lineTo(iRx + seg.ux * linerPx * 0.7, iRy + seg.uy * linerPx * 0.7); mCtx.stroke();
+          }
+        }
+        mCtx.globalAlpha = 1.0;
+        mCtx.lineWidth = 2.5;
+      }
+    }
   }
 
   mCtx.restore();
