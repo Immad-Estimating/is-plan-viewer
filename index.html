@@ -1860,7 +1860,7 @@ const FITTINGS_BY_SHAPE = {
     { type: '45el', label: '↗ 45°', title: '45° Elbow (2)' },
     { type: '22el', label: '↗ 22.5°', title: '22.5° Elbow (3)' },
     { type: 'tee', label: '⊤ Tee', title: 'Tee (4)' },
-    { type: 'saddle', label: '⌓ Saddle', title: 'Saddle Tee (5)' },
+    { type: 'saddle45y', label: '⑂ 45Y', title: 'Saddle Tap 45° Wye (5)' },
     { type: 'lateral', label: '⑂ Lat', title: '45° Lateral (6)' },
     { type: 'wye', label: '⑃ Wye', title: 'Wye (7)' },
     { type: 'reducer', label: '⊃ Red', title: 'Concentric Reducer (8)' },
@@ -1884,7 +1884,7 @@ const FITTINGS_BY_SHAPE = {
     { type: '90el', label: '↱ 90°', title: '90° Elbow (1)' },
     { type: '45el', label: '↗ 45°', title: '45° Elbow (2)' },
     { type: 'tee', label: '⊤ Tee', title: 'Tee (4)' },
-    { type: 'saddle', label: '⌓ Saddle', title: 'Saddle Tee (5)' },
+    { type: 'saddle45y', label: '⑂ 45Y', title: 'Saddle Tap 45° Wye (5)' },
     { type: 'reducer', label: '⊃ Red', title: 'Reducer (8)' },
     { type: 'endcap', label: '▫ Cap', title: 'End Cap' },
     { type: 'transition', label: '◇ Trans', title: 'Oval to Round Transition' },
@@ -2451,7 +2451,7 @@ window.addEventListener('keydown', (e) => {
   }
   else if (fittingMode && /^[1-9]$/.test(e.key)) {
     e.preventDefault();
-    const types = ['90el','45el','22el','tee','saddle','lateral','wye','reducer','eccReducer'];
+    const types = ['90el','45el','22el','tee','saddle45y','lateral','wye','reducer','eccReducer'];
     const idx = parseInt(e.key) - 1;
     if (idx < types.length) selectFittingType(types[idx]);
     return;
@@ -2979,14 +2979,17 @@ function getFittingConnPoints(f) {
       points.push(r(0, halfW + branchLen));    // branch end center
       break;
     }
-    case 'saddle': {
-      // drawSaddle: main -mainLen to +mainLen, branch goes UP from -halfW
-      const mainLen = D * 1.5;
-      const branchLen = D * 1.5;
-      const halfW = D / 2;
-      points.push(r(-mainLen, 0));
-      points.push(r(mainLen, 0));
-      points.push(r(0, -(halfW + branchLen))); // branch up
+    case 'saddle45y': {
+      // Saddle tap 45Y: main + branch at 45° from top of main
+      const mainLen45 = D * 1.5;
+      const bD = D2 || D;
+      const branchLen45 = bD * 1.8;
+      const halfW45 = D / 2;
+      const a45 = Math.PI / 4;
+      points.push(r(-mainLen45, 0)); // main entry
+      points.push(r(mainLen45, 0));  // main exit
+      // Branch end: starts at (0, -halfW) goes at 45° upward-right
+      points.push(r(Math.sin(a45) * branchLen45, -(halfW45 + Math.cos(a45) * branchLen45)));
       break;
     }
     case 'lateral': {
@@ -3992,7 +3995,7 @@ async function saveLastPage() {
 
 const FITTING_NAMES = {
   '90el': '90° Elbow', '45el': '45° Elbow', '22el': '22.5° Elbow',
-  'tee': 'Tee', 'saddle': 'Saddle Tee', 'lateral': '45° Lateral',
+  'tee': 'Tee', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
   'endcap': 'End Cap', 'transition': 'Transition'
 };
@@ -4069,7 +4072,7 @@ window.selectFittingType = function(type) {
   });
   document.getElementById('fpPreview').textContent = FITTING_NAMES[type] || type;
   // Show/hide sizeB based on type
-  const needsB = ['tee','saddle','lateral','wye','reducer','eccReducer','transition'].includes(type);
+  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition'].includes(type);
   document.getElementById('fpSizeB').style.display = needsB ? '' : 'none';
   document.getElementById('fpSizeB').previousElementSibling.style.display = needsB ? '' : 'none';
 };
@@ -4201,7 +4204,7 @@ function drawFitting(f, isSelected) {
     case '45el': drawElbow(D, Math.PI / 4); break;
     case '22el': drawElbow(D, Math.PI / 8); break;
     case 'tee': drawTee(D, D2); break;
-    case 'saddle': drawSaddle(D, D2); break;
+    case 'saddle45y': drawSaddle45Y(D, D2); break;
     case 'lateral': drawLateral(D, D2); break;
     case 'wye': drawWye(D, D2); break;
     case 'reducer': drawReducer(D, D2, false); break;
@@ -4371,23 +4374,40 @@ function drawTee(D, branchD) {
   mCtx.stroke();
 }
 
-function drawSaddle(D, branchD) {
+function drawSaddle45Y(D, branchD) {
+  // SMACNA Saddle Tap 45° Wye
+  // Main duct runs horizontally. Branch taps off the top at 45°.
+  // If branchD === D (or 0/empty), it's a standard 45Y.
+  // If branchD !== D, it's a reducing 45Y — branch is narrower.
   const halfW = D / 2;
-  const halfB = branchD / 2;
+  const bD = (branchD && branchD !== D) ? branchD : D; // branch diameter
+  const halfB = bD / 2;
   const mainLen = D * 1.5;
-  const branchLen = D * 1.2;
+  const branchLen = bD * 1.8;
+  const angle = Math.PI / 4; // 45°
+  const cosA = Math.cos(angle), sinA = Math.sin(angle);
   
-  // Main duct (unbroken)
-  mCtx.beginPath();
-  mCtx.moveTo(-mainLen, -halfW);
-  mCtx.lineTo(mainLen, -halfW);
-  mCtx.stroke();
+  // Main duct — top wall has a gap where branch taps on
+  // The branch opening on the main top wall spans ±halfB along the wall
+  const gapHalf = halfB / sinA; // projected gap width on the horizontal top wall
+  
+  // Main duct bottom wall (unbroken)
   mCtx.beginPath();
   mCtx.moveTo(-mainLen, halfW);
   mCtx.lineTo(mainLen, halfW);
   mCtx.stroke();
   
-  // End caps
+  // Main duct top wall (broken at saddle)
+  mCtx.beginPath();
+  mCtx.moveTo(-mainLen, -halfW);
+  mCtx.lineTo(-gapHalf, -halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(gapHalf, -halfW);
+  mCtx.lineTo(mainLen, -halfW);
+  mCtx.stroke();
+  
+  // End caps on main
   mCtx.beginPath();
   mCtx.moveTo(-mainLen, -halfW);
   mCtx.lineTo(-mainLen, halfW);
@@ -4397,23 +4417,46 @@ function drawSaddle(D, branchD) {
   mCtx.lineTo(mainLen, halfW);
   mCtx.stroke();
   
-  // Branch on top with saddle curve
+  // Branch walls at 45° from the gap in the top wall
+  // Left branch wall: from (-gapHalf, -halfW) going up-right at 45°
+  const blStartX = -gapHalf, blStartY = -halfW;
+  const blEndX = blStartX + sinA * branchLen;
+  const blEndY = blStartY - cosA * branchLen;
+  
+  // Right branch wall: from (gapHalf, -halfW) going up-right at 45°
+  const brStartX = gapHalf, brStartY = -halfW;
+  const brEndX = brStartX + sinA * branchLen;
+  const brEndY = brStartY - cosA * branchLen;
+  
+  // Saddle curves at junction (smooth transition from main wall to branch)
   mCtx.beginPath();
-  mCtx.moveTo(-halfB, -halfW);
-  mCtx.quadraticCurveTo(-halfB * 1.3, -halfW - halfB * 0.4, -halfB, -halfW - halfB * 0.5);
-  mCtx.lineTo(-halfB, -halfW - branchLen);
-  mCtx.stroke();
-  mCtx.beginPath();
-  mCtx.moveTo(halfB, -halfW);
-  mCtx.quadraticCurveTo(halfB * 1.3, -halfW - halfB * 0.4, halfB, -halfW - halfB * 0.5);
-  mCtx.lineTo(halfB, -halfW - branchLen);
+  mCtx.moveTo(blStartX, blStartY);
+  mCtx.quadraticCurveTo(blStartX + sinA * halfB * 0.3, blStartY - cosA * halfB * 0.3, blStartX + sinA * halfB * 0.5, blStartY - cosA * halfB * 0.5);
+  mCtx.lineTo(blEndX, blEndY);
   mCtx.stroke();
   
-  // Branch end cap
   mCtx.beginPath();
-  mCtx.moveTo(-halfB, -halfW - branchLen);
-  mCtx.lineTo(halfB, -halfW - branchLen);
+  mCtx.moveTo(brStartX, brStartY);
+  mCtx.quadraticCurveTo(brStartX + sinA * halfB * 0.3, brStartY - cosA * halfB * 0.3, brStartX + sinA * halfB * 0.5, brStartY - cosA * halfB * 0.5);
+  mCtx.lineTo(brEndX, brEndY);
   mCtx.stroke();
+  
+  // Branch end cap (perpendicular to branch direction)
+  mCtx.beginPath();
+  mCtx.moveTo(blEndX, blEndY);
+  mCtx.lineTo(brEndX, brEndY);
+  mCtx.stroke();
+  
+  // If reducing, show size transition indicator (small tick marks)
+  if (branchD && branchD !== D) {
+    const midBx = (blEndX + brEndX) / 2;
+    const midBy = (blEndY + brEndY) / 2;
+    const tickLen = halfB * 0.3;
+    mCtx.beginPath();
+    mCtx.moveTo(midBx - cosA * tickLen, midBy - sinA * tickLen);
+    mCtx.lineTo(midBx + cosA * tickLen, midBy + sinA * tickLen);
+    mCtx.stroke();
+  }
 }
 
 function drawLateral(D, branchD) {
