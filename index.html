@@ -3154,9 +3154,26 @@ function drawMeasureOverlay() {
   const saved = pageMeasurements[currentPage] || [];
   for (const m of saved) {
     _currentRenderMeas = m;
-    const isSelected = m.id === selectedMeasId;
+    const isSelected = m.id === selectedMeasId || m.id === dragMeasId;
     const mColor = isSelected ? '#e94560' : '#00ff88';
     drawMeasurementLine(m.points, m.distance.formatted, m.duct, mColor, false);
+  }
+  
+  // Dashed circle around the endpoint being dragged
+  if (isDraggingEndpoint && dragMeasId != null) {
+    const m = findMeasurement(dragMeasId);
+    if (m && dragPointIdx >= 0 && dragPointIdx < m.points.length) {
+      const p = m.points[dragPointIdx];
+      mCtx.save();
+      mCtx.setLineDash([4, 4]);
+      mCtx.strokeStyle = '#e94560';
+      mCtx.lineWidth = 1.5;
+      mCtx.beginPath();
+      mCtx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+      mCtx.stroke();
+      mCtx.setLineDash([]);
+      mCtx.restore();
+    }
   }
   
   if (calibrationMode && calibrationPoints.length > 0) {
