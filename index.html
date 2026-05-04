@@ -2147,7 +2147,7 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
   
-  // Fitting dragging with snap
+  // Fitting dragging with snap (R key handled in keydown below)
   if (isDraggingFitting && dragFittingId != null && dragFittingOrigPos) {
     const pt = screenToPdf(e.clientX, e.clientY);
     const dx = pt.x - dragFittingStart.x;
@@ -2446,15 +2446,19 @@ window.addEventListener('keydown', (e) => {
     if (idx < types.length) selectFittingType(types[idx]);
     return;
   }
-  else if (fittingMode && (e.key === 'r' || e.key === 'R' || e.key === ']')) {
+  else if ((e.key === 'r' || e.key === 'R' || e.key === ']') && (selectedFittingId || isDraggingFitting)) {
     e.preventDefault();
-    if (selectedFittingId) { rotateFittingSelected(90); }
+    const rotId = selectedFittingId || dragFittingId;
+    if (rotId) {
+      const ff = (pageFittings[currentPage]||[]).find(x=>x.id===rotId);
+      if (ff) { ff.rotation = ((ff.rotation||0) + 90) % 360; drawMeasureOverlay(); scheduleSave(); }
+    }
     else { rotateFittingInput(90); }
     return;
   }
   else if (fittingMode && e.key === '[') {
     e.preventDefault();
-    if (selectedFittingId) { rotateFittingSelected(-90); }
+    if (selectedFittingId) rotateFittingSelected(-90);
     else { rotateFittingInput(-90); }
     return;
   }
