@@ -1893,6 +1893,9 @@ const FITTINGS_BY_SHAPE = {
 let selectedFittingId = null;
 let fittingIdCounter = 0;
 let fittingMousePos = null;
+let dragMeasId = null;
+let dragPointIdx = null;
+let isDraggingEndpoint = false;
 let fittingDragRotate = false;
 let fittingDragStartAngle = 0;
 const pageFittings = {};
@@ -2067,6 +2070,23 @@ viewer.addEventListener('mousedown', (e) => {
   if (!pdfDoc) return;
   if (calibrationMode) return;
   if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette')) return;
+  
+  // Endpoint drag: when not in measure/fitting mode, check for endpoint hit
+  if (!measureMode && !fittingMode) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const displayScale = currentScale / baseScale;
+    const hitR = 8 / displayScale;
+    const hit = hitTestEndpoint(pt.x, pt.y, hitR);
+    if (hit) {
+      isDraggingEndpoint = true;
+      dragMeasId = hit.measId;
+      dragPointIdx = hit.pointIdx;
+      e.preventDefault();
+      viewer.classList.add('grabbing');
+      return;
+    }
+  }
+  
   if ((measureMode || fittingMode) && !e.shiftKey) return;
   isPanning = true;
   startX = e.clientX - panX;
@@ -2075,6 +2095,29 @@ viewer.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('mousemove', (e) => {
+  // Endpoint dragging
+  if (isDraggingEndpoint && dragMeasId != null) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const m = findMeasurement(dragMeasId);
+    if (m && dragPointIdx >= 0 && dragPointIdx < m.points.length) {
+      m.points[dragPointIdx] = { x: pt.x, y: pt.y };
+      const scale = m.scale || getScaleForPage(currentPage);
+      m.pxLength = computePolylineLength(m.points);
+      m.distance = computeRealDistance(m.pxLength, scale);
+      drawMeasureOverlay();
+    }
+    return;
+  }
+  
+  // Cursor: show grab on endpoint hover when idle
+  if (!isPanning && !measureMode && !fittingMode && !isDraggingEndpoint && pdfDoc) {
+    const hpt = screenToPdf(e.clientX, e.clientY);
+    const ds = currentScale / baseScale;
+    const hr = 8 / ds;
+    const hit = hitTestEndpoint(hpt.x, hpt.y, hr);
+    viewer.style.cursor = hit ? 'grab' : '';
+  }
+  
   if (isPanning) {
     panX = e.clientX - startX;
     panY = e.clientY - startY;
@@ -2093,6 +2136,17 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', () => {
+  if (isDraggingEndpoint) {
+    isDraggingEndpoint = false;
+    dragMeasId = null;
+    dragPointIdx = null;
+    viewer.classList.remove('grabbing');
+    viewer.style.cursor = '';
+    drawMeasureOverlay();
+    updatePanel();
+    scheduleSave();
+    return;
+  }
   if (isPanning) scheduleViewSave();
   isPanning = false;
   viewer.classList.remove('grabbing');
@@ -2708,6 +2762,21 @@ window.finishDuct = function(save) {
   scheduleSave();
 };
 
+function hitTestEndpoint(pdfX, pdfY, hitRadius) {
+  const measurements = pageMeasurements[currentPage] || [];
+  for (let mi = measurements.length - 1; mi >= 0; mi--) {
+    const m = measurements[mi];
+    for (let pi = 0; pi < m.points.length; pi++) {
+      const dx = pdfX - m.points[pi].x;
+      const dy = pdfY - m.points[pi].y;
+      if (Math.sqrt(dx*dx + dy*dy) < hitRadius) {
+        return { measId: m.id, pointIdx: pi };
+      }
+    }
+  }
+  return null;
+}
+
 function findMeasurement(id) {
   for (const page in pageMeasurements) {
     const m = pageMeasurements[page].find(m => m.id === id);
@@ -3001,10 +3070,10 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   for (const p of points) {
     mCtx.fillStyle = color;
     mCtx.beginPath();
-    mCtx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    mCtx.arc(p.x, p.y, 5, 0, Math.PI * 2);
     mCtx.fill();
     mCtx.strokeStyle = '#1a1a2e';
-    mCtx.lineWidth = 1;
+    mCtx.lineWidth = 1.5;
     mCtx.stroke();
   }
 
