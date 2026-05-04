@@ -3755,69 +3755,82 @@ function drawFitting(f, isSelected) {
 }
 
 function drawElbow(D, sweep) {
+  // SMACNA round elbow: entry from left, turns downward (CW) by sweep angle
+  // CLR = 1.5D, inner throat = CLR - D/2 = D, outer heel = CLR + D/2 = 2D
   const halfW = D / 2;
   const CLR = D * 1.5;
-  const innerR = CLR - halfW;
-  const outerR = CLR + halfW;
+  const innerR = CLR - halfW; // = D
+  const outerR = CLR + halfW; // = 2D
   const stub = D * 0.5;
   
-  // Entry stub (left, going right)
+  // Arc center: entry duct comes from left along y=0 centerline.
+  // The turn goes downward, so arc center is BELOW the centerline at (0, CLR).
+  const cx = 0, cy = CLR;
+  
+  // Entry tangent point is where the arc meets the incoming duct.
+  // At the arc center (0, CLR), the point directly above at distance CLR is (0, 0) — the centerline.
+  // Inner wall (top, closer to center) is at y = -halfW → distance from center = CLR - halfW = innerR ✓
+  // Outer wall (bottom, farther from center) is at y = halfW → distance from center = CLR - halfW... no.
+  // Wait: arc center is at (0, CLR). Top wall at y=-halfW: distance = CLR + halfW = outerR. 
+  // Bottom wall at y=halfW: distance = CLR - halfW = innerR.
+  // So top wall = outer (heel), bottom wall = inner (throat). That's correct for a downward turn.
+  
+  // Arc angles: entry is at angle -PI/2 (pointing straight up from center).
+  // For a 90° CW turn, sweep to angle 0 (pointing right from center).
+  const arcStart = -Math.PI / 2;
+  const arcEnd = -Math.PI / 2 + sweep;
+  
+  // Entry stub: horizontal duct coming from the left
+  // Top wall (outer/heel)
   mCtx.beginPath();
   mCtx.moveTo(-stub, -halfW);
   mCtx.lineTo(0, -halfW);
   mCtx.stroke();
+  // Bottom wall (inner/throat)
   mCtx.beginPath();
   mCtx.moveTo(-stub, halfW);
   mCtx.lineTo(0, halfW);
   mCtx.stroke();
-  
   // Entry end cap
   mCtx.beginPath();
   mCtx.moveTo(-stub, -halfW);
   mCtx.lineTo(-stub, halfW);
   mCtx.stroke();
   
-  // Arc center is at (0, -CLR) relative to fitting center shifted
-  // Actually, let's center on the arc. Entry comes from left.
-  // Arc center at (0, halfW + innerR) = (0, halfW + CLR - halfW) = (0, CLR)
-  // Nah, simpler: arc center below entry point
-  const cx = 0, cy = halfW;
-  // Inner arc from angle -PI/2 sweeping by -sweep
+  // Inner arc (throat — bottom/inside of turn)
   mCtx.beginPath();
-  mCtx.arc(cx, cy, innerR, -Math.PI/2, -Math.PI/2 + sweep, false);
+  mCtx.arc(cx, cy, innerR, arcStart, arcEnd, false);
   mCtx.stroke();
   
-  // Outer arc
+  // Outer arc (heel — top/outside of turn)
   mCtx.beginPath();
-  mCtx.arc(cx, cy, outerR, -Math.PI/2, -Math.PI/2 + sweep, false);
+  mCtx.arc(cx, cy, outerR, arcStart, arcEnd, false);
   mCtx.stroke();
   
-  // Exit stub
-  const exitAngle = -Math.PI/2 + sweep;
-  const exitDirX = Math.cos(exitAngle);
-  const exitDirY = Math.sin(exitAngle);
-  const exitPerpX = -exitDirY;
-  const exitPerpY = exitDirX;
+  // Exit: compute where arcs end
+  const eiX = cx + innerR * Math.cos(arcEnd);
+  const eiY = cy + innerR * Math.sin(arcEnd);
+  const eoX = cx + outerR * Math.cos(arcEnd);
+  const eoY = cy + outerR * Math.sin(arcEnd);
   
-  const exitInnerX = cx + innerR * Math.cos(exitAngle);
-  const exitInnerY = cy + innerR * Math.sin(exitAngle);
-  const exitOuterX = cx + outerR * Math.cos(exitAngle);
-  const exitOuterY = cy + outerR * Math.sin(exitAngle);
+  // Exit direction: tangent to the arc at exit (perpendicular to radial)
+  const edX = -Math.sin(arcEnd); // tangent direction
+  const edY = Math.cos(arcEnd);
   
+  // Exit stub walls
   mCtx.beginPath();
-  mCtx.moveTo(exitInnerX, exitInnerY);
-  mCtx.lineTo(exitInnerX + exitDirX * stub, exitInnerY + exitDirY * stub);
+  mCtx.moveTo(eiX, eiY);
+  mCtx.lineTo(eiX + edX * stub, eiY + edY * stub);
   mCtx.stroke();
-  
   mCtx.beginPath();
-  mCtx.moveTo(exitOuterX, exitOuterY);
-  mCtx.lineTo(exitOuterX + exitDirX * stub, exitOuterY + exitDirY * stub);
+  mCtx.moveTo(eoX, eoY);
+  mCtx.lineTo(eoX + edX * stub, eoY + edY * stub);
   mCtx.stroke();
   
   // Exit end cap
   mCtx.beginPath();
-  mCtx.moveTo(exitInnerX + exitDirX * stub, exitInnerY + exitDirY * stub);
-  mCtx.lineTo(exitOuterX + exitDirX * stub, exitOuterY + exitDirY * stub);
+  mCtx.moveTo(eiX + edX * stub, eiY + edY * stub);
+  mCtx.lineTo(eoX + edX * stub, eoY + edY * stub);
   mCtx.stroke();
 }
 
