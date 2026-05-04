@@ -2134,6 +2134,13 @@ window.addEventListener('mousemove', (e) => {
     const m = findMeasurement(dragMeasId);
     if (m && dragPointIdx >= 0 && dragPointIdx < m.points.length) {
       let nx = pt.x, ny = pt.y;
+      // Shift = orthogonal constraint relative to adjacent point
+      if (e.shiftKey && m.points.length >= 2) {
+        const adjIdx = dragPointIdx === 0 ? 1 : dragPointIdx - 1;
+        const adj = m.points[adjIdx];
+        const c = constrainOrtho({x:nx,y:ny}, adj, true);
+        nx = c.x; ny = c.y;
+      }
       // Snap endpoint to nearby fitting/duct connection points
       const targets = getAllSnapTargets(dragMeasId, null);
       const snap = findBestSnap([{x: nx, y: ny}], targets, SNAP_THRESHOLD_PX);
@@ -2217,7 +2224,9 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
   if ((measureMode || calibrationMode) && pdfDoc) {
-    mousePos = screenToPdf(e.clientX, e.clientY);
+    let mp = screenToPdf(e.clientX, e.clientY);
+    if (e.shiftKey && measPoints.length > 0) mp = constrainOrtho(mp, measPoints[measPoints.length - 1], true);
+    mousePos = mp;
     drawMeasureOverlay();
   }
   if (fittingMode && pdfDoc) {
@@ -2313,7 +2322,8 @@ viewer.addEventListener('click', (e) => {
 
   if (!measureMode) return;
   
-  const pt = screenToPdf(e.clientX, e.clientY);
+  let pt = screenToPdf(e.clientX, e.clientY);
+  if (e.shiftKey && measPoints.length > 0) pt = constrainOrtho(pt, measPoints[measPoints.length - 1], true);
   measPoints.push(pt);
   drawMeasureOverlay();
 });
@@ -3078,6 +3088,15 @@ function findBestSnap(connPoints, targets, thresholdPx) {
     }
   }
   return bestDist < threshold ? { snapDx: bestDx, snapDy: bestDy, snapped: true } : { snapDx: 0, snapDy: 0, snapped: false };
+}
+
+// Constrain point to orthogonal (0/90°) relative to reference when Shift held
+function constrainOrtho(pt, ref, shiftKey) {
+  if (!shiftKey || !ref) return pt;
+  const dx = Math.abs(pt.x - ref.x);
+  const dy = Math.abs(pt.y - ref.y);
+  if (dx > dy) return { x: pt.x, y: ref.y }; // horizontal
+  return { x: ref.x, y: pt.y }; // vertical
 }
 
 function hitTestEndpoint(pdfX, pdfY, hitRadius) {
