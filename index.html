@@ -4372,68 +4372,51 @@ function drawTee(D, branchD) {
 }
 
 function drawSaddle45Y(D, branchD) {
-  // SMACNA Saddle Tap 45° Wye — branch collar on main duct.
+  // SMACNA Saddle Tap 45° Wye — branch takeoff on main duct.
   // D = main duct diameter, branchD = branch diameter (0/empty/same → branch = D)
+  // The main duct is shown as a horizontal line with an OPENING where the branch cuts through.
+  // The branch angles at exactly 45° upward from the main.
   const halfW = D / 2;
   const bD = (branchD && branchD > 0 && branchD !== D) ? branchD : D;
   const halfB = bD / 2;
-  const branchLen = bD * 2.0;
-  const angle = Math.PI / 4;
-  const cosA = Math.cos(angle), sinA = Math.sin(angle);
+  const branchLen = bD * 2.0; // SMACNA standard ~2x branch diameter
   
-  // Main duct line with ticks
-  const mainHalf = D * 1.0;
+  // Main duct extends left and right
+  const mainHalf = D * 1.2;
   const tickH = halfW * 0.3;
-  mCtx.beginPath(); mCtx.moveTo(-mainHalf, 0); mCtx.lineTo(mainHalf, 0); mCtx.stroke();
+  
+  // The branch opening on the main line:
+  // Branch perpendicular width = bD. Projected onto horizontal at 45° = bD / sin(45°)
+  const openHalf = halfB / Math.sin(Math.PI / 4);
+  
+  // Main duct line — LEFT side (up to the opening)
+  mCtx.beginPath(); mCtx.moveTo(-mainHalf, 0); mCtx.lineTo(-openHalf, 0); mCtx.stroke();
+  // Main duct line — RIGHT side (after the opening)
+  mCtx.beginPath(); mCtx.moveTo(openHalf, 0); mCtx.lineTo(mainHalf, 0); mCtx.stroke();
+  // End ticks
   mCtx.beginPath(); mCtx.moveTo(-mainHalf, -tickH); mCtx.lineTo(-mainHalf, tickH); mCtx.stroke();
   mCtx.beginPath(); mCtx.moveTo(mainHalf, -tickH); mCtx.lineTo(mainHalf, tickH); mCtx.stroke();
   
-  // Branch direction and perpendicular
-  const dirX = sinA, dirY = -cosA; // 45° up-right
-  const nBx = cosA, nBy = sinA;     // perpendicular to branch
+  // Branch at 45°: left wall starts at left edge of opening, right wall at right edge
+  // Direction: 45° upward (negative Y) and to the right
+  const cos45 = Math.cos(Math.PI / 4);
+  const sin45 = Math.sin(Math.PI / 4);
+  const dirX = sin45, dirY = -cos45;
   
-  // Where branch walls meet the main line:
-  // Left wall starts where the 45° line from the left wall intersects y=0
-  // Right wall starts at center (0,0) where it meets the main
-  // The opening on the main spans from the left start to the right start
-  const blSx = -halfB / sinA; // left wall hits main line at this x (projected)
-  const blSy = 0;
-  const brSx = 0; // right wall starts at center
-  const brSy = 0;
+  // Left branch wall: from (-openHalf, 0) going 45° up
+  const lEx = -openHalf + dirX * branchLen;
+  const lEy = 0 + dirY * branchLen;
+  mCtx.beginPath(); mCtx.moveTo(-openHalf, 0); mCtx.lineTo(lEx, lEy); mCtx.stroke();
   
-  // Branch end points
-  const blEx = blSx + dirX * branchLen;
-  const blEy = blSy + dirY * branchLen;
-  const brEx = brSx + dirX * branchLen;
-  const brEy = brSy + dirY * branchLen;
+  // Right branch wall: from (openHalf, 0) going 45° up (parallel to left wall)
+  // But offset by branch width perpendicular to direction
+  // Actually both walls start at the main line opening edges and run parallel at 45°
+  const rEx = openHalf + dirX * branchLen;
+  const rEy = 0 + dirY * branchLen;
+  mCtx.beginPath(); mCtx.moveTo(openHalf, 0); mCtx.lineTo(rEx, rEy); mCtx.stroke();
   
-  // Draw as one continuous closed shape:
-  // Main line left → left branch start → left branch wall up → end cap → right branch wall down → right branch start → main line right
-  // This ensures everything is connected with no gaps.
-  mCtx.beginPath();
-  // Left branch wall from main line up to branch end
-  mCtx.moveTo(blSx, blSy);
-  mCtx.lineTo(blEx, blEy);
-  mCtx.stroke();
-  
-  // Right branch wall from main line up to branch end
-  mCtx.beginPath();
-  mCtx.moveTo(brSx, brSy);
-  mCtx.lineTo(brEx, brEy);
-  mCtx.stroke();
-  
-  // Branch end cap connecting left and right walls at the top
-  mCtx.beginPath();
-  mCtx.moveTo(blEx, blEy);
-  mCtx.lineTo(brEx, brEy);
-  mCtx.stroke();
-  
-  // Connect the two start points along the main line (the saddle opening)
-  // This closes the bottom of the fitting
-  mCtx.beginPath();
-  mCtx.moveTo(blSx, blSy);
-  mCtx.lineTo(brSx, brSy);
-  mCtx.stroke();
+  // Branch end cap (perpendicular to branch)
+  mCtx.beginPath(); mCtx.moveTo(lEx, lEy); mCtx.lineTo(rEx, rEy); mCtx.stroke();
 }
 
 function drawLateral(D, branchD) {
