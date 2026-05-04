@@ -244,9 +244,7 @@
   .meas-item .meas-info { flex: 1; }
   .meas-item .meas-length { color: #00ff88; font-weight: 600; font-size: 13px; }
   .meas-item .meas-duct { color: #a0a0c0; font-size: 11px; margin-top: 2px; }
-  .meas-item .meas-fittings-edit { margin-top: 4px; }
-  .meas-item .meas-fittings-edit button { background: #1a1a2e; border: 1px solid #0f3460; color: #a0a0c0; padding: 2px 6px; border-radius: 3px; font-size: 10px; cursor: pointer; margin-right: 2px; }
-  .meas-item .meas-fittings-edit button:hover { border-color: #e94560; color: #e0e0e0; }
+
   .meas-item .meas-delete { background: none; border: none; color: #e94560; cursor: pointer; font-size: 16px; padding: 0 4px; opacity: 0.6; }
   .meas-item .meas-delete:hover { opacity: 1; }
   .meas-empty { font-size: 12px; color: #a0a0c0; text-align: center; padding: 20px; }
@@ -1819,7 +1817,6 @@ async function saveCurrentPageData() {
     pxLength: m.pxLength,
     distance: m.distance,
     duct: m.duct,
-    fittings: m.fittings || []
   }));
   
   await idbPut('pageData', {
@@ -2425,46 +2422,7 @@ function getDuctDrawConfig() {
   return { type, dims: d, symbol: symbols[type] };
 };
 
-// ---- Fitting detection ----
-function detectFittings(points, duct) {
-  if (!duct || points.length < 3) return [];
-  const fittings = [];
-  for (let i = 1; i < points.length - 1; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const next = points[i + 1];
-    // Calculate angle of turn at this point
-    const a1 = Math.atan2(curr.y - prev.y, curr.x - prev.x);
-    const a2 = Math.atan2(next.y - curr.y, next.x - curr.x);
-    let angleDiff = Math.abs(a2 - a1);
-    if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-    const degrees = angleDiff * (180 / Math.PI);
-    
-    let type = null;
-    if (degrees >= 80 && degrees <= 100) type = '90el';
-    else if (degrees >= 35 && degrees <= 55) type = '45el';
-    else if (degrees >= 15 && degrees <= 34) type = '22el';
-    else if (degrees > 100 && degrees <= 135) type = '90el'; // generous for hand-drawn
-    
-    if (type) {
-      // Determine turn direction for rendering
-      const cross = (curr.x - prev.x) * (next.y - curr.y) - (curr.y - prev.y) * (next.x - curr.x);
-      fittings.push({
-        type,
-        angle: Math.round(degrees),
-        pointIdx: i,
-        direction: cross > 0 ? 'cw' : 'ccw',
-        size: duct.dims // inherits duct size
-      });
-    }
-  }
-  return fittings;
-}
 
-function getFittingLabel(type) {
-  const labels = { '90el': '90° EL', '45el': '45° EL', '22el': '22.5° EL' };
-  return labels[type] || type;
-}
 
 function finishMeasurement() {
   if (measPoints.length < 2) return;
@@ -2482,7 +2440,6 @@ function finishMeasurement() {
     pxLength: pxLen,
     distance: dist,
     duct: null,
-    fittings: [],           // auto-detected + manual fittings [{type, angle, pointIdx, size}]
     labelText: null,        // custom label (null = auto-generated)
     labelSize: null,        // per-measurement override (null = use global)
     labelTextOpacity: null, // per-measurement text opacity override
@@ -2494,7 +2451,6 @@ function finishMeasurement() {
   
   if (ductDrawMode) {
     meas.duct = getDuctDrawConfig();
-    meas.fittings = detectFittings(meas.points, meas.duct);
     measPoints = [];
     drawMeasureOverlay();
     updatePanel();
@@ -2556,7 +2512,6 @@ window.finishDuct = function(save) {
         }
         const symbols = { rect: '▬', oval: '⬭', round: '●', spiral: '◎' };
         meas.duct = { type, dims, symbol: symbols[type] };
-        meas.fittings = detectFittings(meas.points, meas.duct);
       }
     }
   }
@@ -2655,22 +2610,7 @@ function getDuctHalfWidthPx(duct) {
   return Math.max(4, Math.min(30, D * 0.7)) * (baseScale / 2);
 }
 
-function getElbowCLRPx(duct) {
-  const diam = parseFloat(duct.dims) || 14;
-  let D = diam;
-  if (duct.dims && duct.dims.includes('x')) {
-    const parts = duct.dims.split('x').map(Number);
-    D = Math.max(parts[0] || 14, parts[1] || 14);
-  }
-  const scale = getScaleForPage(currentPage);
-  if (scale) {
-    const pxPerFoot = getPxPerRealFoot(scale);
-    if (pxPerFoot) return (D * 1.5 / 12) * pxPerFoot;
-  }
-  // Fallback
-  const halfW = Math.max(4, Math.min(30, D * 0.7)) * (baseScale / 2);
-  return halfW * 3; // 1.5 * D equivalent
-}
+
 
 // Line-line intersection: p1 + t*d1 = p2 + s*d2. Returns intersection point or null if parallel.
 function lineLineIntersect(p1, d1, p2, d2) {
@@ -2681,16 +2621,10 @@ function lineLineIntersect(p1, d1, p2, d2) {
 }
 
 // Unified duct wall rendering: traces both wall paths as one continuous shape with bezier turns
-function drawDuctRun(points, duct, fittings, color) {
+function drawDuctRun(points, duct, color) {
   if (points.length < 2) return;
   const halfW = getDuctHalfWidthPx(duct);
   const isSpiral = duct.type === 'spiral';
-
-  // Build fitting lookup by pointIdx for label rendering
-  const fittingMap = {};
-  for (const f of fittings) {
-    fittingMap[f.pointIdx] = f;
-  }
 
   // Step 1: Compute direction and perpendicular for each segment
   const segs = [];
@@ -2821,59 +2755,6 @@ function drawDuctRun(points, duct, fittings, color) {
     mCtx.globalAlpha = 1.0;
   }
 
-  // Step 5: Fitting labels at turn points
-  const effSize = (_currentRenderMeas && _currentRenderMeas.labelSize != null) ? _currentRenderMeas.labelSize : annoSize;
-  const effTextOp = (_currentRenderMeas && _currentRenderMeas.labelTextOpacity != null) ? _currentRenderMeas.labelTextOpacity : annoTextOpacity;
-  const effFillOp = (_currentRenderMeas && _currentRenderMeas.labelFillOpacity != null) ? _currentRenderMeas.labelFillOpacity : annoFillOpacity;
-
-  for (const fit of fittings) {
-    if (fit.pointIdx < 1 || fit.pointIdx >= points.length - 1) continue;
-    const segIdx = fit.pointIdx - 1; // incoming segment index
-    if (segIdx >= segs.length - 1) continue; // need a next segment too
-    const seg = segs[segIdx];
-    const nextSeg = segs[segIdx + 1];
-    const V = points[fit.pointIdx];
-
-    // Determine outside of the bend via cross product
-    const cross = seg.ux * nextSeg.uy - seg.uy * nextSeg.ux;
-
-    // Compute control point on the outside wall for label positioning
-    const endWall = cross > 0
-      ? { x: V.x - seg.nx * halfW, y: V.y - seg.ny * halfW }   // right wall (outside)
-      : { x: V.x + seg.nx * halfW, y: V.y + seg.ny * halfW };  // left wall (outside)
-    const outWall = cross > 0
-      ? { x: V.x - nextSeg.nx * halfW, y: V.y - nextSeg.ny * halfW }
-      : { x: V.x + nextSeg.nx * halfW, y: V.y + nextSeg.ny * halfW };
-    const cp = lineLineIntersect(
-      endWall, { x: seg.ux, y: seg.uy },
-      outWall, { x: -nextSeg.ux, y: -nextSeg.uy }
-    );
-    const lx = cp ? cp.x : V.x;
-    const ly = cp ? cp.y : V.y;
-
-    const labelSz = effSize * 0.65 * baseScale;
-    const renderSz = Math.max(28, labelSz);
-    const lsc = labelSz / renderSz;
-    mCtx.font = `bold ${renderSz}px -apple-system, BlinkMacSystemFont, sans-serif`;
-    const ftLabel = getFittingLabel(fit.type);
-    const tw = mCtx.measureText(ftLabel).width;
-
-    mCtx.save();
-    mCtx.translate(lx, ly);
-    mCtx.scale(lsc, lsc);
-    mCtx.globalAlpha = effFillOp;
-    mCtx.fillStyle = 'rgba(22, 33, 62, 0.9)';
-    mCtx.beginPath();
-    mCtx.roundRect(-tw/2 - 3, -renderSz/2 - 3, tw + 6, renderSz + 6, 3);
-    mCtx.fill();
-    mCtx.globalAlpha = effTextOp;
-    mCtx.fillStyle = '#00ff88';
-    mCtx.textAlign = 'center';
-    mCtx.textBaseline = 'middle';
-    mCtx.fillText(ftLabel, 0, 0);
-    mCtx.restore();
-  }
-
   mCtx.restore();
 }
 
@@ -2894,7 +2775,7 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   // For duct-tagged runs, draw the unified duct walls (no centerline)
   // For plain measurements, draw the centerline
   if (duct && points.length >= 2) {
-    drawDuctRun(points, duct, fittings, color);
+    drawDuctRun(points, duct, color);
   } else {
     mCtx.strokeStyle = color;
     mCtx.lineWidth = 2.5;
@@ -3162,19 +3043,12 @@ function updatePanel() {
     
     for (const m of measurements) {
       const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}</div>` : '';
-      let fittingInfo = '';
-      if (m.fittings && m.fittings.length > 0) {
-        const counts = {};
-        m.fittings.forEach(f => { counts[f.type] = (counts[f.type] || 0) + 1; });
-        const parts = Object.entries(counts).map(([t, c]) => `${c}× ${getFittingLabel(t)}`);
-        fittingInfo = `<div class="meas-duct" style="color:#00ff88">${parts.join(', ')}</div>`;
-      }
+
       const customLabel = m.labelText ? `<div class="meas-duct" style="color:#e94560;font-style:italic">"${escapeHtml(m.labelText)}"</div>` : '';
       html += `<div class="meas-item" data-id="${m.id}">
         <div class="meas-info">
           <div class="meas-length">${m.distance.formatted}</div>
           ${ductInfo}
-          ${fittingInfo}
           ${customLabel}
         </div>
         <button class="meas-edit-btn" onclick="editMeasurement(${m.id})" title="Edit label">✏️</button>
