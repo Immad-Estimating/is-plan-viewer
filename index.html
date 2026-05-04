@@ -72,6 +72,10 @@
   .fitting-palette { display: none; position: absolute; top: 50px; left: 16px; z-index: 55; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); width: 280px; cursor: default; }
   .fitting-palette.active { display: block; }
   .fitting-palette h4 { font-size: 12px; color: #a0a0c0; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .fitting-shape-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+  .fitting-shape-tabs button { flex: 1; background: #1a1a2e; border: 1px solid #0f3460; color: #a0a0c0; padding: 5px 4px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; transition: background 0.15s; }
+  .fitting-shape-tabs button:hover { background: #0f3460; color: #e0e0e0; }
+  .fitting-shape-tabs button.active { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.15); }
   .fitting-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 10px; }
   .fitting-grid button { background: #1a1a2e; border: 1px solid #0f3460; color: #a0a0c0; padding: 6px 2px; border-radius: 4px; cursor: pointer; font-size: 10px; text-align: center; transition: background 0.15s, border-color 0.15s; line-height: 1.2; }
   .fitting-grid button:hover { background: #0f3460; color: #e0e0e0; }
@@ -564,19 +568,12 @@
         <h4>Fittings</h4>
         <span class="fp-preview" id="fpPreview">Select a fitting</span>
       </div>
-      <div class="fitting-grid" id="fittingGrid">
-        <button data-type="90el" onclick="selectFittingType('90el')" title="90° Elbow (1)">↱ 90°</button>
-        <button data-type="45el" onclick="selectFittingType('45el')" title="45° Elbow (2)">↗ 45°</button>
-        <button data-type="22el" onclick="selectFittingType('22el')" title="22.5° Elbow (3)">↗ 22.5°</button>
-        <button data-type="tee" onclick="selectFittingType('tee')" title="Tee (4)">⊤ Tee</button>
-        <button data-type="saddle" onclick="selectFittingType('saddle')" title="Saddle Tee (5)">⌓ Saddle</button>
-        <button data-type="lateral" onclick="selectFittingType('lateral')" title="45° Lateral (6)">⑂ Lat</button>
-        <button data-type="wye" onclick="selectFittingType('wye')" title="Wye (7)">⑃ Wye</button>
-        <button data-type="reducer" onclick="selectFittingType('reducer')" title="Reducer (8)">⊃ Red</button>
-        <button data-type="eccReducer" onclick="selectFittingType('eccReducer')" title="Ecc Reducer (9)">⊐ Ecc</button>
-        <button data-type="endcap" onclick="selectFittingType('endcap')" title="End Cap">▫ Cap</button>
-        <button data-type="transition" onclick="selectFittingType('transition')" title="Transition">◇ Trans</button>
+      <div class="fitting-shape-tabs">
+        <button class="active" data-shape="round" onclick="setFittingShape('round')">● Round</button>
+        <button data-shape="rect" onclick="setFittingShape('rect')">▬ Rectangular</button>
+        <button data-shape="oval" onclick="setFittingShape('oval')">⬭ Oval</button>
       </div>
+      <div class="fitting-grid" id="fittingGrid"></div>
       <div class="fitting-dims">
         <label>A:</label>
         <input type="text" id="fpSizeA" value="14" placeholder="14">
@@ -1854,6 +1851,45 @@ window._measIdCounter = 0;
 // Fitting mode state
 let fittingMode = false;
 let selectedFittingType = null;
+let currentFittingShape = 'round'; // 'round', 'rect', 'oval'
+
+// Fittings available per shape category
+const FITTINGS_BY_SHAPE = {
+  round: [
+    { type: '90el', label: '↱ 90°', title: '90° Elbow (1)' },
+    { type: '45el', label: '↗ 45°', title: '45° Elbow (2)' },
+    { type: '22el', label: '↗ 22.5°', title: '22.5° Elbow (3)' },
+    { type: 'tee', label: '⊤ Tee', title: 'Tee (4)' },
+    { type: 'saddle', label: '⌓ Saddle', title: 'Saddle Tee (5)' },
+    { type: 'lateral', label: '⑂ Lat', title: '45° Lateral (6)' },
+    { type: 'wye', label: '⑃ Wye', title: 'Wye (7)' },
+    { type: 'reducer', label: '⊃ Red', title: 'Concentric Reducer (8)' },
+    { type: 'eccReducer', label: '⊐ Ecc', title: 'Eccentric Reducer (9)' },
+    { type: 'endcap', label: '▫ Cap', title: 'End Cap' },
+    { type: 'transition', label: '◇ Trans', title: 'Round to Rect Transition' },
+  ],
+  rect: [
+    { type: '90el', label: '↱ 90°', title: '90° Elbow (1)' },
+    { type: '45el', label: '↗ 45°', title: '45° Elbow (2)' },
+    { type: '22el', label: '↗ 22.5°', title: '22.5° Elbow (3)' },
+    { type: 'tee', label: '⊤ Tee', title: 'Tee (4)' },
+    { type: 'lateral', label: '⑂ Lat', title: '45° Lateral (6)' },
+    { type: 'wye', label: '⑃ Wye', title: 'Wye (7)' },
+    { type: 'reducer', label: '⊃ Red', title: 'Reducer (8)' },
+    { type: 'eccReducer', label: '⊐ Ecc', title: 'Offset (9)' },
+    { type: 'endcap', label: '▫ Cap', title: 'End Cap' },
+    { type: 'transition', label: '◇ Trans', title: 'Rect to Round Transition' },
+  ],
+  oval: [
+    { type: '90el', label: '↱ 90°', title: '90° Elbow (1)' },
+    { type: '45el', label: '↗ 45°', title: '45° Elbow (2)' },
+    { type: 'tee', label: '⊤ Tee', title: 'Tee (4)' },
+    { type: 'saddle', label: '⌓ Saddle', title: 'Saddle Tee (5)' },
+    { type: 'reducer', label: '⊃ Red', title: 'Reducer (8)' },
+    { type: 'endcap', label: '▫ Cap', title: 'End Cap' },
+    { type: 'transition', label: '◇ Trans', title: 'Oval to Round Transition' },
+  ]
+};
 let selectedFittingId = null;
 let fittingIdCounter = 0;
 let fittingMousePos = null;
@@ -3495,6 +3531,35 @@ window.toggleFittingMode = function() {
   drawMeasureOverlay();
   updatePanel();
 };
+
+window.setFittingShape = function(shape) {
+  currentFittingShape = shape;
+  document.querySelectorAll('.fitting-shape-tabs button').forEach(b => {
+    b.classList.toggle('active', b.dataset.shape === shape);
+  });
+  selectedFittingType = null;
+  document.getElementById('fpPreview').textContent = 'Select a fitting';
+  renderFittingGrid();
+  // Update dimension labels
+  const isRect = (shape === 'rect' || shape === 'oval');
+  document.getElementById('fpSizeA').placeholder = isRect ? '24x12' : '14';
+  if (isRect && !document.getElementById('fpSizeA').value.includes('x')) {
+    document.getElementById('fpSizeA').value = '24x12';
+  } else if (!isRect && document.getElementById('fpSizeA').value.includes('x')) {
+    document.getElementById('fpSizeA').value = '14';
+  }
+};
+
+function renderFittingGrid() {
+  const grid = document.getElementById('fittingGrid');
+  const fittings = FITTINGS_BY_SHAPE[currentFittingShape] || FITTINGS_BY_SHAPE.round;
+  grid.innerHTML = fittings.map(f =>
+    `<button data-type="${f.type}" onclick="selectFittingType('${f.type}')" title="${f.title}" ${selectedFittingType === f.type ? 'class="selected"' : ''}>${f.label}</button>`
+  ).join('');
+}
+
+// Initialize grid on load
+setTimeout(() => renderFittingGrid(), 0);
 
 window.selectFittingType = function(type) {
   selectedFittingType = type;
