@@ -1891,6 +1891,7 @@ const FITTINGS_BY_SHAPE = {
   ]
 };
 let selectedFittingId = null;
+let selectedMeasId = null; // selected measurement for deletion/editing in idle mode
 let fittingIdCounter = 0;
 let fittingMousePos = null;
 let dragMeasId = null;
@@ -2277,6 +2278,39 @@ viewer.addEventListener('click', (e) => {
     return;
   }
 
+  // Idle mode: click to select a fitting or duct for deletion
+  if (!measureMode && !fittingMode) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const ds = currentScale / baseScale;
+    const hr = 8 / ds;
+    // Check fitting hit
+    const fitHit = hitTestFitting(pt.x, pt.y);
+    if (fitHit) {
+      selectedMeasId = null;
+      selectedFittingId = fitHit.fittingId;
+      drawMeasureOverlay();
+      updatePanel();
+      return;
+    }
+    // Check segment hit
+    const segHit = hitTestSegment(pt.x, pt.y, hr * 1.5);
+    if (segHit) {
+      selectedFittingId = null;
+      selectedMeasId = segHit.measId;
+      drawMeasureOverlay();
+      updatePanel();
+      return;
+    }
+    // Click on empty space: deselect
+    if (selectedMeasId || selectedFittingId) {
+      selectedMeasId = null;
+      selectedFittingId = null;
+      drawMeasureOverlay();
+      updatePanel();
+      return;
+    }
+  }
+
   if (!measureMode) return;
   
   const pt = screenToPdf(e.clientX, e.clientY);
@@ -2424,9 +2458,14 @@ window.addEventListener('keydown', (e) => {
     else { rotateFittingInput(-90); }
     return;
   }
-  else if ((e.key === 'Delete' || e.key === 'Backspace') && fittingMode && selectedFittingId) {
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFittingId) {
     e.preventDefault();
     deleteFitting(selectedFittingId);
+  }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedMeasId) {
+    e.preventDefault();
+    deleteMeasurement(selectedMeasId);
+    selectedMeasId = null;
     return;
   }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && measPoints.length > 0) {
@@ -2712,6 +2751,7 @@ function renderSavedCustomScales() {
 // ---- Measure mode ----
 window.toggleMeasureMode = function() {
   if (ductDrawMode) toggleDuctDraw();
+  selectedMeasId = null; selectedFittingId = null;
   measureMode = !measureMode;
   const btn = document.getElementById('measureBtn');
   btn.classList.toggle('active', measureMode);
@@ -3110,7 +3150,9 @@ function drawMeasureOverlay() {
   const saved = pageMeasurements[currentPage] || [];
   for (const m of saved) {
     _currentRenderMeas = m;
-    drawMeasurementLine(m.points, m.distance.formatted, m.duct, '#00ff88', false);
+    const isSelected = m.id === selectedMeasId;
+    const mColor = isSelected ? '#e94560' : '#00ff88';
+    drawMeasurementLine(m.points, m.distance.formatted, m.duct, mColor, false);
   }
   
   if (calibrationMode && calibrationPoints.length > 0) {
