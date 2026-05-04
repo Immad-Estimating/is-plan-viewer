@@ -3244,6 +3244,7 @@ function showElevationInput() {
 
 function drawElevationLabels(measurements) {
   for (const m of measurements) {
+    // Draw elevation labels on tagged points
     for (const pt of m.points) {
       if (!pt.elevation) continue;
       const fontSize = 11 * baseScale;
@@ -3254,7 +3255,6 @@ function drawElevationLabels(measurements) {
       const text = '↕ ' + pt.elevation;
       const tw = mCtx.measureText(text).width;
       const pad = 3;
-      // Position below-left of the point
       const lx = pt.x - 5;
       const ly = pt.y + 12;
       mCtx.translate(lx, ly);
@@ -3265,13 +3265,135 @@ function drawElevationLabels(measurements) {
       mCtx.roundRect(-pad, -renderSz/2 - pad, tw + pad*2, renderSz + pad*2, 3);
       mCtx.fill();
       mCtx.globalAlpha = 1.0;
-      mCtx.fillStyle = '#00bfff'; // blue for elevation - distinct from green duct
+      mCtx.fillStyle = '#00bfff';
       mCtx.textAlign = 'left';
       mCtx.textBaseline = 'middle';
       mCtx.fillText(text, 0, 0);
       mCtx.restore();
     }
+    
+    // Draw elevation change offset symbols between adjacent points with different elevations
+    for (let i = 0; i < m.points.length - 1; i++) {
+      const p1 = m.points[i], p2 = m.points[i+1];
+      if (!p1.elevation || !p2.elevation) continue;
+      if (p1.elevation === p2.elevation) continue;
+      
+      // Parse elevations to numbers (inches) for comparison
+      const e1 = parseElevToInches(p1.elevation);
+      const e2 = parseElevToInches(p2.elevation);
+      if (e1 === null || e2 === null || e1 === e2) continue;
+      
+      const isRise = e2 > e1;
+      const vertDist = Math.abs(e2 - e1);
+      
+      // Draw the offset symbol at the midpoint of the segment
+      const mx = (p1.x + p2.x) / 2;
+      const my = (p1.y + p2.y) / 2;
+      
+      // Segment direction
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const len = Math.sqrt(dx*dx + dy*dy) || 1;
+      const ux = dx/len, uy = dy/len;
+      const nx = -uy, ny = ux; // perpendicular
+      
+      // Offset symbol size: proportional to duct width or a minimum visible size
+      const halfW = m.duct ? getDuctHalfWidthPx(m.duct) : 8;
+      const kickLen = halfW * 2.5; // length of each 45° kick along the duct
+      const kickOff = halfW * 1.5; // perpendicular offset of the jog
+      const sign = isRise ? 1 : -1; // direction of offset (perpendicular to duct)
+      
+      mCtx.save();
+      mCtx.strokeStyle = '#00bfff';
+      mCtx.lineWidth = 2;
+      mCtx.setLineDash([]);
+      mCtx.globalAlpha = 0.9;
+      
+      // The offset Z-shape: two 45° kicks showing duct going up/down
+      // Point A: start of offset (before midpoint along duct)
+      const ax = mx - ux * kickLen;
+      const ay = my - uy * kickLen;
+      // Point B: first kick destination (offset perpendicular)
+      const bx = mx + nx * kickOff * sign;
+      const by = my + ny * kickOff * sign;
+      // Point C: end of offset (after midpoint along duct)
+      const cx = mx + ux * kickLen;
+      const cy = my + uy * kickLen;
+      
+      // Draw the Z/S offset
+      mCtx.beginPath();
+      mCtx.moveTo(ax, ay);
+      mCtx.lineTo(bx - ux * kickLen * 0.3, by - uy * kickLen * 0.3);
+      mCtx.lineTo(bx + ux * kickLen * 0.3, by + uy * kickLen * 0.3);
+      mCtx.lineTo(cx, cy);
+      mCtx.stroke();
+      
+      // Arrow indicating direction (up or down)
+      const arrowX = bx;
+      const arrowY = by;
+      const arrowLen = halfW * 0.8;
+      const arrowDir = sign; // perpendicular direction
+      mCtx.beginPath();
+      mCtx.moveTo(arrowX, arrowY);
+      mCtx.lineTo(arrowX + nx * arrowLen * arrowDir, arrowY + ny * arrowLen * arrowDir);
+      mCtx.stroke();
+      // Arrowhead
+      const ahx = arrowX + nx * arrowLen * arrowDir;
+      const ahy = arrowY + ny * arrowLen * arrowDir;
+      const ahSize = arrowLen * 0.4;
+      mCtx.beginPath();
+      mCtx.moveTo(ahx, ahy);
+      mCtx.lineTo(ahx - nx * ahSize * arrowDir + ux * ahSize, ahy - ny * ahSize * arrowDir + uy * ahSize);
+      mCtx.moveTo(ahx, ahy);
+      mCtx.lineTo(ahx - nx * ahSize * arrowDir - ux * ahSize, ahy - ny * ahSize * arrowDir - uy * ahSize);
+      mCtx.stroke();
+      
+      // Vertical distance label
+      const vFt = Math.floor(vertDist / 12);
+      const vIn = Math.round(vertDist % 12);
+      const vText = isRise ? '↑' : '↓';
+      const vLabel = vText + (vFt > 0 ? vFt + "'" : '') + (vIn > 0 ? vIn + '"' : (vFt > 0 ? '' : '0"'));
+      const vFontSize = 10 * baseScale;
+      const vRender = Math.max(24, vFontSize);
+      const vSc = vFontSize / vRender;
+      mCtx.font = `bold ${vRender}px -apple-system, sans-serif`;
+      const vtw = mCtx.measureText(vLabel).width;
+      const vlx = bx + nx * (kickOff * 0.5) * sign;
+      const vly = by + ny * (kickOff * 0.5) * sign;
+      mCtx.save();
+      mCtx.translate(vlx, vly);
+      mCtx.scale(vSc, vSc);
+      mCtx.fillStyle = 'rgba(0, 30, 60, 0.9)';
+      mCtx.beginPath();
+      mCtx.roundRect(-vtw/2-3, -vRender/2-3, vtw+6, vRender+6, 3);
+      mCtx.fill();
+      mCtx.fillStyle = '#00bfff';
+      mCtx.textAlign = 'center';
+      mCtx.textBaseline = 'middle';
+      mCtx.fillText(vLabel, 0, 0);
+      mCtx.restore();
+      
+      mCtx.restore();
+    }
   }
+}
+
+// Parse elevation string to inches (supports 12'6", 12.5, 150", 12ft 6in, etc.)
+function parseElevToInches(str) {
+  if (!str) return null;
+  str = str.trim().toLowerCase();
+  // Try feet-inches: 12'6", 12'-6"
+  let m = str.match(/^(\d+)['’]\s*-?\s*(\d+(?:\.\d+)?)["\u201d]?$/);
+  if (m) return parseInt(m[1]) * 12 + parseFloat(m[2]);
+  // Just feet: 12', 12ft
+  m = str.match(/^([\d.]+)\s*(?:['’]|ft|feet)$/);
+  if (m) return parseFloat(m[1]) * 12;
+  // Just inches: 150", 150in
+  m = str.match(/^([\d.]+)\s*(?:["\u201d]|in)$/);
+  if (m) return parseFloat(m[1]);
+  // Plain number — assume feet
+  m = str.match(/^([\d.]+)$/);
+  if (m) return parseFloat(m[1]) * 12;
+  return null;
 }
 
 let _currentRenderMeas = null;
