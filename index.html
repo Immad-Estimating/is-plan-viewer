@@ -455,9 +455,9 @@
     <button onclick="nextPage()" title="Next Page">▶</button>
     <div class="separator"></div>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)">📐 Measure</button>
-    <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (S)">◎ Duct</button>
+    <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)">◎ Duct</button>
     <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)">🔩 Fittings</button>
-    <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (V)">📌 Stack</button>
+    <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)">📌 Stack</button>
     <button id="panelBtn" onclick="togglePanel()" title="Measurements Panel">📋</button>
   </div>
 
@@ -2678,13 +2678,13 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
-  else if (e.key === 's' || e.key === 'S') { e.preventDefault(); window.toggleDuctDraw(); }
+  else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); window.toggleDuctDraw(); }
   else if ((e.key === 'e' || e.key === 'E') && selectedEndpointMeasId != null && selectedEndpointIdx != null && !elevationInputActive) {
     e.preventDefault();
     showElevationInput();
   }
   else if (e.key === 't' || e.key === 'T') { e.preventDefault(); window.toggleFittingMode(); return; }
-  else if (e.key === 'v' || e.key === 'V') { e.preventDefault(); window.toggleStackMode(); return; }
+  else if (e.key === 's' || e.key === 'S') { e.preventDefault(); window.toggleStackMode(); return; }
   else if (e.key === 'Escape') {
     if (calibrationMode) { cancelCalibration(); return; }
     if (selectedStackId || selectedStackItemId) { selectedStackId = null; selectedStackItemId = null; hideStackPalette(); drawMeasureOverlay(); updatePanel(); return; }
