@@ -1931,6 +1931,9 @@ let isDraggingStack = false;
 let dragStackId = null;
 let dragStackStart = null;
 let isDraggingCallout = false;
+let isDraggingLabel = false;
+let dragLabelMeasId = null;
+let dragLabelStart = null; // {x,y} pdf coords at drag start
 let dragCalloutStackId = null;
 let dragCalloutItemId = null;
 let dragCalloutStart = null;
@@ -1970,6 +1973,11 @@ async function saveCurrentPageData() {
     pxLength: m.pxLength,
     distance: m.distance,
     duct: m.duct,
+    labelText: m.labelText || null,
+    labelSize: m.labelSize != null ? m.labelSize : null,
+    labelTextOpacity: m.labelTextOpacity != null ? m.labelTextOpacity : null,
+    labelFillOpacity: m.labelFillOpacity != null ? m.labelFillOpacity : null,
+    labelOffset: m.labelOffset || null,
   }));
   
   const fittings = (pageFittings[pageNum] || []).map(f => ({
@@ -2178,6 +2186,16 @@ viewer.addEventListener('mousedown', (e) => {
       viewer.classList.add('grabbing');
       return;
     }
+    // Priority 2.5: label drag (click on a measurement/duct label to reposition it)
+    const labelHit = hitTestLabel(pt.x, pt.y);
+    if (labelHit) {
+      isDraggingLabel = true;
+      dragLabelMeasId = labelHit.measId;
+      dragLabelStart = { x: pt.x, y: pt.y };
+      e.preventDefault();
+      viewer.style.cursor = 'move';
+      return;
+    }
     // Priority 3: whole duct/measurement drag (click on the line itself)
     const segHit = hitTestSegment(pt.x, pt.y, hitR * 1.5);
     if (segHit) {
@@ -2234,6 +2252,20 @@ window.addEventListener('mousemove', (e) => {
         dragCalloutStart = { x: pt.x, y: pt.y };
         drawMeasureOverlay();
       }
+    }
+    return;
+  }
+  // Label dragging
+  if (isDraggingLabel && dragLabelMeasId != null) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const m = findMeasurement(dragLabelMeasId);
+    if (m && m._labelMidpoint) {
+      // Store offset from the auto midpoint
+      m.labelOffset = {
+        dx: pt.x - m._labelMidpoint.x,
+        dy: pt.y - m._labelMidpoint.y
+      };
+      drawMeasureOverlay();
     }
     return;
   }
@@ -2351,6 +2383,16 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', () => {
+  if (isDraggingLabel) {
+    isDraggingLabel = false;
+    dragLabelMeasId = null;
+    dragLabelStart = null;
+    viewer.style.cursor = '';
+    drawMeasureOverlay();
+    updatePanel();
+    scheduleSave();
+    return;
+  }
   if (isDraggingStack || isDraggingCallout) {
     isDraggingStack = false;
     isDraggingCallout = false;
@@ -2547,6 +2589,21 @@ viewer.addEventListener('click', (e) => {
 });
 
 viewer.addEventListener('dblclick', (e) => {
+  // Double-click on a detached label: pin it back to center
+  if (!measureMode && !fittingMode) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const labelHit = hitTestLabel(pt.x, pt.y);
+    if (labelHit) {
+      const m = findMeasurement(labelHit.measId);
+      if (m && m.labelOffset) {
+        m.labelOffset = null;
+        drawMeasureOverlay();
+        scheduleSave();
+        e.preventDefault();
+        return;
+      }
+    }
+  }
   // Fitting double-click: edit dimensions
   if (fittingMode) {
     const pt = screenToPdf(e.clientX, e.clientY);
@@ -2767,6 +2824,13 @@ window.addEventListener('keydown', (e) => {
   else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFittingId) {
     e.preventDefault();
     deleteFitting(selectedFittingId);
+  }
+  else if ((e.key === 'p' || e.key === 'P') && selectedMeasId) {
+    // Pin/unpin label: reset label offset to snap back to center
+    e.preventDefault();
+    const pm = findMeasurement(selectedMeasId);
+    if (pm) { pm.labelOffset = null; drawMeasureOverlay(); scheduleSave(); }
+    return;
   }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedMeasId) {
     e.preventDefault();
@@ -3130,7 +3194,8 @@ function finishMeasurement() {
     labelText: null,        // custom label (null = auto-generated)
     labelSize: null,        // per-measurement override (null = use global)
     labelTextOpacity: null, // per-measurement text opacity override
-    labelFillOpacity: null  // per-measurement fill opacity override
+    labelFillOpacity: null, // per-measurement fill opacity override
+    labelOffset: null       // {dx,dy} offset from auto midpoint (null = pinned to center)
   };
   
   if (!pageMeasurements[currentPage]) pageMeasurements[currentPage] = [];
@@ -3442,6 +3507,19 @@ function hitTestFitting(pdfX, pdfY) {
     const r = getFittingBoundingRadius(f);
     const dx = pdfX - f.x, dy = pdfY - f.y;
     if (Math.sqrt(dx*dx + dy*dy) < r) return { fittingId: f.id };
+  }
+  return null;
+}
+
+function hitTestLabel(pdfX, pdfY) {
+  const measurements = pageMeasurements[currentPage] || [];
+  for (let i = measurements.length - 1; i >= 0; i--) {
+    const m = measurements[i];
+    if (!m._labelBox) continue;
+    const b = m._labelBox;
+    if (pdfX >= b.x && pdfX <= b.x + b.w && pdfY >= b.y && pdfY <= b.y + b.h) {
+      return { measId: m.id };
+    }
   }
   return null;
 }
@@ -4120,19 +4198,40 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   const textWidth = mCtx.measureText(text).width;
   const padding = 4 * (renderFontSize / 14);
   
+  const hasOffset = measObj && measObj.labelOffset;
+  const labelX = hasOffset ? mx + measObj.labelOffset.dx : mx;
+  const labelY = hasOffset ? my + measObj.labelOffset.dy : my;
+  
+  // Leader line from duct midpoint to detached label
+  if (hasOffset) {
+    mCtx.save();
+    mCtx.strokeStyle = color;
+    mCtx.lineWidth = 1;
+    mCtx.setLineDash([4, 4]);
+    mCtx.globalAlpha = 0.6;
+    mCtx.beginPath();
+    mCtx.moveTo(mx, my);
+    mCtx.lineTo(labelX, labelY);
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+    mCtx.globalAlpha = 1.0;
+    mCtx.restore();
+  }
+  
   const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-  const displayAngle = (angle > Math.PI/2 || angle < -Math.PI/2) ? angle + Math.PI : angle;
+  const displayAngle = hasOffset ? 0 : ((angle > Math.PI/2 || angle < -Math.PI/2) ? angle + Math.PI : angle);
   
   mCtx.save();
-  mCtx.translate(mx, my);
+  mCtx.translate(labelX, labelY);
   mCtx.rotate(displayAngle);
   mCtx.scale(labelScale, labelScale);
   
   mCtx.globalAlpha = effFillOpacity;
   mCtx.fillStyle = 'rgb(22, 33, 62)';
   const bgHeight = renderFontSize + padding * 2;
+  const bgW = textWidth + padding * 2;
   mCtx.beginPath();
-  mCtx.roundRect(-textWidth/2 - padding, -bgHeight/2, textWidth + padding*2, bgHeight, 4);
+  mCtx.roundRect(-textWidth/2 - padding, -bgHeight/2, bgW, bgHeight, 4);
   mCtx.fill();
   
   mCtx.strokeStyle = color;
@@ -4147,6 +4246,21 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   mCtx.globalAlpha = 1.0;
   
   mCtx.restore();
+  
+  // Store hit area for label drag detection (in PDF coords, axis-aligned bounding box)
+  if (measObj) {
+    const halfW = (bgW * labelScale) / 2;
+    const halfH = (bgHeight * labelScale) / 2;
+    if (hasOffset) {
+      // No rotation — simple box
+      measObj._labelBox = { x: labelX - halfW, y: labelY - halfH, w: halfW * 2, h: halfH * 2 };
+    } else {
+      // Rotated — use a circular hit area based on the larger dimension
+      const r = Math.max(halfW, halfH);
+      measObj._labelBox = { x: mx - r, y: my - r, w: r * 2, h: r * 2 };
+    }
+    measObj._labelMidpoint = { x: mx, y: my };
+  }
 }
 
 // ---- Side panel ----
