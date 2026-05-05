@@ -5006,7 +5006,8 @@ function drawStack(stack) {
     }
     mCtx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
     const tw = mCtx.measureText(text).width;
-    const boxW = tw + 32;
+    const iconSpace = 20; // space for shape icon
+    const boxW = tw + iconSpace + 32;
     const boxH = 24;
     const bx = item.callout.x - 4;
     const by = item.callout.y - boxH / 2;
@@ -5020,11 +5021,36 @@ function drawStack(stack) {
     mCtx.fill();
     mCtx.stroke();
     
-    // Text
+    // Shape icon — drawn before text
+    const iconX = bx + 12;
+    const iconY = item.callout.y;
+    const iconColor = isItemSelected ? '#e94560' : '#00ff88';
+    const itemShape = item.shape || (item.sizeB ? 'rect' : 'round');
+    mCtx.save();
+    mCtx.strokeStyle = iconColor;
+    mCtx.fillStyle = 'transparent';
+    mCtx.lineWidth = 1.5;
+    if (itemShape === 'round') {
+      // Circle icon
+      mCtx.beginPath();
+      mCtx.arc(iconX, iconY, 6, 0, Math.PI * 2);
+      mCtx.stroke();
+    } else if (itemShape === 'oval') {
+      // Oval icon
+      mCtx.beginPath();
+      mCtx.ellipse(iconX, iconY, 8, 5, 0, 0, Math.PI * 2);
+      mCtx.stroke();
+    } else {
+      // Rectangle icon
+      mCtx.strokeRect(iconX - 7, iconY - 5, 14, 10);
+    }
+    mCtx.restore();
+    
+    // Text (offset right for icon)
     mCtx.fillStyle = '#ffffff';
     mCtx.textAlign = 'left';
     mCtx.textBaseline = 'middle';
-    mCtx.fillText(text, bx + 8, item.callout.y);
+    mCtx.fillText(text, bx + 8 + iconSpace, item.callout.y);
     
     // ✕ button
     const xBtnX = bx + boxW - 18;
