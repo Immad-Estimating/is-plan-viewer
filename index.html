@@ -2675,6 +2675,20 @@ window.addEventListener('keydown', (e) => {
     if (idx < types.length) selectFittingType(types[idx]);
     return;
   }
+  else if ((e.key === 'r' || e.key === 'R' || e.key === ']') && selectedStackItemId) {
+    // Rotate a fitting inside a vertical stack
+    e.preventDefault();
+    const stacks = pageStacks[currentPage] || [];
+    for (const stack of stacks) {
+      const si = stack.items.find(it => it.id === selectedStackItemId);
+      if (si && si.type !== 'ductrun') {
+        si.rotation = ((si.rotation || 0) + 90) % 360;
+        drawMeasureOverlay(); scheduleSave();
+        break;
+      }
+    }
+    return;
+  }
   else if ((e.key === 'r' || e.key === 'R' || e.key === ']') && (selectedFittingId || isDraggingFitting || (fittingMode && selectedFittingType))) {
     e.preventDefault();
     const rotId = selectedFittingId || dragFittingId;
@@ -2686,6 +2700,20 @@ window.addEventListener('keydown', (e) => {
       rotateFittingInput(90);
     }
     else { rotateFittingInput(90); }
+    return;
+  }
+  else if (e.key === '[' && selectedStackItemId) {
+    // Rotate CCW a fitting inside a vertical stack
+    e.preventDefault();
+    const stacks2 = pageStacks[currentPage] || [];
+    for (const stack of stacks2) {
+      const si = stack.items.find(it => it.id === selectedStackItemId);
+      if (si && si.type !== 'ductrun') {
+        si.rotation = ((si.rotation || 0) - 90 + 360) % 360;
+        drawMeasureOverlay(); scheduleSave();
+        break;
+      }
+    }
     return;
   }
   else if (fittingMode && e.key === '[') {
