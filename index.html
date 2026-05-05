@@ -1932,6 +1932,11 @@ let dragStackId = null;
 let dragStackStart = null;
 let isDraggingCallout = false;
 let isDraggingLabel = false;
+
+// Snap preview cache — avoids calling getAllSnapTargets() every frame
+let _snapPreviewCache = null;
+let _snapPreviewCacheTime = 0;
+const SNAP_CACHE_TTL = 150; // ms
 let dragLabelMeasId = null;
 let dragLabelStart = null; // {x,y} pdf coords at drag start
 let dragCalloutStackId = null;
@@ -1958,6 +1963,7 @@ function scheduleSave() {
   if (!activeDrawingId) return;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => saveCurrentPageData(), 500);
+  _snapPreviewCache = null; // invalidate snap cache when items change
 }
 
 async function saveCurrentPageData() {
@@ -3817,27 +3823,29 @@ function drawMeasureOverlay() {
     mCtx.globalAlpha = 1.0;
   }
 
-  // Snap preview indicator — show when cursor is near a snap target in measure/duct draw/fitting mode
+  // Snap preview indicator — cached to avoid getAllSnapTargets() every frame
   if ((measureMode || fittingMode) && mousePos) {
-    const previewTargets = getAllSnapTargets(null, null);
+    const now = performance.now();
+    if (!_snapPreviewCache || now - _snapPreviewCacheTime > SNAP_CACHE_TTL) {
+      _snapPreviewCache = getAllSnapTargets(null, null);
+      _snapPreviewCacheTime = now;
+    }
     const displayScale = currentScale / baseScale;
     const threshold = SNAP_THRESHOLD_PX / displayScale;
     let closestDist = Infinity;
     let closestPt = null;
-    for (const tp of previewTargets) {
+    for (const tp of _snapPreviewCache) {
       const d = Math.sqrt((mousePos.x - tp.x) ** 2 + (mousePos.y - tp.y) ** 2);
       if (d < threshold && d < closestDist) { closestDist = d; closestPt = tp; }
     }
     if (closestPt) {
       mCtx.save();
-      // Outer pulsing ring
       mCtx.strokeStyle = '#00ff88';
       mCtx.lineWidth = 2;
       mCtx.setLineDash([3, 3]);
       mCtx.beginPath();
       mCtx.arc(closestPt.x, closestPt.y, threshold * 0.5, 0, Math.PI * 2);
       mCtx.stroke();
-      // Inner solid dot
       mCtx.setLineDash([]);
       mCtx.fillStyle = '#00ff88';
       mCtx.globalAlpha = 0.8;
@@ -3847,6 +3855,8 @@ function drawMeasureOverlay() {
       mCtx.globalAlpha = 1.0;
       mCtx.restore();
     }
+  } else {
+    _snapPreviewCache = null; // clear cache when not in snap-eligible mode
   }
 
   if (measureMode && measPoints.length > 0) {
@@ -4252,14 +4262,22 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
     const halfW = (bgW * labelScale) / 2;
     const halfH = (bgHeight * labelScale) / 2;
     if (hasOffset) {
-      // No rotation — simple box
-      measObj._labelBox = { x: labelX - halfW, y: labelY - halfH, w: halfW * 2, h: halfH * 2 };
+      if (!measObj._labelBox) measObj._labelBox = {};
+      measObj._labelBox.x = labelX - halfW;
+      measObj._labelBox.y = labelY - halfH;
+      measObj._labelBox.w = halfW * 2;
+      measObj._labelBox.h = halfH * 2;
     } else {
-      // Rotated — use a circular hit area based on the larger dimension
       const r = Math.max(halfW, halfH);
-      measObj._labelBox = { x: mx - r, y: my - r, w: r * 2, h: r * 2 };
+      if (!measObj._labelBox) measObj._labelBox = {};
+      measObj._labelBox.x = mx - r;
+      measObj._labelBox.y = my - r;
+      measObj._labelBox.w = r * 2;
+      measObj._labelBox.h = r * 2;
     }
-    measObj._labelMidpoint = { x: mx, y: my };
+    if (!measObj._labelMidpoint) measObj._labelMidpoint = {};
+    measObj._labelMidpoint.x = mx;
+    measObj._labelMidpoint.y = my;
   }
 }
 
