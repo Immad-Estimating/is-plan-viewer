@@ -4317,11 +4317,22 @@ function updatePanel() {
         html += `<div class="fitting-group-title"${sel}>Stack #${stack.id} (${stack.items.length} items) <button class="fi-delete" onclick="deleteStack(${stack.id})" title="Delete Stack">×</button></div>`;
         html += `<div class="fitting-group-items">`;
         for (const it of stack.items) {
-          const name = FITTING_NAMES[it.type] || it.type || 'Duct Run';
-          const dims = it.sizeA + (it.sizeB ? '/' + it.sizeB : '');
+          let itemLabel;
+          if (it.type === 'ductrun') {
+            const rd = it.riseDrop ? ` ↕ ${escapeHtml(it.riseDrop)}` : '';
+            if (it.shape === 'round' || (!it.sizeB && !it.shape)) {
+              itemLabel = `Vert. Duct Ø${escapeHtml(it.sizeA)}${rd}`;
+            } else {
+              itemLabel = `Vert. Duct ${escapeHtml(it.sizeA)}x${escapeHtml(it.sizeB)}${rd}`;
+            }
+          } else {
+            const name = FITTING_NAMES[it.type] || it.type;
+            const dims = it.sizeA + (it.sizeB ? '/' + it.sizeB : '');
+            itemLabel = `${name} ${dims}`;
+          }
           const itemSel = it.id === selectedStackItemId ? ' style="background:rgba(233,69,96,0.15)"' : '';
           html += `<div class="fitting-item"${itemSel}>`;
-          html += `<span>${name} ${dims}</span>`;
+          html += `<span>${itemLabel}</span>`;
           html += `<button class="fi-delete" onclick="deleteStackItem(${it.id})" title="Delete">×</button>`;
           html += `</div>`;
         }
@@ -4759,11 +4770,33 @@ function showStackPalette(stack) {
     </div>
     ${shapeTabs}
     <div id="spGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px;"></div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+    <div id="spInputsFitting" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
       <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;">Size A</label>
       <input id="spSizeA" value="14" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
       <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;">B</label>
       <input id="spSizeB" value="" placeholder="opt" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+    </div>
+    <div id="spInputsDuctRound" style="display:none;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+        <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;width:55px;">Diameter</label>
+        <input id="spDuctDiam" value="14" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;width:55px;">Rise/Drop</label>
+        <input id="spDuctRiseRound" value="" placeholder="6'" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+      </div>
+    </div>
+    <div id="spInputsDuctRect" style="display:none;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+        <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;width:55px;">Width</label>
+        <input id="spDuctW" value="24" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+        <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;">Height</label>
+        <input id="spDuctH" value="12" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;width:55px;">Rise/Drop</label>
+        <input id="spDuctRiseRect" value="" placeholder="6'" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+      </div>
     </div>
     <button id="spAddBtn" onclick="addStackItemFromPalette(${stack.id})" style="width:100%;background:#00ff88;color:#1a1a2e;border:none;padding:6px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">Add Item</button>
   `;
@@ -4786,6 +4819,13 @@ window.setStackPaletteShape = function(shape) {
     b.style.color = isActive ? '#e94560' : '#a0a0c0';
     b.style.background = isActive ? 'rgba(233,69,96,0.15)' : '#1a1a2e';
   });
+  // Reset input panels to fitting mode on shape change
+  const fittingInputs = document.getElementById('spInputsFitting');
+  const ductRoundInputs = document.getElementById('spInputsDuctRound');
+  const ductRectInputs = document.getElementById('spInputsDuctRect');
+  if (fittingInputs) fittingInputs.style.display = 'flex';
+  if (ductRoundInputs) ductRoundInputs.style.display = 'none';
+  if (ductRectInputs) ductRectInputs.style.display = 'none';
   renderStackPaletteGrid();
 };
 
@@ -4811,13 +4851,47 @@ window.selectStackPaletteType = function(type) {
     b.style.color = isActive ? '#e94560' : '#a0a0c0';
     b.style.background = isActive ? 'rgba(233,69,96,0.1)' : '#1a1a2e';
   });
+  // Toggle input panels: fitting inputs vs duct run inputs
+  const fittingInputs = document.getElementById('spInputsFitting');
+  const ductRoundInputs = document.getElementById('spInputsDuctRound');
+  const ductRectInputs = document.getElementById('spInputsDuctRect');
+  if (fittingInputs) fittingInputs.style.display = (type === 'ductrun') ? 'none' : 'flex';
+  if (ductRoundInputs && ductRectInputs) {
+    const shape = window._stackPaletteShape || 'round';
+    if (type === 'ductrun' && shape === 'round') {
+      ductRoundInputs.style.display = 'block';
+      ductRectInputs.style.display = 'none';
+    } else if (type === 'ductrun') {
+      ductRoundInputs.style.display = 'none';
+      ductRectInputs.style.display = 'block';
+    } else {
+      ductRoundInputs.style.display = 'none';
+      ductRectInputs.style.display = 'none';
+    }
+  }
 };
 
 window.addStackItemFromPalette = function(stackId) {
   const type = window._stackPaletteType;
   if (!type) return;
-  const sizeA = document.getElementById('spSizeA').value || '14';
-  const sizeB = document.getElementById('spSizeB').value || '';
+  const shape = window._stackPaletteShape || 'round';
+  let sizeA, sizeB, riseDrop = '';
+  
+  if (type === 'ductrun') {
+    if (shape === 'round') {
+      sizeA = (document.getElementById('spDuctDiam') || {}).value || '14';
+      sizeB = '';
+      riseDrop = (document.getElementById('spDuctRiseRound') || {}).value || '';
+    } else {
+      sizeA = (document.getElementById('spDuctW') || {}).value || '24';
+      sizeB = (document.getElementById('spDuctH') || {}).value || '12';
+      riseDrop = (document.getElementById('spDuctRiseRect') || {}).value || '';
+    }
+  } else {
+    sizeA = document.getElementById('spSizeA').value || '14';
+    sizeB = document.getElementById('spSizeB').value || '';
+  }
+  
   const stacks = pageStacks[currentPage] || [];
   const stack = stacks.find(s => s.id === stackId);
   if (!stack) return;
@@ -4831,8 +4905,10 @@ window.addStackItemFromPalette = function(stackId) {
   stack.items.push({
     id: stackItemIdCounter,
     type: type,
+    shape: shape,
     sizeA: sizeA,
     sizeB: sizeB,
+    riseDrop: riseDrop,
     rotation: 0,
     label: '',
     callout: { x: calloutX, y: calloutY }
@@ -4915,9 +4991,19 @@ function drawStack(stack) {
     }
     
     // Callout box
-    const name = item.type === 'ductrun' ? 'Vert. Duct Run' : (FITTING_NAMES[item.type] || item.type);
-    const dims = item.sizeA + (item.sizeB ? '/' + item.sizeB : '');
-    const text = `${name} ${dims}`;
+    let text;
+    if (item.type === 'ductrun') {
+      const rd = item.riseDrop ? ` ↕ ${item.riseDrop}` : '';
+      if (item.shape === 'round' || (!item.sizeB && !item.shape)) {
+        text = `Vert. Duct Ø${item.sizeA}${rd}`;
+      } else {
+        text = `Vert. Duct ${item.sizeA}x${item.sizeB}${rd}`;
+      }
+    } else {
+      const name = FITTING_NAMES[item.type] || item.type;
+      const dims = item.sizeA + (item.sizeB ? '/' + item.sizeB : '');
+      text = `${name} ${dims}`;
+    }
     mCtx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
     const tw = mCtx.measureText(text).width;
     const boxW = tw + 32;
