@@ -5159,35 +5159,26 @@ function drawStack(stack) {
     mCtx.restore();
   }
   
-  // Draw stack point dot (on top)
+  // Draw stack point indicator (small center dot — doesn't obscure duct rendering)
   mCtx.save();
-  // Outer ring
   mCtx.beginPath();
-  mCtx.arc(stack.x, stack.y, 12, 0, Math.PI * 2);
-  mCtx.strokeStyle = stackColor;
-  mCtx.lineWidth = 2;
-  mCtx.stroke();
-  // Filled inner circle
-  mCtx.beginPath();
-  mCtx.arc(stack.x, stack.y, 8, 0, Math.PI * 2);
+  mCtx.arc(stack.x, stack.y, 3, 0, Math.PI * 2);
   mCtx.fillStyle = stackColor;
-  mCtx.globalAlpha = 0.7;
   mCtx.fill();
-  mCtx.globalAlpha = 1.0;
   
-  // Selected dashed circle
+  // Selected: subtle dashed circle just outside the center dot
   if (isStackSelected) {
-    mCtx.setLineDash([4, 4]);
+    mCtx.setLineDash([3, 3]);
     mCtx.strokeStyle = '#e94560';
-    mCtx.lineWidth = 1.5;
+    mCtx.lineWidth = 1;
     mCtx.beginPath();
-    mCtx.arc(stack.x, stack.y, 20, 0, Math.PI * 2);
+    mCtx.arc(stack.x, stack.y, 7, 0, Math.PI * 2);
     mCtx.stroke();
     mCtx.setLineDash([]);
   }
   mCtx.restore();
   
-  // Store hit area for stack point
+  // Store hit area for stack point (generous for click targeting)
   stack._hitRadius = 14;
 }
 
