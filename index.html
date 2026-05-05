@@ -2691,7 +2691,11 @@ window.addEventListener('keydown', (e) => {
     if (stackMode) { toggleStackMode(); return; }
     if (fittingMode && selectedFittingId) { selectedFittingId = null; drawMeasureOverlay(); updatePanel(); return; }
     if (fittingMode) { toggleFittingMode(); return; }
-    if (measPoints.length > 0) { measPoints = []; drawMeasureOverlay(); }
+    if (measPoints.length > 0) { measPoints = []; drawMeasureOverlay(); return; }
+    if (ductDrawMode) { toggleDuctDraw(); return; }
+    if (measureMode) { toggleMeasureMode(); return; }
+    if (selectedFittingId) { selectedFittingId = null; drawMeasureOverlay(); updatePanel(); return; }
+    if (selectedMeasId) { selectedMeasId = null; drawMeasureOverlay(); updatePanel(); return; }
   }
   else if (fittingMode && /^[1-9]$/.test(e.key)) {
     e.preventDefault();
