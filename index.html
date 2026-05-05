@@ -94,6 +94,7 @@
   .fitting-palette .fp-header span { font-size: 12px; color: #a0a0c0; }
   .fitting-palette .fp-preview { font-size: 11px; color: #00ff88; margin-bottom: 6px; }
   .fitting-selected-highlight { stroke: #e94560 !important; }
+  .viewer-container.stack-mode { cursor: crosshair; }
   .fittings-section { margin-top: 12px; border-top: 1px solid #0f3460; padding-top: 8px; }
   .fittings-section h4 { font-size: 11px; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
   .fitting-group { margin-bottom: 4px; }
@@ -456,6 +457,7 @@
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)">📐 Measure</button>
     <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (S)">◎ Duct</button>
     <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)">🔩 Fittings</button>
+    <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (V)">📌 Stack</button>
     <button id="panelBtn" onclick="togglePanel()" title="Measurements Panel">📋</button>
   </div>
 
@@ -1917,6 +1919,21 @@ let fittingDragRotate = false;
 let fittingDragStartAngle = 0;
 const pageFittings = {};
 
+// ---- Vertical Stack state ----
+const pageStacks = {};
+let stackMode = false;
+let stackIdCounter = 0;
+let stackItemIdCounter = 0;
+let selectedStackId = null;
+let selectedStackItemId = null;
+let isDraggingStack = false;
+let dragStackId = null;
+let dragStackStart = null;
+let isDraggingCallout = false;
+let dragCalloutStackId = null;
+let dragCalloutItemId = null;
+let dragCalloutStart = null;
+
 // Current drawing context for auto-save
 let activeDrawingId = null;
 let activeProjectId = null;
@@ -1959,6 +1976,15 @@ async function saveCurrentPageData() {
     rotation: f.rotation, sizeA: f.sizeA, sizeB: f.sizeB, label: f.label
   }));
 
+  const stacks = (pageStacks[pageNum] || []).map(s => ({
+    id: s.id, x: s.x, y: s.y,
+    items: s.items.map(it => ({
+      id: it.id, type: it.type, sizeA: it.sizeA, sizeB: it.sizeB,
+      rotation: it.rotation, label: it.label,
+      callout: { x: it.callout.x, y: it.callout.y }
+    }))
+  }));
+
   await idbPut('pageData', {
     id: key,
     drawingId: activeDrawingId,
@@ -1966,6 +1992,7 @@ async function saveCurrentPageData() {
     scale,
     measurements,
     fittings,
+    stacks,
     pageName: pageNames[pageNum] || '',
     annoSize: annoSize,
     annoTextOpacity: annoTextOpacity,
@@ -1988,8 +2015,11 @@ async function loadPageDataForDrawing(drawingId) {
   for (const k in pageScales) delete pageScales[k];
   for (const k in pageMeasurements) delete pageMeasurements[k];
   for (const k in pageFittings) delete pageFittings[k];
+  for (const k in pageStacks) delete pageStacks[k];
   measureIdCounter = 0;
   fittingIdCounter = 0;
+  stackIdCounter = 0;
+  stackItemIdCounter = 0;
   
   for (const k in pageNames) delete pageNames[k];
   for (const pd of allPageData) {
@@ -2009,6 +2039,15 @@ async function loadPageDataForDrawing(drawingId) {
       pageFittings[pd.pageNum] = pd.fittings;
       for (const f of pd.fittings) {
         if (f.id > fittingIdCounter) fittingIdCounter = f.id;
+      }
+    }
+    if (pd.stacks && pd.stacks.length > 0) {
+      pageStacks[pd.pageNum] = pd.stacks;
+      for (const s of pd.stacks) {
+        if (s.id > stackIdCounter) stackIdCounter = s.id;
+        for (const it of s.items) {
+          if (it.id > stackItemIdCounter) stackItemIdCounter = it.id;
+        }
       }
     }
   }
@@ -2086,8 +2125,31 @@ function pdfToScreen(px, py) {
 viewer.addEventListener('mousedown', (e) => {
   if (!pdfDoc) return;
   if (calibrationMode) return;
-  if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette')) return;
+  if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette')) return;
   
+  // Stack/callout drag: when not in measure/fitting mode
+  if (!measureMode && !fittingMode) {
+    const ptStack = screenToPdf(e.clientX, e.clientY);
+    const stackHit = hitTestStack(ptStack.x, ptStack.y);
+    if (stackHit && stackHit.type === 'callout') {
+      isDraggingCallout = true;
+      dragCalloutStackId = stackHit.stackId;
+      dragCalloutItemId = stackHit.itemId;
+      dragCalloutStart = { x: ptStack.x, y: ptStack.y };
+      e.preventDefault();
+      viewer.classList.add('grabbing');
+      return;
+    }
+    if (stackHit && stackHit.type === 'stackPoint') {
+      isDraggingStack = true;
+      dragStackId = stackHit.stackId;
+      dragStackStart = { x: ptStack.x, y: ptStack.y };
+      e.preventDefault();
+      viewer.classList.add('grabbing');
+      return;
+    }
+  }
+
   // Endpoint or segment drag: when not in measure/fitting mode
   if (!measureMode && !fittingMode) {
     const pt = screenToPdf(e.clientX, e.clientY);
@@ -2129,7 +2191,7 @@ viewer.addEventListener('mousedown', (e) => {
     }
   }
   
-  if ((measureMode || fittingMode) && !e.shiftKey) return;
+  if ((measureMode || fittingMode || stackMode) && !e.shiftKey) return;
   isPanning = true;
   startX = e.clientX - panX;
   startY = e.clientY - panY;
@@ -2137,6 +2199,43 @@ viewer.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('mousemove', (e) => {
+  // Stack dragging
+  if (isDraggingStack && dragStackId != null) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const dx = pt.x - dragStackStart.x;
+    const dy = pt.y - dragStackStart.y;
+    const stacks = pageStacks[currentPage] || [];
+    const stack = stacks.find(s => s.id === dragStackId);
+    if (stack) {
+      stack.x += dx;
+      stack.y += dy;
+      for (const item of stack.items) {
+        item.callout.x += dx;
+        item.callout.y += dy;
+      }
+      dragStackStart = { x: pt.x, y: pt.y };
+      drawMeasureOverlay();
+    }
+    return;
+  }
+  // Callout dragging
+  if (isDraggingCallout && dragCalloutStackId != null) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const stacks = pageStacks[currentPage] || [];
+    const stack = stacks.find(s => s.id === dragCalloutStackId);
+    if (stack) {
+      const item = stack.items.find(it => it.id === dragCalloutItemId);
+      if (item) {
+        const dx = pt.x - dragCalloutStart.x;
+        const dy = pt.y - dragCalloutStart.y;
+        item.callout.x += dx;
+        item.callout.y += dy;
+        dragCalloutStart = { x: pt.x, y: pt.y };
+        drawMeasureOverlay();
+      }
+    }
+    return;
+  }
   // Endpoint dragging with snap
   if (isDraggingEndpoint && dragMeasId != null) {
     const pt = screenToPdf(e.clientX, e.clientY);
@@ -2208,19 +2307,24 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
   
-  // Cursor: grab on endpoints, move on segments/fittings
-  if (!isPanning && !measureMode && !fittingMode && !isDraggingEndpoint && !isDraggingSegment && !isDraggingFitting && pdfDoc) {
+  // Cursor: grab on endpoints, move on segments/fittings/stacks
+  if (!isPanning && !measureMode && !fittingMode && !isDraggingEndpoint && !isDraggingSegment && !isDraggingFitting && !isDraggingStack && !isDraggingCallout && pdfDoc) {
     const hpt = screenToPdf(e.clientX, e.clientY);
     const ds = currentScale / baseScale;
     const hr = 8 / ds;
-    const epHit = hitTestEndpoint(hpt.x, hpt.y, hr);
-    if (epHit) { viewer.style.cursor = 'grab'; }
+    // Check stack hit for cursor
+    const stackCursorHit = hitTestStack(hpt.x, hpt.y);
+    if (stackCursorHit) { viewer.style.cursor = stackCursorHit.type === 'closeBtn' ? 'pointer' : 'move'; }
     else {
-      const fitHit = hitTestFitting(hpt.x, hpt.y);
-      if (fitHit) { viewer.style.cursor = 'move'; }
+      const epHit = hitTestEndpoint(hpt.x, hpt.y, hr);
+      if (epHit) { viewer.style.cursor = 'grab'; }
       else {
-        const segHit = hitTestSegment(hpt.x, hpt.y, hr * 1.5);
-        viewer.style.cursor = segHit ? 'move' : '';
+        const fitHit = hitTestFitting(hpt.x, hpt.y);
+        if (fitHit) { viewer.style.cursor = 'move'; }
+        else {
+          const segHit = hitTestSegment(hpt.x, hpt.y, hr * 1.5);
+          viewer.style.cursor = segHit ? 'move' : '';
+        }
       }
     }
   }
@@ -2245,6 +2349,21 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', () => {
+  if (isDraggingStack || isDraggingCallout) {
+    isDraggingStack = false;
+    isDraggingCallout = false;
+    dragStackId = null;
+    dragStackStart = null;
+    dragCalloutStackId = null;
+    dragCalloutItemId = null;
+    dragCalloutStart = null;
+    viewer.classList.remove('grabbing');
+    viewer.style.cursor = '';
+    drawMeasureOverlay();
+    updatePanel();
+    scheduleSave();
+    return;
+  }
   if (isDraggingEndpoint || isDraggingSegment || isDraggingFitting) {
     isDraggingEndpoint = false;
     isDraggingSegment = false;
@@ -2272,7 +2391,7 @@ viewer.addEventListener('click', (e) => {
   if (!pdfDoc) return;
   if (isPanning) return;
   
-  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette')) {
+  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette')) {
     return;
   }
 
@@ -2296,16 +2415,82 @@ viewer.addEventListener('click', (e) => {
     return;
   }
 
-  // Idle mode: click to select a fitting or duct for deletion
-  if (!measureMode && !fittingMode) {
+  // Stack mode: click to interact with stacks or create new ones
+  if (stackMode) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const stackHit = hitTestStack(pt.x, pt.y);
+    if (stackHit) {
+      if (stackHit.type === 'closeBtn') {
+        deleteStackItem(stackHit.itemId);
+        return;
+      }
+      if (stackHit.type === 'callout') {
+        selectedStackId = stackHit.stackId;
+        selectedStackItemId = stackHit.itemId;
+        drawMeasureOverlay();
+        updatePanel();
+        return;
+      }
+      if (stackHit.type === 'stackPoint') {
+        selectedStackId = stackHit.stackId;
+        selectedStackItemId = null;
+        const stack = (pageStacks[currentPage] || []).find(s => s.id === stackHit.stackId);
+        if (stack) showStackPalette(stack);
+        drawMeasureOverlay();
+        updatePanel();
+        return;
+      }
+    }
+    // Click on empty space: create new stack point
+    if (!pageStacks[currentPage]) pageStacks[currentPage] = [];
+    stackIdCounter++;
+    const newStack = { id: stackIdCounter, x: pt.x, y: pt.y, items: [] };
+    pageStacks[currentPage].push(newStack);
+    selectedStackId = newStack.id;
+    selectedStackItemId = null;
+    showStackPalette(newStack);
+    drawMeasureOverlay();
+    updatePanel();
+    scheduleSave();
+    return;
+  }
+
+  // Idle mode: click to select a fitting, stack, or duct for deletion
+  if (!measureMode && !fittingMode && !stackMode) {
     const pt = screenToPdf(e.clientX, e.clientY);
     const ds = currentScale / baseScale;
     const hr = 8 / ds;
+    // Check stack hit first
+    const stackHit = hitTestStack(pt.x, pt.y);
+    if (stackHit) {
+      selectedMeasId = null;
+      selectedFittingId = null;
+      if (stackHit.type === 'closeBtn') {
+        deleteStackItem(stackHit.itemId);
+        return;
+      }
+      if (stackHit.type === 'callout') {
+        selectedStackId = stackHit.stackId;
+        selectedStackItemId = stackHit.itemId;
+        drawMeasureOverlay();
+        updatePanel();
+        return;
+      }
+      if (stackHit.type === 'stackPoint') {
+        selectedStackId = stackHit.stackId;
+        selectedStackItemId = null;
+        drawMeasureOverlay();
+        updatePanel();
+        return;
+      }
+    }
     // Check fitting hit
     const fitHit = hitTestFitting(pt.x, pt.y);
     if (fitHit) {
       selectedMeasId = null;
       selectedFittingId = fitHit.fittingId;
+      selectedStackId = null;
+      selectedStackItemId = null;
       drawMeasureOverlay();
       updatePanel();
       return;
@@ -2333,11 +2518,14 @@ viewer.addEventListener('click', (e) => {
       return;
     }
     // Click on empty space: deselect
-    if (selectedMeasId || selectedFittingId || selectedEndpointMeasId) {
+    if (selectedMeasId || selectedFittingId || selectedEndpointMeasId || selectedStackId || selectedStackItemId) {
       selectedMeasId = null;
       selectedFittingId = null;
       selectedEndpointMeasId = null;
       selectedEndpointIdx = null;
+      selectedStackId = null;
+      selectedStackItemId = null;
+      hideStackPalette();
       drawMeasureOverlay();
       updatePanel();
       return;
@@ -2471,8 +2659,11 @@ window.addEventListener('keydown', (e) => {
     showElevationInput();
   }
   else if (e.key === 't' || e.key === 'T') { e.preventDefault(); window.toggleFittingMode(); return; }
+  else if (e.key === 'v' || e.key === 'V') { e.preventDefault(); window.toggleStackMode(); return; }
   else if (e.key === 'Escape') {
     if (calibrationMode) { cancelCalibration(); return; }
+    if (selectedStackId || selectedStackItemId) { selectedStackId = null; selectedStackItemId = null; hideStackPalette(); drawMeasureOverlay(); updatePanel(); return; }
+    if (stackMode) { toggleStackMode(); return; }
     if (fittingMode && selectedFittingId) { selectedFittingId = null; drawMeasureOverlay(); updatePanel(); return; }
     if (fittingMode) { toggleFittingMode(); return; }
     if (measPoints.length > 0) { measPoints = []; drawMeasureOverlay(); }
@@ -2502,6 +2693,14 @@ window.addEventListener('keydown', (e) => {
     if (selectedFittingId) rotateFittingSelected(-90);
     else { rotateFittingInput(-90); }
     return;
+  }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedStackItemId) {
+    e.preventDefault();
+    deleteStackItem(selectedStackItemId);
+  }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedStackId && !selectedStackItemId) {
+    e.preventDefault();
+    deleteStack(selectedStackId);
   }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFittingId) {
     e.preventDefault();
@@ -2796,6 +2995,7 @@ function renderSavedCustomScales() {
 // ---- Measure mode ----
 window.toggleMeasureMode = function() {
   if (ductDrawMode) toggleDuctDraw();
+  if (stackMode) toggleStackMode();
   selectedMeasId = null; selectedFittingId = null;
   measureMode = !measureMode;
   const btn = document.getElementById('measureBtn');
@@ -2808,6 +3008,7 @@ window.toggleMeasureMode = function() {
 };
 
 window.toggleDuctDraw = function() {
+  if (stackMode) toggleStackMode();
   ductDrawMode = !ductDrawMode;
   if (ductDrawMode && !measureMode) {
     measureMode = true; // duct draw uses the measure click system
@@ -3454,6 +3655,12 @@ function drawMeasureOverlay() {
   for (const f of fittingsOnPage) {
     drawFitting(f, f.id === selectedFittingId);
   }
+
+  // Draw vertical stacks
+  const stacksOnPage = pageStacks[currentPage] || [];
+  for (const stack of stacksOnPage) {
+    drawStack(stack);
+  }
   
   // Draw fitting ghost preview
   if (fittingMode && selectedFittingType && fittingMousePos) {
@@ -4095,6 +4302,36 @@ function updatePanel() {
     html += `</div>`;
   }
 
+  // Vertical Stacks section
+  const allStackPages = Object.keys(pageStacks).map(Number).sort((a,b) => a-b);
+  const hasStacks = allStackPages.some(p => (pageStacks[p] || []).length > 0);
+  if (hasStacks) {
+    html += `<div class="fittings-section"><h4>📌 Vertical Stacks</h4>`;
+    for (const page of allStackPages) {
+      const stacks = pageStacks[page] || [];
+      if (stacks.length === 0) continue;
+      html += `<div class="meas-group-title">Page ${page}</div>`;
+      for (const stack of stacks) {
+        const sel = stack.id === selectedStackId ? ' style="background:rgba(0,255,136,0.15)"' : '';
+        html += `<div class="fitting-group">`;
+        html += `<div class="fitting-group-title"${sel}>Stack #${stack.id} (${stack.items.length} items) <button class="fi-delete" onclick="deleteStack(${stack.id})" title="Delete Stack">×</button></div>`;
+        html += `<div class="fitting-group-items">`;
+        for (const it of stack.items) {
+          const name = FITTING_NAMES[it.type] || it.type || 'Duct Run';
+          const dims = it.sizeA + (it.sizeB ? '/' + it.sizeB : '');
+          const itemSel = it.id === selectedStackItemId ? ' style="background:rgba(233,69,96,0.15)"' : '';
+          html += `<div class="fitting-item"${itemSel}>`;
+          html += `<span>${name} ${dims}</span>`;
+          html += `<button class="fi-delete" onclick="deleteStackItem(${it.id})" title="Delete">×</button>`;
+          html += `</div>`;
+        }
+        html += `</div></div>`;
+      }
+    }
+    html += `<button class="clear-fittings-btn" onclick="clearAllStacks()">Clear All Stacks</button>`;
+    html += `</div>`;
+  }
+
   content.innerHTML = html || '<div class="meas-empty">No measurements yet.<br>Use 📏 Measure to start.</div>';
 }
 
@@ -4323,6 +4560,7 @@ window.toggleFittingMode = function() {
   }
   if (fittingMode && measureMode) { toggleMeasureMode(); }
   if (fittingMode && ductDrawMode) { toggleDuctDraw(); }
+  if (fittingMode && stackMode) { toggleStackMode(); }
   drawMeasureOverlay();
   updatePanel();
 };
@@ -4474,6 +4712,311 @@ window.clearAllFittings = function() {
   updatePanel();
   scheduleSave();
 };
+
+// =====================================================
+// Vertical Stack System
+// =====================================================
+
+window.toggleStackMode = function() {
+  stackMode = !stackMode;
+  const btn = document.getElementById('stackBtn');
+  btn.classList.toggle('active', stackMode);
+  viewer.classList.toggle('stack-mode', stackMode);
+  if (!stackMode) {
+    selectedStackId = null;
+    selectedStackItemId = null;
+    hideStackPalette();
+  }
+  if (stackMode && measureMode) { toggleMeasureMode(); }
+  if (stackMode && ductDrawMode) { toggleDuctDraw(); }
+  if (stackMode && fittingMode) { toggleFittingMode(); }
+  drawMeasureOverlay();
+  updatePanel();
+};
+
+function hideStackPalette() {
+  const el = document.getElementById('stackPalette');
+  if (el) el.remove();
+}
+
+function showStackPalette(stack) {
+  hideStackPalette();
+  const screenPos = pdfToScreen(stack.x, stack.y);
+  const div = document.createElement('div');
+  div.id = 'stackPalette';
+  div.style.cssText = `position:absolute;left:${screenPos.x + 30}px;top:${screenPos.y - 20}px;z-index:60;background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:10px;box-shadow:0 4px 16px rgba(0,0,0,0.4);width:260px;cursor:default;font-size:12px;color:#e0e0e0;`;
+  
+  let shapeTabs = `<div style="display:flex;gap:4px;margin-bottom:8px;">`;
+  ['round','rect','oval'].forEach(s => {
+    shapeTabs += `<button onclick="setStackPaletteShape('${s}')" data-shape="${s}" class="sp-shape-tab" style="flex:1;background:#1a1a2e;border:1px solid #0f3460;color:#a0a0c0;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;${s === 'round' ? 'border-color:#e94560;color:#e94560;background:rgba(233,69,96,0.15);' : ''}">${s.charAt(0).toUpperCase()+s.slice(1)}</button>`;
+  });
+  shapeTabs += `</div>`;
+  
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:12px;color:#a0a0c0;text-transform:uppercase;letter-spacing:0.5px;">Add to Stack #${stack.id}</span>
+      <button onclick="hideStackPalette()" style="background:none;border:none;color:#e94560;cursor:pointer;font-size:16px;">&times;</button>
+    </div>
+    ${shapeTabs}
+    <div id="spGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px;"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+      <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;">Size A</label>
+      <input id="spSizeA" value="14" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+      <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;">B</label>
+      <input id="spSizeB" value="" placeholder="opt" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+    </div>
+    <button id="spAddBtn" onclick="addStackItemFromPalette(${stack.id})" style="width:100%;background:#00ff88;color:#1a1a2e;border:none;padding:6px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">Add Item</button>
+  `;
+  viewer.appendChild(div);
+  // Prevent click events from propagating to viewer
+  div.addEventListener('mousedown', e => e.stopPropagation());
+  div.addEventListener('click', e => e.stopPropagation());
+  window._stackPaletteShape = 'round';
+  window._stackPaletteType = null;
+  window._stackPaletteStackId = stack.id;
+  renderStackPaletteGrid();
+}
+
+window.setStackPaletteShape = function(shape) {
+  window._stackPaletteShape = shape;
+  window._stackPaletteType = null;
+  document.querySelectorAll('.sp-shape-tab').forEach(b => {
+    const isActive = b.dataset.shape === shape;
+    b.style.borderColor = isActive ? '#e94560' : '#0f3460';
+    b.style.color = isActive ? '#e94560' : '#a0a0c0';
+    b.style.background = isActive ? 'rgba(233,69,96,0.15)' : '#1a1a2e';
+  });
+  renderStackPaletteGrid();
+};
+
+function renderStackPaletteGrid() {
+  const grid = document.getElementById('spGrid');
+  if (!grid) return;
+  const shape = window._stackPaletteShape || 'round';
+  const fittings = FITTINGS_BY_SHAPE[shape] || FITTINGS_BY_SHAPE.round;
+  let html = '';
+  // Add "Duct Run" option
+  html += `<button data-type="ductrun" onclick="selectStackPaletteType('ductrun')" title="Vertical Duct Run" style="background:#1a1a2e;border:1px solid #0f3460;color:#a0a0c0;padding:6px 2px;border-radius:4px;cursor:pointer;font-size:10px;text-align:center;line-height:1.2;">▥ Duct</button>`;
+  for (const f of fittings) {
+    html += `<button data-type="${f.type}" onclick="selectStackPaletteType('${f.type}')" title="${f.title}" style="background:#1a1a2e;border:1px solid #0f3460;color:#a0a0c0;padding:6px 2px;border-radius:4px;cursor:pointer;font-size:10px;text-align:center;line-height:1.2;">${f.label}</button>`;
+  }
+  grid.innerHTML = html;
+}
+
+window.selectStackPaletteType = function(type) {
+  window._stackPaletteType = type;
+  document.querySelectorAll('#spGrid button').forEach(b => {
+    const isActive = b.dataset.type === type;
+    b.style.borderColor = isActive ? '#e94560' : '#0f3460';
+    b.style.color = isActive ? '#e94560' : '#a0a0c0';
+    b.style.background = isActive ? 'rgba(233,69,96,0.1)' : '#1a1a2e';
+  });
+};
+
+window.addStackItemFromPalette = function(stackId) {
+  const type = window._stackPaletteType;
+  if (!type) return;
+  const sizeA = document.getElementById('spSizeA').value || '14';
+  const sizeB = document.getElementById('spSizeB').value || '';
+  const stacks = pageStacks[currentPage] || [];
+  const stack = stacks.find(s => s.id === stackId);
+  if (!stack) return;
+  
+  stackItemIdCounter++;
+  const itemCount = stack.items.length;
+  // Auto-arrange callout: 80px right, stagger down by 30px
+  const calloutX = stack.x + 80;
+  const calloutY = stack.y + (itemCount * 30);
+  
+  stack.items.push({
+    id: stackItemIdCounter,
+    type: type,
+    sizeA: sizeA,
+    sizeB: sizeB,
+    rotation: 0,
+    label: '',
+    callout: { x: calloutX, y: calloutY }
+  });
+  
+  drawMeasureOverlay();
+  updatePanel();
+  scheduleSave();
+};
+
+window.deleteStack = function(stackId) {
+  const stacks = pageStacks[currentPage] || [];
+  const idx = stacks.findIndex(s => s.id === stackId);
+  if (idx !== -1) stacks.splice(idx, 1);
+  if (selectedStackId === stackId) { selectedStackId = null; selectedStackItemId = null; hideStackPalette(); }
+  drawMeasureOverlay();
+  updatePanel();
+  scheduleSave();
+};
+
+window.deleteStackItem = function(itemId) {
+  const stacks = pageStacks[currentPage] || [];
+  for (const stack of stacks) {
+    const idx = stack.items.findIndex(it => it.id === itemId);
+    if (idx !== -1) {
+      stack.items.splice(idx, 1);
+      if (selectedStackItemId === itemId) selectedStackItemId = null;
+      // Remove empty stacks
+      if (stack.items.length === 0) {
+        const si = stacks.indexOf(stack);
+        if (si !== -1) stacks.splice(si, 1);
+        if (selectedStackId === stack.id) { selectedStackId = null; hideStackPalette(); }
+      }
+      break;
+    }
+  }
+  drawMeasureOverlay();
+  updatePanel();
+  scheduleSave();
+};
+
+window.clearAllStacks = function() {
+  pageStacks[currentPage] = [];
+  selectedStackId = null;
+  selectedStackItemId = null;
+  hideStackPalette();
+  drawMeasureOverlay();
+  updatePanel();
+  scheduleSave();
+};
+
+function drawStack(stack) {
+  const isStackSelected = selectedStackId === stack.id;
+  const stackColor = isStackSelected ? '#e94560' : '#00ff88';
+  
+  // Draw leader lines and callout boxes for each item
+  for (const item of stack.items) {
+    const isItemSelected = selectedStackItemId === item.id;
+    const hasSelectedItem = selectedStackItemId != null && stack.items.some(it => it.id === selectedStackItemId);
+    
+    mCtx.save();
+    if (hasSelectedItem && !isItemSelected) {
+      mCtx.globalAlpha = 0.3;
+    }
+    
+    // Leader line from stack point to callout
+    mCtx.beginPath();
+    mCtx.moveTo(stack.x, stack.y);
+    mCtx.lineTo(item.callout.x, item.callout.y);
+    mCtx.strokeStyle = isItemSelected ? '#e94560' : '#00ff88';
+    mCtx.lineWidth = 1.5;
+    mCtx.setLineDash([4, 4]);
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+    
+    // Draw fitting at stack point (small representation)
+    if (item.type !== 'ductrun') {
+      const miniF = { type: item.type, x: stack.x, y: stack.y, rotation: item.rotation || 0, sizeA: item.sizeA, sizeB: item.sizeB, label: '' };
+      drawFitting(miniF, isItemSelected);
+    }
+    
+    // Callout box
+    const name = item.type === 'ductrun' ? 'Vert. Duct Run' : (FITTING_NAMES[item.type] || item.type);
+    const dims = item.sizeA + (item.sizeB ? '/' + item.sizeB : '');
+    const text = `${name} ${dims}`;
+    mCtx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+    const tw = mCtx.measureText(text).width;
+    const boxW = tw + 32;
+    const boxH = 24;
+    const bx = item.callout.x - 4;
+    const by = item.callout.y - boxH / 2;
+    
+    // Box background
+    mCtx.fillStyle = '#16213e';
+    mCtx.strokeStyle = isItemSelected ? '#e94560' : '#0f3460';
+    mCtx.lineWidth = 1;
+    mCtx.beginPath();
+    mCtx.roundRect(bx, by, boxW, boxH, 4);
+    mCtx.fill();
+    mCtx.stroke();
+    
+    // Text
+    mCtx.fillStyle = '#ffffff';
+    mCtx.textAlign = 'left';
+    mCtx.textBaseline = 'middle';
+    mCtx.fillText(text, bx + 8, item.callout.y);
+    
+    // ✕ button
+    const xBtnX = bx + boxW - 18;
+    const xBtnY = by + 2;
+    mCtx.fillStyle = '#e94560';
+    mCtx.font = 'bold 12px sans-serif';
+    mCtx.textAlign = 'center';
+    mCtx.textBaseline = 'top';
+    mCtx.fillText('\u00d7', xBtnX + 8, xBtnY + 2);
+    
+    // Store hit area for click detection
+    item._calloutBox = { x: bx, y: by, w: boxW, h: boxH };
+    item._closeBtn = { x: xBtnX, y: xBtnY, w: 16, h: 16 };
+    
+    mCtx.restore();
+  }
+  
+  // Draw stack point dot (on top)
+  mCtx.save();
+  // Outer ring
+  mCtx.beginPath();
+  mCtx.arc(stack.x, stack.y, 12, 0, Math.PI * 2);
+  mCtx.strokeStyle = stackColor;
+  mCtx.lineWidth = 2;
+  mCtx.stroke();
+  // Filled inner circle
+  mCtx.beginPath();
+  mCtx.arc(stack.x, stack.y, 8, 0, Math.PI * 2);
+  mCtx.fillStyle = stackColor;
+  mCtx.globalAlpha = 0.7;
+  mCtx.fill();
+  mCtx.globalAlpha = 1.0;
+  
+  // Selected dashed circle
+  if (isStackSelected) {
+    mCtx.setLineDash([4, 4]);
+    mCtx.strokeStyle = '#e94560';
+    mCtx.lineWidth = 1.5;
+    mCtx.beginPath();
+    mCtx.arc(stack.x, stack.y, 20, 0, Math.PI * 2);
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+  }
+  mCtx.restore();
+  
+  // Store hit area for stack point
+  stack._hitRadius = 14;
+}
+
+function hitTestStack(pdfX, pdfY) {
+  const stacks = pageStacks[currentPage] || [];
+  for (let si = stacks.length - 1; si >= 0; si--) {
+    const stack = stacks[si];
+    // Test callout close buttons first
+    for (let ii = stack.items.length - 1; ii >= 0; ii--) {
+      const item = stack.items[ii];
+      if (item._closeBtn) {
+        const cb = item._closeBtn;
+        if (pdfX >= cb.x && pdfX <= cb.x + cb.w && pdfY >= cb.y && pdfY <= cb.y + cb.h) {
+          return { type: 'closeBtn', stackId: stack.id, itemId: item.id };
+        }
+      }
+      // Test callout box
+      if (item._calloutBox) {
+        const box = item._calloutBox;
+        if (pdfX >= box.x && pdfX <= box.x + box.w && pdfY >= box.y && pdfY <= box.y + box.h) {
+          return { type: 'callout', stackId: stack.id, itemId: item.id };
+        }
+      }
+    }
+    // Test stack point dot
+    const dx = pdfX - stack.x, dy = pdfY - stack.y;
+    if (Math.sqrt(dx * dx + dy * dy) < (stack._hitRadius || 14)) {
+      return { type: 'stackPoint', stackId: stack.id };
+    }
+  }
+  return null;
+}
 
 // ---- Fitting rendering functions ----
 
