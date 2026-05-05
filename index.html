@@ -4986,7 +4986,7 @@ function drawStack(stack) {
     
     // Draw fitting at stack point (small representation)
     if (item.type !== 'ductrun') {
-      const miniF = { type: item.type, x: stack.x, y: stack.y, rotation: item.rotation || 0, sizeA: item.sizeA, sizeB: item.sizeB, label: '' };
+      const miniF = { type: item.type, x: stack.x, y: stack.y, rotation: item.rotation || 0, sizeA: item.sizeA, sizeB: item.sizeB, label: '', _noLabel: true };
       drawFitting(miniF, isItemSelected);
     }
     
@@ -5177,22 +5177,24 @@ function drawFitting(f, isSelected) {
     mCtx.restore();
   }
   
-  // Label
-  const labelText = f.label || (FITTING_NAMES[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : ''));
-  const fontSize = Math.max(8, D * 0.3);
-  mCtx.save();
-  mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
-  mCtx.textAlign = 'center';
-  mCtx.textBaseline = 'top';
-  const labelY = f.y + getFittingBoundingRadius(f) * 0.6;
-  const tw = mCtx.measureText(labelText).width;
-  mCtx.fillStyle = 'rgba(22, 33, 62, 0.85)';
-  mCtx.beginPath();
-  mCtx.roundRect(f.x - tw/2 - 3, labelY - 2, tw + 6, fontSize + 4, 3);
-  mCtx.fill();
-  mCtx.fillStyle = '#e0e0e0';
-  mCtx.fillText(labelText, f.x, labelY);
-  mCtx.restore();
+  // Label (suppressed for fittings inside vertical stacks — they use callout annotations instead)
+  if (!f._noLabel) {
+    const labelText = f.label || (FITTING_NAMES[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : ''));
+    const fontSize = Math.max(8, D * 0.3);
+    mCtx.save();
+    mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    mCtx.textAlign = 'center';
+    mCtx.textBaseline = 'top';
+    const labelY = f.y + getFittingBoundingRadius(f) * 0.6;
+    const tw = mCtx.measureText(labelText).width;
+    mCtx.fillStyle = 'rgba(22, 33, 62, 0.85)';
+    mCtx.beginPath();
+    mCtx.roundRect(f.x - tw/2 - 3, labelY - 2, tw + 6, fontSize + 4, 3);
+    mCtx.fill();
+    mCtx.fillStyle = '#e0e0e0';
+    mCtx.fillText(labelText, f.x, labelY);
+    mCtx.restore();
+  }
 }
 
 function drawElbow(D, sweep) {
