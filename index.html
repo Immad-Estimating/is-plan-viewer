@@ -2681,7 +2681,7 @@ window.addEventListener('keydown', (e) => {
     const stacks = pageStacks[currentPage] || [];
     for (const stack of stacks) {
       const si = stack.items.find(it => it.id === selectedStackItemId);
-      if (si && si.type !== 'ductrun') {
+      if (si && !(si.type === 'ductrun' && (si.shape === 'round' || (!si.sizeB && !si.shape)))) {
         si.rotation = ((si.rotation || 0) + 90) % 360;
         drawMeasureOverlay(); scheduleSave();
         break;
@@ -2708,7 +2708,7 @@ window.addEventListener('keydown', (e) => {
     const stacks2 = pageStacks[currentPage] || [];
     for (const stack of stacks2) {
       const si = stack.items.find(it => it.id === selectedStackItemId);
-      if (si && si.type !== 'ductrun') {
+      if (si && !(si.type === 'ductrun' && (si.shape === 'round' || (!si.sizeB && !si.shape)))) {
         si.rotation = ((si.rotation || 0) - 90 + 360) % 360;
         drawMeasureOverlay(); scheduleSave();
         break;
@@ -5021,58 +5021,61 @@ function drawStack(stack) {
       mCtx.lineWidth = 2.5;
       mCtx.lineJoin = 'round';
       mCtx.lineCap = 'round';
+      const rot = ((item.rotation || 0) * Math.PI) / 180;
+      mCtx.translate(stack.x, stack.y);
+      mCtx.rotate(rot);
       if (itemShape === 'round') {
-        // Round duct in plan view = circle at scale diameter
+        // Round duct in plan view = circle at scale diameter (rotation has no visual effect)
         const diam = inchesToPx(parseDimension(item.sizeA));
         const r = diam / 2;
         mCtx.beginPath();
-        mCtx.arc(stack.x, stack.y, r, 0, Math.PI * 2);
+        mCtx.arc(0, 0, r, 0, Math.PI * 2);
         mCtx.stroke();
         // Diagonal cross to indicate vertical (industry standard)
-        mCtx.beginPath();
         const cr = r * 0.7;
-        mCtx.moveTo(stack.x - cr, stack.y - cr);
-        mCtx.lineTo(stack.x + cr, stack.y + cr);
+        mCtx.beginPath();
+        mCtx.moveTo(-cr, -cr);
+        mCtx.lineTo(cr, cr);
         mCtx.stroke();
         mCtx.beginPath();
-        mCtx.moveTo(stack.x + cr, stack.y - cr);
-        mCtx.lineTo(stack.x - cr, stack.y + cr);
+        mCtx.moveTo(cr, -cr);
+        mCtx.lineTo(-cr, cr);
         mCtx.stroke();
       } else if (itemShape === 'oval') {
-        // Oval duct in plan view = ellipse at scale dimensions
+        // Oval duct in plan view = ellipse at scale dimensions, rotatable
         const w = inchesToPx(parseFloat(item.sizeA) || 14);
         const h = item.sizeB ? inchesToPx(parseFloat(item.sizeB) || 8) : w * 0.6;
         const hw = w / 2;
         const hh = h / 2;
         mCtx.beginPath();
-        mCtx.ellipse(stack.x, stack.y, hw, hh, 0, 0, Math.PI * 2);
+        mCtx.ellipse(0, 0, hw, hh, 0, 0, Math.PI * 2);
         mCtx.stroke();
-        // Single diagonal cross for vertical indication
+        // Diagonal cross for vertical indication
         const cx = hw * 0.7;
         const cy = hh * 0.7;
         mCtx.beginPath();
-        mCtx.moveTo(stack.x - cx, stack.y - cy);
-        mCtx.lineTo(stack.x + cx, stack.y + cy);
+        mCtx.moveTo(-cx, -cy);
+        mCtx.lineTo(cx, cy);
         mCtx.stroke();
         mCtx.beginPath();
-        mCtx.moveTo(stack.x + cx, stack.y - cy);
-        mCtx.lineTo(stack.x - cx, stack.y + cy);
+        mCtx.moveTo(cx, -cy);
+        mCtx.lineTo(-cx, cy);
         mCtx.stroke();
       } else {
-        // Rectangular duct in plan view = rectangle at scale WxH
+        // Rectangular duct in plan view = rectangle at scale WxH, rotatable
         const w = inchesToPx(parseFloat(item.sizeA) || 24);
         const h = item.sizeB ? inchesToPx(parseFloat(item.sizeB) || 12) : w * 0.5;
         const hw = w / 2;
         const hh = h / 2;
-        mCtx.strokeRect(stack.x - hw, stack.y - hh, w, h);
+        mCtx.strokeRect(-hw, -hh, w, h);
         // Diagonal cross for vertical (industry standard — X through rectangle)
         mCtx.beginPath();
-        mCtx.moveTo(stack.x - hw, stack.y - hh);
-        mCtx.lineTo(stack.x + hw, stack.y + hh);
+        mCtx.moveTo(-hw, -hh);
+        mCtx.lineTo(hw, hh);
         mCtx.stroke();
         mCtx.beginPath();
-        mCtx.moveTo(stack.x + hw, stack.y - hh);
-        mCtx.lineTo(stack.x - hw, stack.y + hh);
+        mCtx.moveTo(hw, -hh);
+        mCtx.lineTo(-hw, hh);
         mCtx.stroke();
       }
       mCtx.restore();
