@@ -2537,6 +2537,10 @@ viewer.addEventListener('click', (e) => {
   
   let pt = screenToPdf(e.clientX, e.clientY);
   if (e.shiftKey && measPoints.length > 0) pt = constrainOrtho(pt, measPoints[measPoints.length - 1], true);
+  // Snap to nearest endpoint of existing ductwork/fittings
+  const snapTargets = getAllSnapTargets(null, null);
+  const snap = findBestSnap([pt], snapTargets, SNAP_THRESHOLD_PX);
+  if (snap.snapped) { pt = { x: pt.x + snap.snapDx, y: pt.y + snap.snapDy }; }
   measPoints.push(pt);
   drawMeasureOverlay();
 });
