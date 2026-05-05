@@ -2774,7 +2774,7 @@ window.addEventListener('keydown', (e) => {
     measPoints.pop();
     drawMeasureOverlay();
   }
-  else if (e.key === 'Enter' && measPoints.length >= 2) {
+  else if ((e.key === 'Enter' || e.key === ' ') && measPoints.length >= 2) {
     e.preventDefault();
     finishMeasurement();
   }
