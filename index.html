@@ -2345,6 +2345,7 @@ window.addEventListener('mousemove', (e) => {
   }
   if (fittingMode && pdfDoc) {
     fittingMousePos = screenToPdf(e.clientX, e.clientY);
+    mousePos = fittingMousePos; // also set mousePos for snap preview indicator
     drawMeasureOverlay();
   }
 });
@@ -3736,6 +3737,38 @@ function drawMeasureOverlay() {
     mCtx.globalAlpha = 0.5;
     drawFitting(ghost, false);
     mCtx.globalAlpha = 1.0;
+  }
+
+  // Snap preview indicator — show when cursor is near a snap target in measure/duct draw/fitting mode
+  if ((measureMode || fittingMode) && mousePos) {
+    const previewTargets = getAllSnapTargets(null, null);
+    const displayScale = currentScale / baseScale;
+    const threshold = SNAP_THRESHOLD_PX / displayScale;
+    let closestDist = Infinity;
+    let closestPt = null;
+    for (const tp of previewTargets) {
+      const d = Math.sqrt((mousePos.x - tp.x) ** 2 + (mousePos.y - tp.y) ** 2);
+      if (d < threshold && d < closestDist) { closestDist = d; closestPt = tp; }
+    }
+    if (closestPt) {
+      mCtx.save();
+      // Outer pulsing ring
+      mCtx.strokeStyle = '#00ff88';
+      mCtx.lineWidth = 2;
+      mCtx.setLineDash([3, 3]);
+      mCtx.beginPath();
+      mCtx.arc(closestPt.x, closestPt.y, threshold * 0.5, 0, Math.PI * 2);
+      mCtx.stroke();
+      // Inner solid dot
+      mCtx.setLineDash([]);
+      mCtx.fillStyle = '#00ff88';
+      mCtx.globalAlpha = 0.8;
+      mCtx.beginPath();
+      mCtx.arc(closestPt.x, closestPt.y, 3, 0, Math.PI * 2);
+      mCtx.fill();
+      mCtx.globalAlpha = 1.0;
+      mCtx.restore();
+    }
   }
 
   if (measureMode && measPoints.length > 0) {
