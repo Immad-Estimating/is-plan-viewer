@@ -1905,6 +1905,7 @@ let selectedEndpointIdx = null;    // which point index is selected
 let elevationInputActive = false;  // is elevation input currently showing
 let fittingIdCounter = 0;
 let fittingMousePos = null;
+let fittingPreMirrored = false; // pre-placement mirror state for fitting ghost
 let dragMeasId = null;
 let dragPointIdx = null;
 let isDraggingEndpoint = false;
@@ -1973,14 +1974,14 @@ async function saveCurrentPageData() {
   
   const fittings = (pageFittings[pageNum] || []).map(f => ({
     id: f.id, type: f.type, x: f.x, y: f.y,
-    rotation: f.rotation, sizeA: f.sizeA, sizeB: f.sizeB, label: f.label
+    rotation: f.rotation, mirrored: f.mirrored || false, sizeA: f.sizeA, sizeB: f.sizeB, label: f.label
   }));
 
   const stacks = (pageStacks[pageNum] || []).map(s => ({
     id: s.id, x: s.x, y: s.y,
     items: s.items.map(it => ({
-      id: it.id, type: it.type, sizeA: it.sizeA, sizeB: it.sizeB,
-      rotation: it.rotation, label: it.label,
+      id: it.id, type: it.type, shape: it.shape, sizeA: it.sizeA, sizeB: it.sizeB,
+      riseDrop: it.riseDrop, rotation: it.rotation, mirrored: it.mirrored || false, label: it.label,
       callout: { x: it.callout.x, y: it.callout.y }
     }))
   }));
@@ -2652,6 +2653,30 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === '0' || e.key === 'f' || e.key === 'F') { e.preventDefault(); window.fitToScreen(); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); window.prevPage(); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); window.nextPage(); }
+  else if ((e.key === 'm' || e.key === 'M') && selectedStackItemId) {
+    // Mirror a fitting/duct inside a vertical stack
+    e.preventDefault();
+    const stacks = pageStacks[currentPage] || [];
+    for (const stack of stacks) {
+      const si = stack.items.find(it => it.id === selectedStackItemId);
+      if (si) { si.mirrored = !si.mirrored; drawMeasureOverlay(); scheduleSave(); break; }
+    }
+    return;
+  }
+  else if ((e.key === 'm' || e.key === 'M') && selectedFittingId) {
+    // Mirror a standalone fitting
+    e.preventDefault();
+    const ff = (pageFittings[currentPage]||[]).find(x=>x.id===selectedFittingId);
+    if (ff) { ff.mirrored = !ff.mirrored; drawMeasureOverlay(); scheduleSave(); }
+    return;
+  }
+  else if ((e.key === 'm' || e.key === 'M') && fittingMode && selectedFittingType) {
+    // Mirror pre-placement ghost
+    e.preventDefault();
+    fittingPreMirrored = !fittingPreMirrored;
+    drawMeasureOverlay();
+    return;
+  }
   else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
   else if (e.key === 's' || e.key === 'S') { e.preventDefault(); window.toggleDuctDraw(); }
   else if ((e.key === 'e' || e.key === 'E') && selectedEndpointMeasId != null && selectedEndpointIdx != null && !elevationInputActive) {
@@ -3696,6 +3721,7 @@ function drawMeasureOverlay() {
       type: selectedFittingType,
       x: fittingMousePos.x, y: fittingMousePos.y,
       rotation: parseFloat(document.getElementById('fpRotation').value) || 0,
+      mirrored: fittingPreMirrored,
       sizeA: document.getElementById('fpSizeA').value || '14',
       sizeB: document.getElementById('fpSizeB').value || '',
     };
@@ -4596,6 +4622,7 @@ window.toggleFittingMode = function() {
   if (!fittingMode) {
     selectedFittingId = null;
     fittingMousePos = null;
+    fittingPreMirrored = false;
   }
   if (fittingMode && measureMode) { toggleMeasureMode(); }
   if (fittingMode && ductDrawMode) { toggleDuctDraw(); }
@@ -4713,6 +4740,7 @@ function handleFittingClick(e) {
       type: selectedFittingType,
       x: placeX, y: placeY,
       rotation: parseFloat(document.getElementById('fpRotation').value) || 0,
+      mirrored: fittingPreMirrored,
       sizeA: document.getElementById('fpSizeA').value || '14',
       sizeB: document.getElementById('fpSizeB').value || '',
       label: null
@@ -5080,7 +5108,7 @@ function drawStack(stack) {
       }
       mCtx.restore();
     } else {
-      const miniF = { type: item.type, x: stack.x, y: stack.y, rotation: item.rotation || 0, sizeA: item.sizeA, sizeB: item.sizeB, label: '', _noLabel: true };
+      const miniF = { type: item.type, x: stack.x, y: stack.y, rotation: item.rotation || 0, mirrored: item.mirrored || false, sizeA: item.sizeA, sizeB: item.sizeB, label: '', _noLabel: true };
       drawFitting(miniF, isItemSelected);
     }
     
@@ -5225,6 +5253,7 @@ function drawFitting(f, isSelected) {
   mCtx.save();
   mCtx.translate(f.x, f.y);
   mCtx.rotate(rot);
+  if (f.mirrored) mCtx.scale(1, -1);
   mCtx.strokeStyle = isSelected ? '#e94560' : '#00ff88';
   mCtx.lineWidth = 2.5;
   mCtx.setLineDash([]);
