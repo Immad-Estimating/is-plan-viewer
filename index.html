@@ -4534,6 +4534,73 @@ window.updateMeasProp = function(id, prop, value) {
   scheduleSave();
 };
 
+// ---- Phase 2: Inline Cost Editors ----
+function buildPhaseOptions(current) {
+  const rt = getProjectRateTable();
+  const phases = rt.phases || DEFAULT_PHASES;
+  return phases.map(p => `<option value="${p}"${p === current ? ' selected' : ''}>${p}</option>`).join('') + `<option value=""${!current ? ' selected' : ''}>(none)</option>`;
+}
+
+window.editFittingCost = function(id) {
+  const el = document.getElementById(`fc-edit-${id}`);
+  if (el) { el.remove(); return; }
+  const f = (pageFittings[currentPage] || []).find(x => x.id === id);
+  if (!f) return;
+  const container = document.getElementById(`fi-${id}`);
+  if (!container) return;
+  const mC = f.materialCost != null ? f.materialCost : '';
+  const lH = f.laborHrs != null ? f.laborHrs : '';
+  const lR = f.laborRate != null ? f.laborRate : '';
+  container.insertAdjacentHTML('beforeend', `<div class="meas-edit-inline" id="fc-edit-${id}">
+    <label>Phase</label>
+    <select style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:3px;font-size:11px;margin-bottom:6px" onchange="updateFitCost(${id},'phase',this.value)">${buildPhaseOptions(f.phase)}</select>
+    <label>Material $</label>
+    <input type="text" value="${mC}" placeholder="0.00" oninput="updateFitCost(${id},'materialCost',this.value)">
+    <label>Labor Hrs</label>
+    <input type="text" value="${lH}" placeholder="0.0" oninput="updateFitCost(${id},'laborHrs',this.value)">
+    <label>Labor $/Hr</label>
+    <input type="text" value="${lR}" placeholder="85" oninput="updateFitCost(${id},'laborRate',this.value)">
+  </div>`);
+};
+
+window.updateFitCost = function(id, prop, value) {
+  const f = (pageFittings[currentPage] || []).find(x => x.id === id);
+  if (!f) return;
+  if (prop === 'phase') { f.phase = value || null; }
+  else { f[prop] = value === '' ? null : parseFloat(value) || null; }
+  scheduleSave();
+};
+
+window.editMeasCost = function(id) {
+  const el = document.getElementById(`mc-edit-${id}`);
+  if (el) { el.remove(); return; }
+  const m = findMeasurement(id);
+  if (!m) return;
+  const item = document.querySelector(`.meas-item[data-id="${id}"]`);
+  if (!item) return;
+  const mC = m.materialCostPerFt != null ? m.materialCostPerFt : '';
+  const lH = m.laborHrsPerFt != null ? m.laborHrsPerFt : '';
+  const lR = m.laborRate != null ? m.laborRate : '';
+  item.insertAdjacentHTML('beforeend', `<div class="meas-edit-inline" id="mc-edit-${id}">
+    <label>Phase</label>
+    <select style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:3px;font-size:11px;margin-bottom:6px" onchange="updateMeasCost(${id},'phase',this.value)">${buildPhaseOptions(m.phase)}</select>
+    <label>Material $/Ft</label>
+    <input type="text" value="${mC}" placeholder="0.00" oninput="updateMeasCost(${id},'materialCostPerFt',this.value)">
+    <label>Labor Hrs/Ft</label>
+    <input type="text" value="${lH}" placeholder="0.0" oninput="updateMeasCost(${id},'laborHrsPerFt',this.value)">
+    <label>Labor $/Hr</label>
+    <input type="text" value="${lR}" placeholder="85" oninput="updateMeasCost(${id},'laborRate',this.value)">
+  </div>`);
+};
+
+window.updateMeasCost = function(id, prop, value) {
+  const m = findMeasurement(id);
+  if (!m) return;
+  if (prop === 'phase') { m.phase = value || null; }
+  else { m[prop] = value === '' ? null : parseFloat(value) || null; }
+  scheduleSave();
+};
+
 window.togglePanel = function() {
   sidePanel.classList.toggle('open');
   const btn = document.getElementById('panelBtn');
@@ -4585,6 +4652,7 @@ function updatePanel() {
           ${customLabel}
         </div>
         <button class="meas-edit-btn" onclick="editMeasurement(${m.id})" title="Edit label">✏️</button>
+        <button class="meas-edit-btn" onclick="editMeasCost(${m.id})" title="Edit cost">💲</button>
         <button class="meas-delete" onclick="deleteMeasurement(${m.id})" title="Delete">×</button>
       </div>`;
     }
@@ -4614,9 +4682,10 @@ function updatePanel() {
         for (const f of items) {
           const dims = f.sizeA + (f.sizeB ? '/' + f.sizeB : '');
           const sel = f.id === selectedFittingId ? ' style="background:rgba(233,69,96,0.15)"' : '';
-          html += `<div class="fitting-item"${sel}>`;
+          html += `<div class="fitting-item" id="fi-${f.id}"${sel}>`;
           const phTag = f.phase ? `<span style="font-size:9px;padding:1px 4px;border-radius:2px;background:rgba(100,149,237,0.2);color:#6495ed;margin-left:4px;text-transform:uppercase">${escapeHtml(f.phase)}</span>` : '';
           html += `<span>${dims} @ ${f.rotation}°${phTag}</span>`;
+          html += `<button class="meas-edit-btn" onclick="editFittingCost(${f.id})" title="Edit cost">💲</button>`;
           html += `<button class="fi-delete" onclick="deleteFitting(${f.id})" title="Delete">×</button>`;
           html += `</div>`;
         }
