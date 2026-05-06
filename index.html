@@ -2264,9 +2264,10 @@ function pbRow(item, sectionId) {
   } else {
     mc = entry ? entry.materialCost : null;
   }
+  var gaugeKey = gauge ? item.key + '-g' + gauge : item.key;
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
-  html += '<td style="padding:4px 2px;text-align:right;color:#00ff88;font-size:11px">' + (mc != null ? '$' + mc.toFixed(2) : '\u2014') + '</td>';
+  html += '<td style="padding:4px 2px">' + pbInput(gaugeKey, 'materialCost', mc) + '</td>';
   html += '<td style="padding:4px 2px">' + pbInput(item.key, 'laborHrs', lh) + '</td>';
   html += '</tr>';
   return html;
