@@ -2149,7 +2149,7 @@ function pbRow(item) {
   var entry = priceBookCache ? priceBookCache[item.key] : null;
   var mc = entry ? entry.materialCost : null;
   var lh = entry ? entry.laborHrs : null;
-  var ga = entry ? entry.gauge : null;
+  var ga = entry && entry.gauge != null ? entry.gauge : (item.gauge || null);
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
   html += '<td style="padding:4px 2px">' + pbInput(item.key, 'gauge', ga) + '</td>';
