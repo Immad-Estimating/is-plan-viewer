@@ -4939,7 +4939,7 @@ function handleFittingClick(e) {
 
 function getFittingBoundingRadius(f) {
   const D = inchesToPx(parseDimension(f.sizeA));
-  return D * 1.5 + 10;
+  return (D * 1.5 + 10) * 0.75;
 }
 
 window.deleteFitting = function(id) {
