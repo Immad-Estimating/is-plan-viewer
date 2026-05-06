@@ -459,6 +459,7 @@
     <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)">🔩 Fittings</button>
     <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)">📌 Stack</button>
     <button id="panelBtn" onclick="togglePanel()" title="Measurements Panel">📋</button>
+    <button onclick="openPriceBook()" title="Global Price Book">💲 Prices</button>
   </div>
 
   <div class="main-content">
@@ -660,6 +661,18 @@
   </div>
 </div>
 
+<!-- ===== PRICE BOOK MODAL ===== -->
+<div class="modal-overlay" id="priceBookModal">
+  <div class="modal" style="width:560px;max-height:85vh">
+    <h3>💲 Global Price Book</h3>
+    <div style="font-size:11px;color:#a0a0c0;margin-bottom:12px">Prices apply to all projects. Set base rates per fitting type and duct type.</div>
+    <div id="priceBookContent" style="overflow-y:auto;flex:1;max-height:55vh"></div>
+    <div class="modal-btns">
+      <button class="cancel-btn" onclick="closePriceBook()">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== CONFIRM DIALOG ===== -->
 <div class="confirm-overlay" id="confirmDialog">
   <div class="confirm-box">
@@ -692,7 +705,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 // IndexedDB Storage Layer
 // =====================================================
 const DB_NAME = 'ISPlanViewerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbInstance = null;
 
 function openDB() {
@@ -711,6 +724,9 @@ function openDB() {
       if (!db.objectStoreNames.contains('pageData')) {
         const pds = db.createObjectStore('pageData', { keyPath: 'id' });
         pds.createIndex('drawingId', 'drawingId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('priceBook')) {
+        db.createObjectStore('priceBook', { keyPath: 'key' });
       }
     };
     req.onsuccess = (e) => { dbInstance = e.target.result; resolve(dbInstance); };
@@ -1939,11 +1955,11 @@ function getProjectRateTable() {
 
 function getCostDefaults(type, sizeA, sizeB) {
   const rt = getProjectRateTable();
-  const fr = rt.fittingRates[type];
+  const pb = getPriceBookEntry(type, sizeA);
   return {
     phase: rt.defaultPhase || 'rough',
-    materialCost: fr ? fr.materialCost : null,
-    laborHrs: fr ? fr.laborHrs : null,
+    materialCost: pb ? pb.materialCost : null,
+    laborHrs: pb ? pb.laborHrs : null,
     laborRate: rt.laborRatePerHr || 85,
     costGroup: null,
     costOverride: false
@@ -1952,11 +1968,12 @@ function getCostDefaults(type, sizeA, sizeB) {
 
 function getDuctCostDefaults(ductConfig) {
   const rt = getProjectRateTable();
-  const dr = rt.ductRates['default'];
+  const ductKey = ductConfig && ductConfig.shape === 'rect' ? 'duct-rect' : 'duct-round';
+  const pb = getPriceBookEntry(ductKey, ductConfig ? ductConfig.dims : null);
   return {
     phase: rt.defaultPhase || 'rough',
-    materialCostPerFt: dr ? dr.materialCostPerFt : null,
-    laborHrsPerFt: dr ? dr.laborHrsPerFt : null,
+    materialCostPerFt: pb ? pb.materialCost : null,
+    laborHrsPerFt: pb ? pb.laborHrs : null,
     laborRate: rt.laborRatePerHr || 85,
     costGroup: null,
     costOverride: false
@@ -1982,6 +1999,86 @@ async function saveProjectRateTable(projectId) {
     await idbPut('projects', project);
   }
 }
+
+// ---- Global Price Book ----
+let priceBookCache = null; // loaded once on init, { '90el': { materialCost, laborHrs, sizeRules:{} }, ... }
+
+async function loadPriceBook() {
+  const all = await idbGetAll('priceBook');
+  priceBookCache = {};
+  for (const entry of all) priceBookCache[entry.key] = entry;
+}
+
+function getPriceBookEntry(type, sizeA) {
+  if (!priceBookCache) return null;
+  const entry = priceBookCache[type];
+  if (!entry) return null;
+  // Check size-specific override first
+  if (entry.sizeRules && sizeA && entry.sizeRules[sizeA]) {
+    return { ...entry, ...entry.sizeRules[sizeA] };
+  }
+  return entry;
+}
+
+async function savePriceBookEntry(key, data) {
+  const entry = { key, ...data };
+  await idbPut('priceBook', entry);
+  if (!priceBookCache) priceBookCache = {};
+  priceBookCache[key] = entry;
+}
+
+// Price Book UI
+const PRICE_BOOK_ITEMS = [
+  { key: '90el', label: '90° Elbow' },
+  { key: '45el', label: '45° Elbow' },
+  { key: '22el', label: '22.5° Elbow' },
+  { key: 'tee', label: 'Tee' },
+  { key: 'rectTap', label: 'Rect Tap' },
+  { key: 'saddle45y', label: 'Saddle 45Y' },
+  { key: 'lateral', label: '45° Lateral' },
+  { key: 'wye', label: 'Wye' },
+  { key: 'reducer', label: 'Reducer' },
+  { key: 'eccReducer', label: 'Ecc Reducer' },
+  { key: 'endcap', label: 'End Cap' },
+  { key: 'transition', label: 'Transition' },
+  { key: 'sqwing', label: 'Square Wing EL' },
+  { key: 'duct-round', label: 'Round Duct (per ft)' },
+  { key: 'duct-rect', label: 'Rect Duct (per ft)' },
+];
+
+window.openPriceBook = function() {
+  renderPriceBook();
+  document.getElementById('priceBookModal').classList.add('open');
+};
+
+window.closePriceBook = function() {
+  document.getElementById('priceBookModal').classList.remove('open');
+};
+
+function renderPriceBook() {
+  const el = document.getElementById('priceBookContent');
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  html += '<tr style="border-bottom:1px solid #0f3460;color:#a0a0c0;text-align:left">';
+  html += '<th style="padding:6px 4px">Item</th><th style="padding:6px 4px">Material $</th><th style="padding:6px 4px">Labor Hrs</th></tr>';
+  for (const item of PRICE_BOOK_ITEMS) {
+    const entry = priceBookCache ? priceBookCache[item.key] : null;
+    const mc = entry && entry.materialCost != null ? entry.materialCost : '';
+    const lh = entry && entry.laborHrs != null ? entry.laborHrs : '';
+    html += `<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">`;
+    html += `<td style="padding:5px 4px;color:#e0e0e0">${item.label}</td>`;
+    html += `<td style="padding:5px 2px"><input type="text" value="${mc}" placeholder="—" style="width:70px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:12px;text-align:right" onchange="updatePBEntry('${item.key}','materialCost',this.value)"></td>`;
+    html += `<td style="padding:5px 2px"><input type="text" value="${lh}" placeholder="—" style="width:70px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:12px;text-align:right" onchange="updatePBEntry('${item.key}','laborHrs',this.value)"></td>`;
+    html += '</tr>';
+  }
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+window.updatePBEntry = async function(key, prop, value) {
+  const existing = (priceBookCache && priceBookCache[key]) || { key };
+  existing[prop] = value === '' ? null : parseFloat(value) || null;
+  await savePriceBookEntry(key, existing);
+};
 
 // ---- Vertical Stack state ----
 const pageStacks = {};
@@ -6137,6 +6234,7 @@ function drawTransition(D, D2) {
 // =====================================================
 async function init() {
   await openDB();
+  await loadPriceBook();
   await loadQuickbaseProjects();
   
   // Setup drag-to-import on left panel
