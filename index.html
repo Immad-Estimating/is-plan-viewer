@@ -632,7 +632,7 @@
         </div>
       </div>
     </div>
-    <button class="panel-toggle-btn" id="panelToggle" onclick="togglePanel()" title="Toggle Measurements Panel">◀</button>
+    <button class="panel-toggle-btn" id="panelToggle" onclick="togglePanel()" title="Toggle Analysis Panel">◀</button>
     </div>
 
     <!-- Side Panel -->
@@ -1965,7 +1965,7 @@ function getProjectRateTable() {
   if (projectRateTable) return projectRateTable;
   // Return defaults if not yet loaded
   return {
-    laborRatePerHr: 85,
+    laborRatePerHr: 45,
     defaultPhase: 'rough',
     phases: [...DEFAULT_PHASES],
     fittingRates: {},   // e.g. { '90el': { laborHrs: 0.5, materialCost: 45 }, ... }
@@ -1980,7 +1980,7 @@ function getCostDefaults(type, sizeA, sizeB) {
     phase: rt.defaultPhase || 'rough',
     materialCost: pb ? pb.materialCost : null,
     laborHrs: pb ? pb.laborHrs : null,
-    laborRate: rt.laborRatePerHr || 85,
+    laborRate: rt.laborRatePerHr || 45,
     costGroup: null,
     costOverride: false
   };
@@ -1994,7 +1994,7 @@ function getDuctCostDefaults(ductConfig) {
     phase: rt.defaultPhase || 'rough',
     materialCostPerFt: pb ? pb.materialCost : null,
     laborHrsPerFt: pb ? pb.laborHrs : null,
-    laborRate: rt.laborRatePerHr || 85,
+    laborRate: rt.laborRatePerHr || 45,
     costGroup: null,
     costOverride: false
   };
@@ -4986,49 +4986,52 @@ window.updateMeasProp = function(id, prop, value) {
 
 // ---- Phase 2: Inline Cost Editors ----
 window.editFittingCost = function(id) {
-  const el = document.getElementById(`fc-edit-${id}`);
+  var el = document.getElementById('fc-edit-' + id);
   if (el) { el.remove(); return; }
-  const f = (pageFittings[currentPage] || []).find(x => x.id === id);
+  var f = (pageFittings[currentPage] || []).find(function(x) { return x.id === id; });
   if (!f) return;
-  const container = document.getElementById(`fi-${id}`);
+  var container = document.getElementById('fi-' + id);
   if (!container) return;
-  const mc = f.materialCost != null ? f.materialCost : 0;
-  const lh = f.laborHrs != null ? f.laborHrs : 0;
-  const lr = f.laborRate != null ? f.laborRate : 85;
-  const laborCost = (lh * lr).toFixed(2);
-  const total = (mc + lh * lr).toFixed(2);
-  container.insertAdjacentHTML('beforeend', `<div class="meas-edit-inline" id="fc-edit-${id}" style="font-size:11px">
-    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Material</span><span style="color:#00ff88">$\${mc.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor</span><span style="color:#ffaa00">\${lh}h × $\${lr}/hr = $\${laborCost}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #0f3460;font-weight:600"><span style="color:#e0e0e0">Total</span><span style="color:#e0e0e0">$\${total}</span></div>
-  </div>`);
+  var mc = f.materialCost != null ? f.materialCost : 0;
+  var lh = f.laborHrs != null ? f.laborHrs : 0;
+  var lr = f.laborRate != null ? f.laborRate : 45;
+  var laborCost = (lh * lr).toFixed(2);
+  var total = (mc + lh * lr).toFixed(2);
+  var h = '<div class="meas-edit-inline" id="fc-edit-' + id + '" style="font-size:11px">';
+  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Material</span><span style="color:#00ff88">$' + mc.toFixed(2) + '</span></div>';
+  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor</span><span style="color:#ffaa00">' + lh + 'h \u00d7 $' + lr + '/hr = $' + laborCost + '</span></div>';
+  h += '<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #0f3460;font-weight:600"><span style="color:#e0e0e0">Total</span><span style="color:#e0e0e0">$' + total + '</span></div>';
+  h += '</div>';
+  container.insertAdjacentHTML('beforeend', h);
 };
 
+
 window.editMeasCost = function(id) {
-  const el = document.getElementById(`mc-edit-${id}`);
+  var el = document.getElementById('mc-edit-' + id);
   if (el) { el.remove(); return; }
-  const otherEl = document.getElementById(`meas-edit-${id}`);
+  var otherEl = document.getElementById('meas-edit-' + id);
   if (otherEl) otherEl.remove();
-  const m = findMeasurement(id);
+  var m = findMeasurement(id);
   if (!m) return;
-  const item = document.querySelector(`.meas-item[data-id="${id}"]`);
+  var item = document.querySelector('.meas-item[data-id="' + id + '"]');
   if (!item) return;
-  const len = m.distance ? m.distance.value : 0;
-  const lenFt = len; // already in feet from scale
-  const mcFt = m.materialCostPerFt != null ? m.materialCostPerFt : 0;
-  const lhFt = m.laborHrsPerFt != null ? m.laborHrsPerFt : 0;
-  const lr = m.laborRate != null ? m.laborRate : 85;
-  const totalMat = (mcFt * lenFt).toFixed(2);
-  const totalHrs = (lhFt * lenFt).toFixed(2);
-  const totalLabor = (lhFt * lenFt * lr).toFixed(2);
-  const total = (mcFt * lenFt + lhFt * lenFt * lr).toFixed(2);
-  item.insertAdjacentHTML('beforeend', `<div class="meas-edit-inline" id="mc-edit-${id}" style="font-size:11px">
-    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Material</span><span style="color:#00ff88">$\${mcFt}/ft × \${lenFt.toFixed(1)}ft = $\${totalMat}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor</span><span style="color:#ffaa00">\${lhFt}h/ft × \${lenFt.toFixed(1)}ft = \${totalHrs}h</span></div>
-    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor $</span><span style="color:#ffaa00">\${totalHrs}h × $\${lr}/hr = $\${totalLabor}</span></div>
-    <div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #0f3460;font-weight:600"><span style="color:#e0e0e0">Total</span><span style="color:#e0e0e0">$\${total}</span></div>
-  </div>`);
+  var lenFt = m.distance ? m.distance.value : 0;
+  var mcFt = m.materialCostPerFt != null ? m.materialCostPerFt : 0;
+  var lhFt = m.laborHrsPerFt != null ? m.laborHrsPerFt : 0;
+  var lr = m.laborRate != null ? m.laborRate : 45;
+  var totalMat = (mcFt * lenFt).toFixed(2);
+  var totalHrs = (lhFt * lenFt).toFixed(1);
+  var totalLabor = (lhFt * lenFt * lr).toFixed(2);
+  var total = (mcFt * lenFt + lhFt * lenFt * lr).toFixed(2);
+  var h = '<div class="meas-edit-inline" id="mc-edit-' + id + '" style="font-size:11px">';
+  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Material</span><span style="color:#00ff88">$' + totalMat + '</span></div>';
+  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor</span><span style="color:#ffaa00">' + totalHrs + ' hrs</span></div>';
+  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor Cost</span><span style="color:#ffaa00">$' + totalLabor + '</span></div>';
+  h += '<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #0f3460;font-weight:600"><span style="color:#e0e0e0">Total</span><span style="color:#e0e0e0">$' + total + '</span></div>';
+  h += '</div>';
+  item.insertAdjacentHTML('beforeend', h);
 };
+
 
 window.togglePanel = function() {
   sidePanel.classList.toggle('open');
