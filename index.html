@@ -2334,7 +2334,8 @@ window.setPBGauge = function(sectionId, gauge) {
 };
 
 function pbInput(key, prop, value) {
-  return '<input type="text" value="' + (value != null ? value : '') + '" placeholder="\u2014" style="width:60px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + key + '\',\'' + prop + '\',this.value)">';
+  var clr = prop === 'materialCost' ? '#00ff88' : prop === 'laborHrs' ? '#ffaa00' : '#e0e0e0';
+  return '<input type="text" value="' + (value != null ? value : '') + '" placeholder="\u2014" style="width:60px;background:#1a1a2e;border:1px solid #0f3460;color:' + clr + ';padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + key + '\',\'' + prop + '\',this.value)">';
 }
 
 function pbRow(item, sectionId) {
