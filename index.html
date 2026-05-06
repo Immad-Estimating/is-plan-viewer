@@ -2040,23 +2040,64 @@ async function savePriceBookEntry(key, data) {
 }
 
 // Price Book UI
-const PRICE_BOOK_ITEMS = [
-  { key: '90el', label: '90° Elbow' },
-  { key: '45el', label: '45° Elbow' },
-  { key: '22el', label: '22.5° Elbow' },
-  { key: 'tee', label: 'Tee' },
-  { key: 'rectTap', label: 'Rect Tap' },
-  { key: 'saddle45y', label: 'Saddle 45Y' },
-  { key: 'lateral', label: '45° Lateral' },
-  { key: 'wye', label: 'Wye' },
-  { key: 'reducer', label: 'Reducer' },
-  { key: 'eccReducer', label: 'Ecc Reducer' },
-  { key: 'endcap', label: 'End Cap' },
-  { key: 'transition', label: 'Transition' },
-  { key: 'sqwing', label: 'Square Wing EL' },
-  { key: 'duct-round', label: 'Round Duct (per ft)' },
-  { key: 'duct-rect', label: 'Rect Duct (per ft)' },
-];
+const PRICE_BOOK_TABS = {
+  rect: {
+    label: 'Rectangular',
+    fittings: [
+      { key: 'rect-90el', label: '90\u00b0 Elbow' },
+      { key: 'rect-45el', label: '45\u00b0 Elbow' },
+      { key: 'rect-22el', label: '22.5\u00b0 Elbow' },
+      { key: 'rect-tee', label: 'Tee' },
+      { key: 'rectTap', label: 'Straight Tap' },
+      { key: 'rect-wye', label: 'Wye' },
+      { key: 'rect-lateral', label: '45\u00b0 Lateral' },
+      { key: 'rect-reducer', label: 'Reducer' },
+      { key: 'rect-eccReducer', label: 'Offset/Ecc Reducer' },
+      { key: 'rect-sqwing', label: 'Square Wing EL' },
+      { key: 'rect-endcap', label: 'End Cap' },
+      { key: 'rect-transition', label: 'Rect to Round Trans.' },
+    ],
+    ductwork: [
+      { key: 'duct-rect', label: 'Rect Duct (per ft)' },
+    ]
+  },
+  round: {
+    label: 'Round',
+    fittings: [
+      { key: 'round-90el', label: '90\u00b0 Elbow' },
+      { key: 'round-45el', label: '45\u00b0 Elbow' },
+      { key: 'round-22el', label: '22.5\u00b0 Elbow' },
+      { key: 'round-tee', label: 'Tee' },
+      { key: 'round-saddle45y', label: 'Saddle 45\u00b0 Wye' },
+      { key: 'round-lateral', label: '45\u00b0 Lateral' },
+      { key: 'round-wye', label: 'Wye' },
+      { key: 'round-reducer', label: 'Concentric Reducer' },
+      { key: 'round-eccReducer', label: 'Eccentric Reducer' },
+      { key: 'round-endcap', label: 'End Cap' },
+      { key: 'round-transition', label: 'Round to Rect Trans.' },
+    ],
+    ductwork: [
+      { key: 'duct-round', label: 'Round Duct (per ft)' },
+    ]
+  },
+  oval: {
+    label: 'Oval',
+    fittings: [
+      { key: 'oval-90el', label: '90\u00b0 Elbow' },
+      { key: 'oval-45el', label: '45\u00b0 Elbow' },
+      { key: 'oval-tee', label: 'Tee' },
+      { key: 'oval-saddle45y', label: 'Saddle 45\u00b0 Wye' },
+      { key: 'oval-reducer', label: 'Reducer' },
+      { key: 'oval-endcap', label: 'End Cap' },
+      { key: 'oval-transition', label: 'Oval to Round Trans.' },
+    ],
+    ductwork: [
+      { key: 'duct-oval', label: 'Oval Duct (per ft)' },
+    ]
+  }
+};
+
+let activePBTab = 'rect';
 
 window.openPriceBook = function() {
   renderPriceBook();
@@ -2067,28 +2108,68 @@ window.closePriceBook = function() {
   document.getElementById('priceBookModal').classList.remove('open');
 };
 
+window.setPBTab = function(tab) {
+  activePBTab = tab;
+  renderPriceBook();
+};
+
+function pbInput(key, prop, value) {
+  return '<input type="text" value="' + (value != null ? value : '') + '" placeholder="\u2014" style="width:60px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + key + '\',\'' + prop + '\',this.value)">';
+}
+
+function pbRow(item) {
+  var entry = priceBookCache ? priceBookCache[item.key] : null;
+  var mc = entry ? entry.materialCost : null;
+  var lh = entry ? entry.laborHrs : null;
+  var ga = entry ? entry.gauge : null;
+  var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
+  html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
+  html += '<td style="padding:4px 2px">' + pbInput(item.key, 'gauge', ga) + '</td>';
+  html += '<td style="padding:4px 2px">' + pbInput(item.key, 'materialCost', mc) + '</td>';
+  html += '<td style="padding:4px 2px">' + pbInput(item.key, 'laborHrs', lh) + '</td>';
+  html += '</tr>';
+  return html;
+}
+
+function pbSectionHeader(title) {
+  return '<tr><td colspan="4" style="padding:10px 4px 4px;font-size:11px;font-weight:700;color:#e94560;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e94560">' + title + '</td></tr>';
+}
+
+function pbColumnHeader() {
+  return '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Item</th><th style="padding:4px;text-align:right">Gauge</th><th style="padding:4px;text-align:right">Material $</th><th style="padding:4px;text-align:right">Labor Hrs</th></tr>';
+}
+
 function renderPriceBook() {
-  const el = document.getElementById('priceBookContent');
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
-  html += '<tr style="border-bottom:1px solid #0f3460;color:#a0a0c0;text-align:left">';
-  html += '<th style="padding:6px 4px">Item</th><th style="padding:6px 4px">Material $</th><th style="padding:6px 4px">Labor Hrs</th></tr>';
-  for (const item of PRICE_BOOK_ITEMS) {
-    const entry = priceBookCache ? priceBookCache[item.key] : null;
-    const mc = entry && entry.materialCost != null ? entry.materialCost : '';
-    const lh = entry && entry.laborHrs != null ? entry.laborHrs : '';
-    html += `<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">`;
-    html += `<td style="padding:5px 4px;color:#e0e0e0">${item.label}</td>`;
-    html += `<td style="padding:5px 2px"><input type="text" value="${mc}" placeholder="—" style="width:70px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:12px;text-align:right" onchange="updatePBEntry('${item.key}','materialCost',this.value)"></td>`;
-    html += `<td style="padding:5px 2px"><input type="text" value="${lh}" placeholder="—" style="width:70px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 6px;border-radius:3px;font-size:12px;text-align:right" onchange="updatePBEntry('${item.key}','laborHrs',this.value)"></td>`;
-    html += '</tr>';
+  var el = document.getElementById('priceBookContent');
+  var tabs = Object.keys(PRICE_BOOK_TABS);
+  var html = '<div style="display:flex;gap:4px;margin-bottom:12px">';
+  for (var i = 0; i < tabs.length; i++) {
+    var t = tabs[i];
+    var active = t === activePBTab;
+    var style = active
+      ? 'background:rgba(233,69,96,0.15);border-color:#e94560;color:#e94560'
+      : 'background:#1a1a2e;border-color:#0f3460;color:#a0a0c0';
+    html += '<button onclick="setPBTab(\'' + t + '\')" style="flex:1;padding:6px 4px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;border:1px solid;' + style + '">' + PRICE_BOOK_TABS[t].label + '</button>';
   }
+  html += '</div>';
+
+  var tab = PRICE_BOOK_TABS[activePBTab];
+  html += '<table style="width:100%;border-collapse:collapse">';
+  html += pbSectionHeader('Fittings');
+  html += pbColumnHeader();
+  for (var j = 0; j < tab.fittings.length; j++) html += pbRow(tab.fittings[j]);
+  html += pbSectionHeader('Ductwork');
+  html += pbColumnHeader();
+  for (var k = 0; k < tab.ductwork.length; k++) html += pbRow(tab.ductwork[k]);
   html += '</table>';
+
   el.innerHTML = html;
 }
 
 window.updatePBEntry = async function(key, prop, value) {
-  const existing = (priceBookCache && priceBookCache[key]) || { key };
-  existing[prop] = value === '' ? null : parseFloat(value) || null;
+  var existing = (priceBookCache && priceBookCache[key]) || { key: key };
+  if (prop === 'gauge') { existing.gauge = value.trim() || null; }
+  else { existing[prop] = value === '' ? null : parseFloat(value) || null; }
   await savePriceBookEntry(key, existing);
 };
 
