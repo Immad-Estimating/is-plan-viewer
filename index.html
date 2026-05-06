@@ -2164,6 +2164,7 @@ const PRICE_BOOK_TABS = {
 
 var pbCollapsed = {};
 var pbGauge = { 'spiral-duct': '26' }; // active gauge per section
+var activePBTab = 'rect';
 
 // Default spiral pricing by gauge: key -> { '26': price, '22': price, ... }
 var SPIRAL_DEFAULTS = {
@@ -2221,7 +2222,12 @@ function getMaterialForGauge(key, gauge) {
 }
 
 window.openPriceBook = function() {
-  try { renderPriceBook(); } catch(e) { console.error('[PriceBook] Render error:', e); document.getElementById('priceBookContent').innerHTML = '<div style="color:#e94560;padding:12px">Error loading price book. Check console.</div>'; }
+  try {
+    renderPriceBook();
+  } catch(e) {
+    console.error('[PriceBook] Render error:', e.message, e.stack);
+    document.getElementById('priceBookContent').innerHTML = '<div style="color:#e94560;padding:12px">Error: ' + e.message + '</div>';
+  }
   document.getElementById('priceBookModal').classList.add('open');
 };
 
