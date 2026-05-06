@@ -663,7 +663,7 @@
 
 <!-- ===== PRICE BOOK MODAL ===== -->
 <div class="modal-overlay" id="priceBookModal">
-  <div class="modal" style="width:560px;max-height:85vh">
+  <div class="modal" style="width:560px;max-height:85vh;resize:both;overflow:auto;min-width:380px;min-height:300px">
     <h3>💲 Global Price Book</h3>
     <div style="font-size:11px;color:#a0a0c0;margin-bottom:12px">Prices apply to all projects. Set base rates per fitting type and duct type.</div>
     <div id="priceBookContent" style="overflow-y:auto;flex:1;max-height:55vh"></div>
@@ -2043,60 +2043,83 @@ async function savePriceBookEntry(key, data) {
 const PRICE_BOOK_TABS = {
   rect: {
     label: 'Rectangular',
-    fittings: [
-      { key: 'rect-90el', label: '90\u00b0 Elbow' },
-      { key: 'rect-45el', label: '45\u00b0 Elbow' },
-      { key: 'rect-22el', label: '22.5\u00b0 Elbow' },
-      { key: 'rect-tee', label: 'Tee' },
-      { key: 'rectTap', label: 'Straight Tap' },
-      { key: 'rect-wye', label: 'Wye' },
-      { key: 'rect-lateral', label: '45\u00b0 Lateral' },
-      { key: 'rect-reducer', label: 'Reducer' },
-      { key: 'rect-eccReducer', label: 'Offset/Ecc Reducer' },
-      { key: 'rect-sqwing', label: 'Square Wing EL' },
-      { key: 'rect-endcap', label: 'End Cap' },
-      { key: 'rect-transition', label: 'Rect to Round Trans.' },
-    ],
-    ductwork: [
-      { key: 'duct-rect', label: 'Rect Duct (per ft)' },
+    sections: [
+      { id: 'rect-fit', title: 'Fittings', items: [
+        { key: 'rect-90el', label: '90\u00b0 Elbow' },
+        { key: 'rect-45el', label: '45\u00b0 Elbow' },
+        { key: 'rect-22el', label: '22.5\u00b0 Elbow' },
+        { key: 'rect-tee', label: 'Tee' },
+        { key: 'rectTap', label: 'Straight Tap' },
+        { key: 'rect-wye', label: 'Wye' },
+        { key: 'rect-lateral', label: '45\u00b0 Lateral' },
+        { key: 'rect-reducer', label: 'Reducer' },
+        { key: 'rect-eccReducer', label: 'Offset/Ecc Reducer' },
+        { key: 'rect-sqwing', label: 'Square Wing EL' },
+        { key: 'rect-endcap', label: 'End Cap' },
+        { key: 'rect-transition', label: 'Rect to Round Trans.' },
+      ]},
+      { id: 'rect-duct', title: 'Ductwork', items: [
+        { key: 'duct-rect', label: 'Rect Duct (per ft)' },
+      ]},
     ]
   },
   round: {
     label: 'Round',
-    fittings: [
-      { key: 'round-90el', label: '90\u00b0 Elbow' },
-      { key: 'round-45el', label: '45\u00b0 Elbow' },
-      { key: 'round-22el', label: '22.5\u00b0 Elbow' },
-      { key: 'round-tee', label: 'Tee' },
-      { key: 'round-saddle45y', label: 'Saddle 45\u00b0 Wye' },
-      { key: 'round-lateral', label: '45\u00b0 Lateral' },
-      { key: 'round-wye', label: 'Wye' },
-      { key: 'round-reducer', label: 'Concentric Reducer' },
-      { key: 'round-eccReducer', label: 'Eccentric Reducer' },
-      { key: 'round-endcap', label: 'End Cap' },
-      { key: 'round-transition', label: 'Round to Rect Trans.' },
-    ],
-    ductwork: [
-      { key: 'duct-round', label: 'Round Duct (per ft)' },
+    sections: [
+      { id: 'spiral-fit', title: 'Spiral — Fittings', items: [
+        { key: 'spiral-90el', label: '90\u00b0 Elbow' },
+        { key: 'spiral-45el', label: '45\u00b0 Elbow' },
+        { key: 'spiral-22el', label: '22.5\u00b0 Elbow' },
+        { key: 'spiral-tee', label: 'Tee' },
+        { key: 'spiral-saddle45y', label: 'Saddle 45\u00b0 Wye' },
+        { key: 'spiral-lateral', label: '45\u00b0 Lateral' },
+        { key: 'spiral-wye', label: 'Wye' },
+        { key: 'spiral-reducer', label: 'Concentric Reducer' },
+        { key: 'spiral-eccReducer', label: 'Eccentric Reducer' },
+        { key: 'spiral-endcap', label: 'End Cap' },
+        { key: 'spiral-transition', label: 'Round to Rect Trans.' },
+      ]},
+      { id: 'spiral-duct', title: 'Spiral — Ductwork', items: [
+        { key: 'duct-spiral', label: 'Spiral Duct (per ft)' },
+      ]},
+      { id: 'snaplock-fit', title: 'Snap Lock — Fittings', items: [
+        { key: 'snaplock-90el', label: '90\u00b0 Elbow' },
+        { key: 'snaplock-45el', label: '45\u00b0 Elbow' },
+        { key: 'snaplock-22el', label: '22.5\u00b0 Elbow' },
+        { key: 'snaplock-tee', label: 'Tee' },
+        { key: 'snaplock-saddle45y', label: 'Saddle 45\u00b0 Wye' },
+        { key: 'snaplock-lateral', label: '45\u00b0 Lateral' },
+        { key: 'snaplock-wye', label: 'Wye' },
+        { key: 'snaplock-reducer', label: 'Concentric Reducer' },
+        { key: 'snaplock-eccReducer', label: 'Eccentric Reducer' },
+        { key: 'snaplock-endcap', label: 'End Cap' },
+        { key: 'snaplock-transition', label: 'Round to Rect Trans.' },
+      ]},
+      { id: 'snaplock-duct', title: 'Snap Lock — Ductwork', items: [
+        { key: 'duct-snaplock', label: 'Snap Lock Duct (per ft)' },
+      ]},
     ]
   },
   oval: {
     label: 'Oval',
-    fittings: [
-      { key: 'oval-90el', label: '90\u00b0 Elbow' },
-      { key: 'oval-45el', label: '45\u00b0 Elbow' },
-      { key: 'oval-tee', label: 'Tee' },
-      { key: 'oval-saddle45y', label: 'Saddle 45\u00b0 Wye' },
-      { key: 'oval-reducer', label: 'Reducer' },
-      { key: 'oval-endcap', label: 'End Cap' },
-      { key: 'oval-transition', label: 'Oval to Round Trans.' },
-    ],
-    ductwork: [
-      { key: 'duct-oval', label: 'Oval Duct (per ft)' },
+    sections: [
+      { id: 'oval-fit', title: 'Fittings', items: [
+        { key: 'oval-90el', label: '90\u00b0 Elbow' },
+        { key: 'oval-45el', label: '45\u00b0 Elbow' },
+        { key: 'oval-tee', label: 'Tee' },
+        { key: 'oval-saddle45y', label: 'Saddle 45\u00b0 Wye' },
+        { key: 'oval-reducer', label: 'Reducer' },
+        { key: 'oval-endcap', label: 'End Cap' },
+        { key: 'oval-transition', label: 'Oval to Round Trans.' },
+      ]},
+      { id: 'oval-duct', title: 'Ductwork', items: [
+        { key: 'duct-oval', label: 'Oval Duct (per ft)' },
+      ]},
     ]
   }
 };
 
+var pbCollapsed = {}; // track collapsed sections by id
 let activePBTab = 'rect';
 
 window.openPriceBook = function() {
@@ -2110,6 +2133,11 @@ window.closePriceBook = function() {
 
 window.setPBTab = function(tab) {
   activePBTab = tab;
+  renderPriceBook();
+};
+
+window.togglePBSection = function(sectionId) {
+  pbCollapsed[sectionId] = !pbCollapsed[sectionId];
   renderPriceBook();
 };
 
@@ -2129,10 +2157,6 @@ function pbRow(item) {
   html += '<td style="padding:4px 2px">' + pbInput(item.key, 'laborHrs', lh) + '</td>';
   html += '</tr>';
   return html;
-}
-
-function pbSectionHeader(title) {
-  return '<tr><td colspan="4" style="padding:10px 4px 4px;font-size:11px;font-weight:700;color:#e94560;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e94560">' + title + '</td></tr>';
 }
 
 function pbColumnHeader() {
@@ -2155,12 +2179,20 @@ function renderPriceBook() {
 
   var tab = PRICE_BOOK_TABS[activePBTab];
   html += '<table style="width:100%;border-collapse:collapse">';
-  html += pbSectionHeader('Fittings');
-  html += pbColumnHeader();
-  for (var j = 0; j < tab.fittings.length; j++) html += pbRow(tab.fittings[j]);
-  html += pbSectionHeader('Ductwork');
-  html += pbColumnHeader();
-  for (var k = 0; k < tab.ductwork.length; k++) html += pbRow(tab.ductwork[k]);
+  for (var s = 0; s < tab.sections.length; s++) {
+    var sec = tab.sections[s];
+    var collapsed = !!pbCollapsed[sec.id];
+    var arrow = collapsed ? '\u25b6' : '\u25bc';
+    var count = sec.items.length;
+    html += '<tr onclick="togglePBSection(\'' + sec.id + '\')" style="cursor:pointer;user-select:none">';
+    html += '<td colspan="4" style="padding:10px 4px 4px;font-size:11px;font-weight:700;color:#e94560;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e94560">';
+    html += arrow + '  ' + sec.title + ' <span style="font-weight:400;color:#a0a0c0;font-size:10px;text-transform:none">(' + count + ')</span>';
+    html += '</td></tr>';
+    if (!collapsed) {
+      html += pbColumnHeader();
+      for (var j = 0; j < sec.items.length; j++) html += pbRow(sec.items[j]);
+    }
+  }
   html += '</table>';
 
   el.innerHTML = html;
