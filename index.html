@@ -1975,7 +1975,13 @@ function getProjectRateTable() {
 
 function getCostDefaults(type, sizeA, sizeB) {
   const rt = getProjectRateTable();
-  const pb = getPriceBookEntry(type, sizeA);
+  // Build price book key: shape prefix + fitting type (e.g., rect-90el, spiral-tee)
+  var shape = currentFittingShape || 'round';
+  var prefix = shape === 'round' ? 'spiral' : shape; // round fittings default to spiral
+  var pbKey = prefix + '-' + type;
+  // Special case: rectTap has no prefix
+  if (type === 'rectTap') pbKey = 'rectTap';
+  const pb = getPriceBookEntry(pbKey, sizeA);
   return {
     phase: rt.defaultPhase || 'rough',
     materialCost: pb ? pb.materialCost : null,
@@ -1988,7 +1994,47 @@ function getCostDefaults(type, sizeA, sizeB) {
 
 function getDuctCostDefaults(ductConfig) {
   const rt = getProjectRateTable();
-  const ductKey = ductConfig && ductConfig.shape === 'rect' ? 'duct-rect' : 'duct-round';
+  var shape = ductConfig ? ductConfig.shape : 'round';
+  var ductKey;
+  if (shape === 'rect') {
+    ductKey = 'duct-rect';
+  } else if (shape === 'oval') {
+    ductKey = 'duct-oval';
+  } else {
+    // Round duct: try spiral size-specific key first (e.g., duct-spiral-12)
+    var dia = ductConfig ? ductConfig.dims : null;
+    if (dia) {
+      // Extract diameter number from dims string
+      var diaNum = parseInt(dia);
+      if (diaNum) {
+        var gauge = document.getElementById('ddGauge') ? document.getElementById('ddGauge').value : '26';
+        var sizeKey = 'duct-spiral-' + diaNum;
+        // Check for gauge-specific saved price first
+        var gKey = sizeKey + '-g' + gauge;
+        var saved = priceBookCache ? priceBookCache[gKey] : null;
+        var mc = null;
+        if (saved && saved.materialCost != null) {
+          mc = saved.materialCost;
+        } else if (typeof SPIRAL_DEFAULTS !== 'undefined' && SPIRAL_DEFAULTS[sizeKey] && SPIRAL_DEFAULTS[sizeKey][gauge] != null) {
+          mc = SPIRAL_DEFAULTS[sizeKey][gauge];
+        }
+        // Also check for labor hrs on the base key
+        var baseEntry = priceBookCache ? priceBookCache[sizeKey] : null;
+        var lh = baseEntry ? baseEntry.laborHrs : null;
+        if (mc != null || lh != null) {
+          return {
+            phase: rt.defaultPhase || 'rough',
+            materialCostPerFt: mc,
+            laborHrsPerFt: lh,
+            laborRate: rt.laborRatePerHr || 45,
+            costGroup: null,
+            costOverride: false
+          };
+        }
+      }
+    }
+    ductKey = 'duct-round';
+  }
   const pb = getPriceBookEntry(ductKey, ductConfig ? ductConfig.dims : null);
   return {
     phase: rt.defaultPhase || 'rough',
