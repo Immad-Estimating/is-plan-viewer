@@ -460,12 +460,7 @@
     <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)">📌 Stack</button>
     <button id="panelBtn" onclick="togglePanel()" title="Measurements Panel">📋</button>
     <button onclick="openPriceBook()" title="Global Price Book">💲 Prices</button>
-    <div class="separator"></div>
-    <select id="gaugeSelect" onchange="currentGauge=this.value" title="Gauge" style="background:#0f3460;color:#e0e0e0;border:1px solid #1a4080;padding:4px 8px;border-radius:4px;font-size:12px;cursor:pointer">
-      <option value="26">26 ga</option>
-      <option value="24">24 ga</option>
-      <option value="22">22 ga</option>
-    </select>
+
   </div>
 
   <div class="main-content">
@@ -573,6 +568,7 @@
       <span id="ddDiamGroup"><label>⌀</label><input type="text" id="ddDiam" class="dd-dim" value="14"></span>
       <span id="ddRectGroup" style="display:none"><label>W</label><input type="text" id="ddW" class="dd-dim" value="24"><label>×</label><input type="text" id="ddH" class="dd-dim" value="12"></span>
       <span id="ddLinerGroup" style="display:none"><label>Liner</label><input type="text" id="ddLiner" class="dd-dim" value="1" style="width:35px" title="Liner thickness (inches)"><label>"</label></span>
+      <label>Ga</label><select id="ddGauge" style="padding:3px 6px;font-size:12px"><option value="26">26</option><option value="24">24</option><option value="22">22</option></select>
       <span class="dd-hint">Click to draw · Enter to finish</span>
       <button class="tool-pin-btn" id="ddPinBtn" onclick="event.stopPropagation(); togglePinDuctBar()" title="Pin position">📌</button>
     </div>
@@ -600,6 +596,14 @@
         <input type="text" id="fpRotation" value="0">
         <button onclick="rotateFittingInput(90)">↷</button>
         <label>°</label>
+      </div>
+      <div class="fitting-dims" style="margin-top:4px">
+        <label>Ga:</label>
+        <select id="fpGauge" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px">
+          <option value="26">26 ga</option>
+          <option value="24">24 ga</option>
+          <option value="22">22 ga</option>
+        </select>
       </div>
     </div>
     <!-- Annotation controls -->
@@ -1891,7 +1895,6 @@ window._measIdCounter = 0;
 let fittingMode = false;
 let selectedFittingType = null;
 let currentFittingShape = 'round'; // 'round', 'rect', 'oval'
-let currentGauge = '26'; // active gauge thickness for new items
 
 // Fittings available per shape category
 const FITTINGS_BY_SHAPE = {
@@ -3744,7 +3747,7 @@ function finishMeasurement() {
     meas.materialCostPerFt = _dcd.materialCostPerFt;
     meas.laborHrsPerFt = _dcd.laborHrsPerFt;
     meas.laborRate = _dcd.laborRate;
-    meas.gauge = currentGauge;
+    meas.gauge = document.getElementById('ddGauge') ? document.getElementById('ddGauge').value : '26';
     measPoints = [];
     drawMeasureOverlay();
     updatePanel();
@@ -4733,7 +4736,6 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   let text = (measObj && measObj.labelText) ? measObj.labelText : label;
   if ((!measObj || !measObj.labelText) && duct) {
     text += ` ${duct.symbol} ${duct.dims}`;
-    if (measObj && measObj.gauge) text += ' ' + measObj.gauge + 'ga';
   }
   
   const effSize = (measObj && measObj.labelSize != null) ? measObj.labelSize : annoSize;
@@ -5069,8 +5071,7 @@ function updatePanel() {
     html += `<div class="meas-group-title">Page ${page}</div>`;
     
     for (const m of measurements) {
-      const gaInfo = m.gauge ? ' ' + m.gauge + 'ga' : '';
-      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}${gaInfo}</div>` : '';
+      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}</div>` : '';
       // Elevation info + auto fittings
       let elevInfo = '';
       const elevChanges = m.points.filter(p => p.elevation && parseElevChange(p.elevation));
@@ -5123,8 +5124,7 @@ function updatePanel() {
           const dims = f.sizeA + (f.sizeB ? '/' + f.sizeB : '');
           const sel = f.id === selectedFittingId ? ' style="background:rgba(233,69,96,0.15)"' : '';
           html += `<div class="fitting-item" id="fi-${f.id}"${sel}>`;
-          const gaTag = f.gauge ? '<span style="font-size:9px;padding:1px 4px;border-radius:2px;background:rgba(160,160,192,0.15);color:#a0a0c0;margin-left:4px">' + f.gauge + 'ga</span>' : '';
-          html += `<span>${dims} @ ${f.rotation}°</span>` + gaTag;
+          html += `<span>${dims} @ ${f.rotation}°</span>`;
           html += `<button class="meas-edit-btn" onclick="editFittingCost(${f.id})" title="Edit cost">💲</button>`;
           html += `<button class="fi-delete" onclick="deleteFitting(${f.id})" title="Delete">×</button>`;
           html += `</div>`;
@@ -5534,7 +5534,7 @@ function handleFittingClick(e) {
       laborRate: _cd.laborRate,
       costGroup: null,
       costOverride: false,
-      gauge: currentGauge
+      gauge: document.getElementById('fpGauge') ? document.getElementById('fpGauge').value : '26'
     };
     pageFittings[currentPage].push(f);
     selectedFittingId = null;
@@ -6085,7 +6085,7 @@ function drawFitting(f, isSelected) {
   
   // Label (suppressed for fittings inside vertical stacks — they use callout annotations instead)
   if (!f._noLabel) {
-    const labelText = f.label || (FITTING_NAMES[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : '') + (f.gauge ? ' ' + f.gauge + 'ga' : ''));
+    const labelText = f.label || (FITTING_NAMES[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : ''));
     const fontSize = Math.max(8, D * 0.3);
     mCtx.save();
     mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
