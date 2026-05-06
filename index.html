@@ -1880,7 +1880,6 @@ const FITTINGS_BY_SHAPE = {
     { type: '45el', label: '↗ 45°', title: '45° Elbow (2)' },
     { type: '22el', label: '↗ 22.5°', title: '22.5° Elbow (3)' },
     { type: 'tee', label: '⊤ Tee', title: 'Tee (4)' },
-    { type: 'rectTap', label: '⊢ Tap', title: 'Straight Rect Tap' },
     { type: 'lateral', label: '⑂ Lat', title: '45° Lateral (6)' },
     { type: 'wye', label: '⑃ Wye', title: 'Wye (7)' },
     { type: 'sqwing', label: '┐ SqW', title: 'Square Wing Elbow' },
@@ -3401,17 +3400,6 @@ function getFittingConnPoints(f) {
       points.push(r(0, swHalf + swStub));  // exit
       break;
     }
-    case 'rectTap': {
-      // Straight rect tap: main duct continuous (no end caps), branch perpendicular down
-      const tapMainLen = D * 1.8;
-      const tapBranchD = (D2 && D2 > 0 && D2 !== D) ? D2 : D * 0.7;
-      const tapBranchLen = tapBranchD * 2.0;
-      const tapHalfW = D / 2;
-      points.push(r(-tapMainLen, 0));              // main left (no end cap — open)
-      points.push(r(tapMainLen, 0));               // main right (no end cap — open)
-      points.push(r(0, tapHalfW + tapBranchLen));  // branch end center
-      break;
-    }
     case 'endcap': {
       // drawEndCap: single opening at x=0
       points.push(r(0, 0));
@@ -4776,8 +4764,7 @@ const FITTING_NAMES = {
   '90el': '90° Elbow', '45el': '45° Elbow', '22el': '22.5° Elbow',
   'tee': 'Tee', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
-  'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
-  'rectTap': 'Rect Tap'
+  'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL'
 };
 
 function inchesToPx(inches) {
@@ -4854,7 +4841,7 @@ window.selectFittingType = function(type) {
   });
   document.getElementById('fpPreview').textContent = FITTING_NAMES[type] || type;
   // Show/hide sizeB based on type
-  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap'].includes(type);  // sqwing uses only sizeA (WxH)
+  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition'].includes(type);  // sqwing uses only sizeA (WxH)
   document.getElementById('fpSizeB').style.display = needsB ? '' : 'none';
   document.getElementById('fpSizeB').previousElementSibling.style.display = needsB ? '' : 'none';
 };
@@ -5459,7 +5446,6 @@ function drawFitting(f, isSelected) {
     case 'endcap': drawEndCap(D); break;
     case 'transition': drawTransition(D, D2); break;
     case 'sqwing': drawSquareWing(D); break;
-    case 'rectTap': drawRectTap(D, D2); break;
   }
   
   mCtx.restore();
@@ -5622,65 +5608,6 @@ function drawTee(D, branchD) {
   mCtx.beginPath();
   mCtx.moveTo(-halfB, halfW + branchLen);
   mCtx.lineTo(halfB, halfW + branchLen);
-  mCtx.stroke();
-}
-
-function drawRectTap(D, branchD) {
-  // Straight Rectangular Tap / Takeoff
-  // Main duct runs continuously (NO end caps — it's existing duct you're tapping into)
-  // Branch exits perpendicular (90°) downward from the main duct bottom wall
-  const halfW = D / 2;
-  const bD = (branchD && branchD > 0 && branchD !== D) ? branchD : D * 0.7;
-  const halfB = bD / 2;
-  const mainLen = D * 1.8;
-  const branchLen = bD * 2.0;
-
-  // Main duct — top wall (continuous, no break)
-  mCtx.beginPath();
-  mCtx.moveTo(-mainLen, -halfW);
-  mCtx.lineTo(mainLen, -halfW);
-  mCtx.stroke();
-
-  // Main duct — bottom wall with opening for branch
-  mCtx.beginPath();
-  mCtx.moveTo(-mainLen, halfW);
-  mCtx.lineTo(-halfB, halfW);
-  mCtx.stroke();
-  mCtx.beginPath();
-  mCtx.moveTo(halfB, halfW);
-  mCtx.lineTo(mainLen, halfW);
-  mCtx.stroke();
-
-  // NO end caps on main duct — it's a tap into existing ductwork
-
-  // Branch going down from opening
-  mCtx.beginPath();
-  mCtx.moveTo(-halfB, halfW);
-  mCtx.lineTo(-halfB, halfW + branchLen);
-  mCtx.stroke();
-  mCtx.beginPath();
-  mCtx.moveTo(halfB, halfW);
-  mCtx.lineTo(halfB, halfW + branchLen);
-  mCtx.stroke();
-
-  // Branch end cap
-  mCtx.beginPath();
-  mCtx.moveTo(-halfB, halfW + branchLen);
-  mCtx.lineTo(halfB, halfW + branchLen);
-  mCtx.stroke();
-
-  // Collar indicator — small tick marks at the tap opening
-  // This is the sheet metal collar where the branch connects
-  const tickLen = halfB * 0.2;
-  mCtx.beginPath();
-  mCtx.moveTo(-halfB - tickLen, halfW);
-  mCtx.lineTo(-halfB, halfW);
-  mCtx.lineTo(-halfB, halfW + tickLen);
-  mCtx.stroke();
-  mCtx.beginPath();
-  mCtx.moveTo(halfB + tickLen, halfW);
-  mCtx.lineTo(halfB, halfW);
-  mCtx.lineTo(halfB, halfW + tickLen);
   mCtx.stroke();
 }
 
