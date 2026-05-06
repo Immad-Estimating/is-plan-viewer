@@ -5620,37 +5620,24 @@ function drawTee(D, branchD) {
 }
 
 function drawRectTap(D, branchD) {
-  // Straight Rectangular Tap — resistor-style symbol
-  // Shows a cut/opening in ductwork: two perpendicular end lines
-  // connected by zigzag offset lines (like an electrical resistor)
-  // Scaled to branch dimension (sizeB), centered at origin
+  // Straight Rectangular Tap — capacitor-style symbol
+  // Two parallel perpendicular lines with empty space (gap) between them
+  // Represents a cut/opening in ductwork where a branch taps in
+  // Width of each line = branch dimension (sizeB), gap = scaled spacing
   const bD = (branchD && branchD > 0 && branchD !== D) ? branchD : D * 0.7;
   const halfB = bD / 2;
-  const jogDepth = halfB * 0.35;  // depth of each zigzag jog
-  const segs = 4;                  // number of zigzag segments
-  const segH = bD / segs;          // height per segment
+  const gap = bD * 0.3;  // empty space between the two plates
 
-  // Left perpendicular end line
+  // Left plate (perpendicular line)
   mCtx.beginPath();
-  mCtx.moveTo(-jogDepth, -halfB);
-  mCtx.lineTo(jogDepth, -halfB);
+  mCtx.moveTo(-gap / 2, -halfB);
+  mCtx.lineTo(-gap / 2, halfB);
   mCtx.stroke();
 
-  // Right perpendicular end line
+  // Right plate (perpendicular line)
   mCtx.beginPath();
-  mCtx.moveTo(-jogDepth, halfB);
-  mCtx.lineTo(jogDepth, halfB);
-  mCtx.stroke();
-
-  // Zigzag path connecting the two end lines (resistor pattern)
-  mCtx.beginPath();
-  mCtx.moveTo(0, -halfB);
-  for (let i = 0; i < segs; i++) {
-    const y0 = -halfB + i * segH;
-    const dir = (i % 2 === 0) ? 1 : -1;
-    mCtx.lineTo(jogDepth * dir, y0 + segH * 0.5);
-    mCtx.lineTo(0, y0 + segH);
-  }
+  mCtx.moveTo(gap / 2, -halfB);
+  mCtx.lineTo(gap / 2, halfB);
   mCtx.stroke();
 }
 
