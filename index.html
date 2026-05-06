@@ -1921,6 +1921,68 @@ let fittingDragRotate = false;
 let fittingDragStartAngle = 0;
 const pageFittings = {};
 
+// ---- Cost & Labor Engine ----
+const DEFAULT_PHASES = ['rough','trim','air-handler','startup','controls','insulation'];
+let projectRateTable = null; // loaded per project from IDB
+
+function getProjectRateTable() {
+  if (projectRateTable) return projectRateTable;
+  // Return defaults if not yet loaded
+  return {
+    laborRatePerHr: 85,
+    defaultPhase: 'rough',
+    phases: [...DEFAULT_PHASES],
+    fittingRates: {},   // e.g. { '90el': { laborHrs: 0.5, materialCost: 45 }, ... }
+    ductRates: {}        // e.g. { 'default': { laborHrsPerFt: 0.15, materialCostPerFt: 8.50 } }
+  };
+}
+
+function getCostDefaults(type, sizeA, sizeB) {
+  const rt = getProjectRateTable();
+  const fr = rt.fittingRates[type];
+  return {
+    phase: rt.defaultPhase || 'rough',
+    materialCost: fr ? fr.materialCost : null,
+    laborHrs: fr ? fr.laborHrs : null,
+    laborRate: rt.laborRatePerHr || 85,
+    costGroup: null,
+    costOverride: false
+  };
+}
+
+function getDuctCostDefaults(ductConfig) {
+  const rt = getProjectRateTable();
+  const dr = rt.ductRates['default'];
+  return {
+    phase: rt.defaultPhase || 'rough',
+    materialCostPerFt: dr ? dr.materialCostPerFt : null,
+    laborHrsPerFt: dr ? dr.laborHrsPerFt : null,
+    laborRate: rt.laborRatePerHr || 85,
+    costGroup: null,
+    costOverride: false
+  };
+}
+
+async function loadProjectRateTable(projectId) {
+  if (!projectId) return;
+  const project = await idbGet('projects', projectId);
+  if (project && project.rateTable) {
+    projectRateTable = project.rateTable;
+  } else {
+    projectRateTable = null; // will use defaults
+  }
+}
+
+async function saveProjectRateTable(projectId) {
+  if (!projectId) return;
+  const project = await idbGet('projects', projectId);
+  if (project) {
+    project.rateTable = getProjectRateTable();
+    project.modifiedAt = Date.now();
+    await idbPut('projects', project);
+  }
+}
+
 // ---- Vertical Stack state ----
 const pageStacks = {};
 let stackMode = false;
@@ -1985,11 +2047,23 @@ async function saveCurrentPageData() {
     labelTextOpacity: m.labelTextOpacity != null ? m.labelTextOpacity : null,
     labelFillOpacity: m.labelFillOpacity != null ? m.labelFillOpacity : null,
     labelOffset: m.labelOffset || null,
+    phase: m.phase || null,
+    materialCostPerFt: m.materialCostPerFt != null ? m.materialCostPerFt : null,
+    laborHrsPerFt: m.laborHrsPerFt != null ? m.laborHrsPerFt : null,
+    laborRate: m.laborRate != null ? m.laborRate : null,
+    costGroup: m.costGroup || null,
+    costOverride: m.costOverride || false,
   }));
   
   const fittings = (pageFittings[pageNum] || []).map(f => ({
     id: f.id, type: f.type, x: f.x, y: f.y,
-    rotation: f.rotation, mirrored: f.mirrored || false, sizeA: f.sizeA, sizeB: f.sizeB, label: f.label
+    rotation: f.rotation, mirrored: f.mirrored || false, sizeA: f.sizeA, sizeB: f.sizeB, label: f.label,
+    phase: f.phase || null,
+    materialCost: f.materialCost != null ? f.materialCost : null,
+    laborHrs: f.laborHrs != null ? f.laborHrs : null,
+    laborRate: f.laborRate != null ? f.laborRate : null,
+    costGroup: f.costGroup || null,
+    costOverride: f.costOverride || false,
   }));
 
   const stacks = (pageStacks[pageNum] || []).map(s => ({
@@ -2072,6 +2146,7 @@ async function loadPageDataForDrawing(drawingId) {
 async function loadDrawingIntoViewer(projectId, drawingId) {
   activeDrawingId = drawingId;
   activeProjectId = projectId;
+  await loadProjectRateTable(projectId);
   
   try {
     const drawing = await idbGet('drawings', drawingId);
@@ -3206,7 +3281,13 @@ function finishMeasurement() {
     labelSize: null,        // per-measurement override (null = use global)
     labelTextOpacity: null, // per-measurement text opacity override
     labelFillOpacity: null, // per-measurement fill opacity override
-    labelOffset: null       // {dx,dy} offset from auto midpoint (null = pinned to center)
+    labelOffset: null,      // {dx,dy} offset from auto midpoint (null = pinned to center)
+    phase: null,
+    materialCostPerFt: null,
+    laborHrsPerFt: null,
+    laborRate: null,
+    costGroup: null,
+    costOverride: false
   };
   
   if (!pageMeasurements[currentPage]) pageMeasurements[currentPage] = [];
@@ -3214,6 +3295,11 @@ function finishMeasurement() {
   
   if (ductDrawMode) {
     meas.duct = getDuctDrawConfig();
+    const _dcd = getDuctCostDefaults(meas.duct);
+    meas.phase = _dcd.phase;
+    meas.materialCostPerFt = _dcd.materialCostPerFt;
+    meas.laborHrsPerFt = _dcd.laborHrsPerFt;
+    meas.laborRate = _dcd.laborRate;
     measPoints = [];
     drawMeasureOverlay();
     updatePanel();
@@ -4490,9 +4576,10 @@ function updatePanel() {
       }
 
       const customLabel = m.labelText ? `<div class="meas-duct" style="color:#e94560;font-style:italic">"${escapeHtml(m.labelText)}"</div>` : '';
+      const phaseTag = m.phase ? `<span style="font-size:9px;padding:1px 4px;border-radius:2px;background:rgba(100,149,237,0.2);color:#6495ed;margin-left:4px;text-transform:uppercase">${escapeHtml(m.phase)}</span>` : '';
       html += `<div class="meas-item" data-id="${m.id}">
         <div class="meas-info">
-          <div class="meas-length">${m.distance.formatted}</div>
+          <div class="meas-length">${m.distance.formatted}${phaseTag}</div>
           ${ductInfo}
           ${elevInfo}
           ${customLabel}
@@ -4528,7 +4615,8 @@ function updatePanel() {
           const dims = f.sizeA + (f.sizeB ? '/' + f.sizeB : '');
           const sel = f.id === selectedFittingId ? ' style="background:rgba(233,69,96,0.15)"' : '';
           html += `<div class="fitting-item"${sel}>`;
-          html += `<span>${dims} @ ${f.rotation}°</span>`;
+          const phTag = f.phase ? `<span style="font-size:9px;padding:1px 4px;border-radius:2px;background:rgba(100,149,237,0.2);color:#6495ed;margin-left:4px;text-transform:uppercase">${escapeHtml(f.phase)}</span>` : '';
+          html += `<span>${dims} @ ${f.rotation}°${phTag}</span>`;
           html += `<button class="fi-delete" onclick="deleteFitting(${f.id})" title="Delete">×</button>`;
           html += `</div>`;
         }
@@ -4919,15 +5007,24 @@ function handleFittingClick(e) {
     const placeTargets = getAllSnapTargets(null, null);
     const placeSnap = findBestSnap(placeholderConns, placeTargets, SNAP_THRESHOLD_PX);
     if (placeSnap.snapped) { placeX += placeSnap.snapDx; placeY += placeSnap.snapDy; }
+    const _sA = document.getElementById('fpSizeA').value || '14';
+    const _sB = document.getElementById('fpSizeB').value || '';
+    const _cd = getCostDefaults(selectedFittingType, _sA, _sB);
     const f = {
       id: fittingIdCounter,
       type: selectedFittingType,
       x: placeX, y: placeY,
       rotation: parseFloat(document.getElementById('fpRotation').value) || 0,
       mirrored: fittingPreMirrored,
-      sizeA: document.getElementById('fpSizeA').value || '14',
-      sizeB: document.getElementById('fpSizeB').value || '',
-      label: null
+      sizeA: _sA,
+      sizeB: _sB,
+      label: null,
+      phase: _cd.phase,
+      materialCost: _cd.materialCost,
+      laborHrs: _cd.laborHrs,
+      laborRate: _cd.laborRate,
+      costGroup: null,
+      costOverride: false
     };
     pageFittings[currentPage].push(f);
     selectedFittingId = null;
