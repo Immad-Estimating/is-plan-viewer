@@ -1880,6 +1880,7 @@ const FITTINGS_BY_SHAPE = {
     { type: '45el', label: '↗ 45°', title: '45° Elbow (2)' },
     { type: '22el', label: '↗ 22.5°', title: '22.5° Elbow (3)' },
     { type: 'tee', label: '⊤ Tee', title: 'Tee (4)' },
+    { type: 'rectTap', label: '⩩ Tap', title: 'Straight Rect Tap' },
     { type: 'lateral', label: '⑂ Lat', title: '45° Lateral (6)' },
     { type: 'wye', label: '⑃ Wye', title: 'Wye (7)' },
     { type: 'sqwing', label: '┐ SqW', title: 'Square Wing Elbow' },
@@ -3400,6 +3401,11 @@ function getFittingConnPoints(f) {
       points.push(r(0, swHalf + swStub));  // exit
       break;
     }
+    case 'rectTap': {
+      // Rect tap: just the cut symbol, snap at center
+      points.push(r(0, 0));
+      break;
+    }
     case 'endcap': {
       // drawEndCap: single opening at x=0
       points.push(r(0, 0));
@@ -4764,7 +4770,8 @@ const FITTING_NAMES = {
   '90el': '90° Elbow', '45el': '45° Elbow', '22el': '22.5° Elbow',
   'tee': 'Tee', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
-  'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL'
+  'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
+  'rectTap': 'Rect Tap'
 };
 
 function inchesToPx(inches) {
@@ -4841,7 +4848,7 @@ window.selectFittingType = function(type) {
   });
   document.getElementById('fpPreview').textContent = FITTING_NAMES[type] || type;
   // Show/hide sizeB based on type
-  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition'].includes(type);  // sqwing uses only sizeA (WxH)
+  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap'].includes(type);  // sqwing uses only sizeA (WxH)
   document.getElementById('fpSizeB').style.display = needsB ? '' : 'none';
   document.getElementById('fpSizeB').previousElementSibling.style.display = needsB ? '' : 'none';
 };
@@ -5446,6 +5453,7 @@ function drawFitting(f, isSelected) {
     case 'endcap': drawEndCap(D); break;
     case 'transition': drawTransition(D, D2); break;
     case 'sqwing': drawSquareWing(D); break;
+    case 'rectTap': drawRectTap(D, D2); break;
   }
   
   mCtx.restore();
@@ -5608,6 +5616,41 @@ function drawTee(D, branchD) {
   mCtx.beginPath();
   mCtx.moveTo(-halfB, halfW + branchLen);
   mCtx.lineTo(halfB, halfW + branchLen);
+  mCtx.stroke();
+}
+
+function drawRectTap(D, branchD) {
+  // Straight Rectangular Tap — resistor-style symbol
+  // Shows a cut/opening in ductwork: two perpendicular end lines
+  // connected by zigzag offset lines (like an electrical resistor)
+  // Scaled to branch dimension (sizeB), centered at origin
+  const bD = (branchD && branchD > 0 && branchD !== D) ? branchD : D * 0.7;
+  const halfB = bD / 2;
+  const jogDepth = halfB * 0.35;  // depth of each zigzag jog
+  const segs = 4;                  // number of zigzag segments
+  const segH = bD / segs;          // height per segment
+
+  // Left perpendicular end line
+  mCtx.beginPath();
+  mCtx.moveTo(-jogDepth, -halfB);
+  mCtx.lineTo(jogDepth, -halfB);
+  mCtx.stroke();
+
+  // Right perpendicular end line
+  mCtx.beginPath();
+  mCtx.moveTo(-jogDepth, halfB);
+  mCtx.lineTo(jogDepth, halfB);
+  mCtx.stroke();
+
+  // Zigzag path connecting the two end lines (resistor pattern)
+  mCtx.beginPath();
+  mCtx.moveTo(0, -halfB);
+  for (let i = 0; i < segs; i++) {
+    const y0 = -halfB + i * segH;
+    const dir = (i % 2 === 0) ? 1 : -1;
+    mCtx.lineTo(jogDepth * dir, y0 + segH * 0.5);
+    mCtx.lineTo(0, y0 + segH);
+  }
   mCtx.stroke();
 }
 
