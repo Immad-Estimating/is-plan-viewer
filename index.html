@@ -2221,7 +2221,7 @@ function getMaterialForGauge(key, gauge) {
 }
 
 window.openPriceBook = function() {
-  renderPriceBook();
+  try { renderPriceBook(); } catch(e) { console.error('[PriceBook] Render error:', e); document.getElementById('priceBookContent').innerHTML = '<div style="color:#e94560;padding:12px">Error loading price book. Check console.</div>'; }
   document.getElementById('priceBookModal').classList.add('open');
 };
 
