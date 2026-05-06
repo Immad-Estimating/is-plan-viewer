@@ -458,7 +458,7 @@
     <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)">◎ Duct</button>
     <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)">🔩 Fittings</button>
     <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)">📌 Stack</button>
-    <button id="panelBtn" onclick="togglePanel()" title="Measurements Panel">📋</button>
+    <button id="panelBtn" onclick="togglePanel()" title="Analysis Panel">📊 Analysis</button>
     <button onclick="openPriceBook()" title="Global Price Book">💲 Prices</button>
 
   </div>
@@ -4992,55 +4992,42 @@ window.editFittingCost = function(id) {
   if (!f) return;
   const container = document.getElementById(`fi-${id}`);
   if (!container) return;
-  const mC = f.materialCost != null ? f.materialCost : '';
-  const lH = f.laborHrs != null ? f.laborHrs : '';
-  const lR = f.laborRate != null ? f.laborRate : '';
-  container.insertAdjacentHTML('beforeend', `<div class="meas-edit-inline" id="fc-edit-${id}">
-    <label>Material $</label>
-    <input type="text" value="${mC}" placeholder="0.00" oninput="updateFitCost(${id},'materialCost',this.value)">
-    <label>Labor Hrs</label>
-    <input type="text" value="${lH}" placeholder="0.0" oninput="updateFitCost(${id},'laborHrs',this.value)">
-    <label>Labor $/Hr</label>
-    <input type="text" value="${lR}" placeholder="85" oninput="updateFitCost(${id},'laborRate',this.value)">
+  const mc = f.materialCost != null ? f.materialCost : 0;
+  const lh = f.laborHrs != null ? f.laborHrs : 0;
+  const lr = f.laborRate != null ? f.laborRate : 85;
+  const laborCost = (lh * lr).toFixed(2);
+  const total = (mc + lh * lr).toFixed(2);
+  container.insertAdjacentHTML('beforeend', `<div class="meas-edit-inline" id="fc-edit-${id}" style="font-size:11px">
+    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Material</span><span style="color:#00ff88">$\${mc.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor</span><span style="color:#ffaa00">\${lh}h × $\${lr}/hr = $\${laborCost}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #0f3460;font-weight:600"><span style="color:#e0e0e0">Total</span><span style="color:#e0e0e0">$\${total}</span></div>
   </div>`);
-};
-
-window.updateFitCost = function(id, prop, value) {
-  const f = (pageFittings[currentPage] || []).find(x => x.id === id);
-  if (!f) return;
-  if (prop === 'phase') { f.phase = value || null; }
-  else { f[prop] = value === '' ? null : parseFloat(value) || null; }
-  scheduleSave();
 };
 
 window.editMeasCost = function(id) {
   const el = document.getElementById(`mc-edit-${id}`);
   if (el) { el.remove(); return; }
   const otherEl = document.getElementById(`meas-edit-${id}`);
-  if (otherEl) otherEl.remove(); // close label editor if open
+  if (otherEl) otherEl.remove();
   const m = findMeasurement(id);
   if (!m) return;
   const item = document.querySelector(`.meas-item[data-id="${id}"]`);
   if (!item) return;
-  const mC = m.materialCostPerFt != null ? m.materialCostPerFt : '';
-  const lH = m.laborHrsPerFt != null ? m.laborHrsPerFt : '';
-  const lR = m.laborRate != null ? m.laborRate : '';
-  item.insertAdjacentHTML('beforeend', `<div class="meas-edit-inline" id="mc-edit-${id}">
-    <label>Material $/Ft</label>
-    <input type="text" value="${mC}" placeholder="0.00" oninput="updateMeasCost(${id},'materialCostPerFt',this.value)">
-    <label>Labor Hrs/Ft</label>
-    <input type="text" value="${lH}" placeholder="0.0" oninput="updateMeasCost(${id},'laborHrsPerFt',this.value)">
-    <label>Labor $/Hr</label>
-    <input type="text" value="${lR}" placeholder="85" oninput="updateMeasCost(${id},'laborRate',this.value)">
+  const len = m.distance ? m.distance.value : 0;
+  const lenFt = len; // already in feet from scale
+  const mcFt = m.materialCostPerFt != null ? m.materialCostPerFt : 0;
+  const lhFt = m.laborHrsPerFt != null ? m.laborHrsPerFt : 0;
+  const lr = m.laborRate != null ? m.laborRate : 85;
+  const totalMat = (mcFt * lenFt).toFixed(2);
+  const totalHrs = (lhFt * lenFt).toFixed(2);
+  const totalLabor = (lhFt * lenFt * lr).toFixed(2);
+  const total = (mcFt * lenFt + lhFt * lenFt * lr).toFixed(2);
+  item.insertAdjacentHTML('beforeend', `<div class="meas-edit-inline" id="mc-edit-${id}" style="font-size:11px">
+    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Material</span><span style="color:#00ff88">$\${mcFt}/ft × \${lenFt.toFixed(1)}ft = $\${totalMat}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor</span><span style="color:#ffaa00">\${lhFt}h/ft × \${lenFt.toFixed(1)}ft = \${totalHrs}h</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor $</span><span style="color:#ffaa00">\${totalHrs}h × $\${lr}/hr = $\${totalLabor}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #0f3460;font-weight:600"><span style="color:#e0e0e0">Total</span><span style="color:#e0e0e0">$\${total}</span></div>
   </div>`);
-};
-
-window.updateMeasCost = function(id, prop, value) {
-  const m = findMeasurement(id);
-  if (!m) return;
-  if (prop === 'phase') { m.phase = value || null; }
-  else { m[prop] = value === '' ? null : parseFloat(value) || null; }
-  scheduleSave();
 };
 
 window.togglePanel = function() {
