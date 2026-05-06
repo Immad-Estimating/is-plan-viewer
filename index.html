@@ -4488,6 +4488,8 @@ document.addEventListener('click', (e) => {
 window.editMeasurement = function(id) {
   const el = document.getElementById(`meas-edit-${id}`);
   if (el) { el.remove(); updatePanel(); return; } // toggle off
+  const otherEl = document.getElementById(`mc-edit-${id}`);
+  if (otherEl) otherEl.remove(); // close cost editor if open
   
   const m = findMeasurement(id);
   if (!m) return;
@@ -4566,6 +4568,8 @@ window.updateFitCost = function(id, prop, value) {
 window.editMeasCost = function(id) {
   const el = document.getElementById(`mc-edit-${id}`);
   if (el) { el.remove(); return; }
+  const otherEl = document.getElementById(`meas-edit-${id}`);
+  if (otherEl) otherEl.remove(); // close label editor if open
   const m = findMeasurement(id);
   if (!m) return;
   const item = document.querySelector(`.meas-item[data-id="${id}"]`);
