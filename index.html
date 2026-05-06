@@ -460,6 +460,12 @@
     <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)">📌 Stack</button>
     <button id="panelBtn" onclick="togglePanel()" title="Measurements Panel">📋</button>
     <button onclick="openPriceBook()" title="Global Price Book">💲 Prices</button>
+    <div class="separator"></div>
+    <select id="gaugeSelect" onchange="currentGauge=this.value" title="Gauge" style="background:#0f3460;color:#e0e0e0;border:1px solid #1a4080;padding:4px 8px;border-radius:4px;font-size:12px;cursor:pointer">
+      <option value="26">26 ga</option>
+      <option value="24">24 ga</option>
+      <option value="22">22 ga</option>
+    </select>
   </div>
 
   <div class="main-content">
@@ -1885,6 +1891,7 @@ window._measIdCounter = 0;
 let fittingMode = false;
 let selectedFittingType = null;
 let currentFittingShape = 'round'; // 'round', 'rect', 'oval'
+let currentGauge = '26'; // active gauge thickness for new items
 
 // Fittings available per shape category
 const FITTINGS_BY_SHAPE = {
@@ -2047,7 +2054,7 @@ const PRICE_BOOK_TABS = {
   rect: {
     label: 'Rectangular',
     sections: [
-      { id: 'rect-fit', title: 'Fittings', items: [
+      { id: 'rect-fit', hasGauge: true, title: 'Fittings', items: [
         { key: 'rect-90el', label: '90\u00b0 Elbow' },
         { key: 'rect-45el', label: '45\u00b0 Elbow' },
         { key: 'rect-22el', label: '22.5\u00b0 Elbow' },
@@ -2061,7 +2068,7 @@ const PRICE_BOOK_TABS = {
         { key: 'rect-endcap', label: 'End Cap' },
         { key: 'rect-transition', label: 'Rect to Round Trans.' },
       ]},
-      { id: 'rect-duct', title: 'Ductwork', items: [
+      { id: 'rect-duct', hasGauge: true, title: 'Ductwork', items: [
         { key: 'duct-rect', label: 'Rect Duct (per ft)' },
       ]},
     ]
@@ -2069,7 +2076,7 @@ const PRICE_BOOK_TABS = {
   round: {
     label: 'Round',
     sections: [
-      { id: 'spiral-fit', title: 'Spiral — Fittings', items: [
+      { id: 'spiral-fit', hasGauge: true, title: 'Spiral — Fittings', items: [
         { key: 'spiral-90el', label: '90\u00b0 Elbow' },
         { key: 'spiral-45el', label: '45\u00b0 Elbow' },
         { key: 'spiral-22el', label: '22.5\u00b0 Elbow' },
@@ -2082,7 +2089,7 @@ const PRICE_BOOK_TABS = {
         { key: 'spiral-endcap', label: 'End Cap' },
         { key: 'spiral-transition', label: 'Round to Rect Trans.' },
       ]},
-      { id: 'spiral-duct', title: 'Spiral — Ductwork', hasGauge: true, items: [
+      { id: 'spiral-duct', hasGauge: true, title: 'Spiral — Ductwork', hasGauge: true, items: [
         { key: 'duct-spiral-3', label: '3″' },
         { key: 'duct-spiral-4', label: '4″' },
         { key: 'duct-spiral-5', label: '5″' },
@@ -2108,7 +2115,7 @@ const PRICE_BOOK_TABS = {
         { key: 'duct-spiral-32', label: '32″' },
         { key: 'duct-spiral-34', label: '34″' },
         { key: 'duct-spiral-36', label: '36″' },      ]},
-      { id: 'snaplock-fit', title: 'Snap Lock — Fittings', items: [
+      { id: 'snaplock-fit', hasGauge: true, title: 'Snap Lock — Fittings', items: [
         { key: 'snaplock-90el', label: '90\u00b0 Elbow' },
         { key: 'snaplock-45el', label: '45\u00b0 Elbow' },
         { key: 'snaplock-22el', label: '22.5\u00b0 Elbow' },
@@ -2121,7 +2128,7 @@ const PRICE_BOOK_TABS = {
         { key: 'snaplock-endcap', label: 'End Cap' },
         { key: 'snaplock-transition', label: 'Round to Rect Trans.' },
       ]},
-      { id: 'snaplock-duct', title: 'Snap Lock — Ductwork', items: [
+      { id: 'snaplock-duct', hasGauge: true, title: 'Snap Lock — Ductwork', items: [
         { key: 'duct-snaplock-3', label: '3″' },
         { key: 'duct-snaplock-4', label: '4″' },
         { key: 'duct-snaplock-5', label: '5″' },
@@ -2138,7 +2145,7 @@ const PRICE_BOOK_TABS = {
   oval: {
     label: 'Oval',
     sections: [
-      { id: 'oval-fit', title: 'Fittings', items: [
+      { id: 'oval-fit', hasGauge: true, title: 'Fittings', items: [
         { key: 'oval-90el', label: '90\u00b0 Elbow' },
         { key: 'oval-45el', label: '45\u00b0 Elbow' },
         { key: 'oval-tee', label: 'Tee' },
@@ -2147,7 +2154,7 @@ const PRICE_BOOK_TABS = {
         { key: 'oval-endcap', label: 'End Cap' },
         { key: 'oval-transition', label: 'Oval to Round Trans.' },
       ]},
-      { id: 'oval-duct', title: 'Ductwork', items: [
+      { id: 'oval-duct', hasGauge: true, title: 'Ductwork', items: [
         { key: 'duct-oval', label: 'Oval Duct (per ft)' },
       ]},
     ]
@@ -2155,7 +2162,7 @@ const PRICE_BOOK_TABS = {
 };
 
 var pbCollapsed = {};
-var pbGauge = { 'spiral-duct': '26' }; // active gauge per section
+var pbGauge = { 'spiral-duct': '26', 'snaplock-duct': '26', 'snaplock-fit': '26', 'spiral-fit': '26', 'rect-fit': '26', 'rect-duct': '26', 'oval-fit': '26', 'oval-duct': '26' }; // active gauge per section
 var activePBTab = 'rect';
 
 // Default spiral pricing by gauge: key -> { '26': price, '22': price, ... }
@@ -2188,7 +2195,6 @@ var SPIRAL_DEFAULTS = {
 };
 
 function getGaugesForSection(sectionId) {
-  if (sectionId !== 'spiral-duct') return null;
   return ['26', '24', '22'];
 }
 
@@ -2487,7 +2493,8 @@ async function saveCurrentPageData() {
     laborHrsPerFt: m.laborHrsPerFt != null ? m.laborHrsPerFt : null,
     laborRate: m.laborRate != null ? m.laborRate : null,
     costGroup: m.costGroup || null,
-    costOverride: m.costOverride || false
+    costOverride: m.costOverride || false,
+    gauge: m.gauge || null
   }));
   
   const fittings = (pageFittings[pageNum] || []).map(f => ({
@@ -2498,7 +2505,8 @@ async function saveCurrentPageData() {
     laborHrs: f.laborHrs != null ? f.laborHrs : null,
     laborRate: f.laborRate != null ? f.laborRate : null,
     costGroup: f.costGroup || null,
-    costOverride: f.costOverride || false
+    costOverride: f.costOverride || false,
+    gauge: f.gauge || null
   }));
 
   const stacks = (pageStacks[pageNum] || []).map(s => ({
@@ -3722,7 +3730,8 @@ function finishMeasurement() {
     laborHrsPerFt: null,
     laborRate: null,
     costGroup: null,
-    costOverride: false
+    costOverride: false,
+    gauge: null
   };
   
   if (!pageMeasurements[currentPage]) pageMeasurements[currentPage] = [];
@@ -3735,6 +3744,7 @@ function finishMeasurement() {
     meas.materialCostPerFt = _dcd.materialCostPerFt;
     meas.laborHrsPerFt = _dcd.laborHrsPerFt;
     meas.laborRate = _dcd.laborRate;
+    meas.gauge = currentGauge;
     measPoints = [];
     drawMeasureOverlay();
     updatePanel();
@@ -4723,6 +4733,7 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   let text = (measObj && measObj.labelText) ? measObj.labelText : label;
   if ((!measObj || !measObj.labelText) && duct) {
     text += ` ${duct.symbol} ${duct.dims}`;
+    if (measObj && measObj.gauge) text += ' ' + measObj.gauge + 'ga';
   }
   
   const effSize = (measObj && measObj.labelSize != null) ? measObj.labelSize : annoSize;
@@ -5058,7 +5069,8 @@ function updatePanel() {
     html += `<div class="meas-group-title">Page ${page}</div>`;
     
     for (const m of measurements) {
-      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}</div>` : '';
+      const gaInfo = m.gauge ? ' ' + m.gauge + 'ga' : '';
+      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}${gaInfo}</div>` : '';
       // Elevation info + auto fittings
       let elevInfo = '';
       const elevChanges = m.points.filter(p => p.elevation && parseElevChange(p.elevation));
@@ -5111,7 +5123,8 @@ function updatePanel() {
           const dims = f.sizeA + (f.sizeB ? '/' + f.sizeB : '');
           const sel = f.id === selectedFittingId ? ' style="background:rgba(233,69,96,0.15)"' : '';
           html += `<div class="fitting-item" id="fi-${f.id}"${sel}>`;
-          html += `<span>${dims} @ ${f.rotation}°</span>`;
+          const gaTag = f.gauge ? '<span style="font-size:9px;padding:1px 4px;border-radius:2px;background:rgba(160,160,192,0.15);color:#a0a0c0;margin-left:4px">' + f.gauge + 'ga</span>' : '';
+          html += `<span>${dims} @ ${f.rotation}°</span>` + gaTag;
           html += `<button class="meas-edit-btn" onclick="editFittingCost(${f.id})" title="Edit cost">💲</button>`;
           html += `<button class="fi-delete" onclick="deleteFitting(${f.id})" title="Delete">×</button>`;
           html += `</div>`;
@@ -5520,7 +5533,8 @@ function handleFittingClick(e) {
       laborHrs: _cd.laborHrs,
       laborRate: _cd.laborRate,
       costGroup: null,
-      costOverride: false
+      costOverride: false,
+      gauge: currentGauge
     };
     pageFittings[currentPage].push(f);
     selectedFittingId = null;
@@ -6071,7 +6085,7 @@ function drawFitting(f, isSelected) {
   
   // Label (suppressed for fittings inside vertical stacks — they use callout annotations instead)
   if (!f._noLabel) {
-    const labelText = f.label || (FITTING_NAMES[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : ''));
+    const labelText = f.label || (FITTING_NAMES[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : '') + (f.gauge ? ' ' + f.gauge + 'ga' : ''));
     const fontSize = Math.max(8, D * 0.3);
     mCtx.save();
     mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
