@@ -5038,8 +5038,19 @@ window.editFittingCost = function(id) {
   if (!f) return;
   var container = document.getElementById('fi-' + id);
   if (!container) return;
-  var mc = f.materialCost != null ? f.materialCost : 0;
-  var lh = f.laborHrs != null ? f.laborHrs : 0;
+  // Live lookup: try stored value, fall back to price book
+  var mc = f.materialCost;
+  var lh = f.laborHrs;
+  if (mc == null || lh == null) {
+    var shape = f.shape || currentFittingShape || 'round';
+    var prefix = shape === 'round' ? 'spiral' : shape;
+    var pbKey = f.type === 'rectTap' ? 'rectTap' : prefix + '-' + f.type;
+    var pb = getPriceBookEntry(pbKey, f.sizeA);
+    if (mc == null && pb) mc = pb.materialCost;
+    if (lh == null && pb) lh = pb.laborHrs;
+  }
+  mc = mc != null ? mc : 0;
+  lh = lh != null ? lh : 0;
   var lr = f.laborRate != null ? f.laborRate : 45;
   var laborCost = (lh * lr).toFixed(2);
   var total = (mc + lh * lr).toFixed(2);
@@ -5062,8 +5073,34 @@ window.editMeasCost = function(id) {
   var item = document.querySelector('.meas-item[data-id="' + id + '"]');
   if (!item) return;
   var lenFt = m.distance ? m.distance.value : 0;
-  var mcFt = m.materialCostPerFt != null ? m.materialCostPerFt : 0;
-  var lhFt = m.laborHrsPerFt != null ? m.laborHrsPerFt : 0;
+  var mcFt = m.materialCostPerFt;
+  var lhFt = m.laborHrsPerFt;
+  // Live lookup from price book if stored values are null
+  if ((mcFt == null || lhFt == null) && m.duct) {
+    var ga = m.gauge || '26';
+    var dShape = m.duct.shape || 'round';
+    if (dShape === 'round' || dShape === 'spiral') {
+      var dia = parseInt(m.duct.dims);
+      if (dia) {
+        var sizeKey = 'duct-spiral-' + dia;
+        var gKey = sizeKey + '-g' + ga;
+        var saved = priceBookCache ? priceBookCache[gKey] : null;
+        if (mcFt == null) {
+          if (saved && saved.materialCost != null) mcFt = saved.materialCost;
+          else if (typeof SPIRAL_DEFAULTS !== 'undefined' && SPIRAL_DEFAULTS[sizeKey] && SPIRAL_DEFAULTS[sizeKey][ga] != null) mcFt = SPIRAL_DEFAULTS[sizeKey][ga];
+        }
+        var baseEntry = priceBookCache ? priceBookCache[sizeKey] : null;
+        if (lhFt == null && baseEntry) lhFt = baseEntry.laborHrs;
+      }
+    } else {
+      var dKey = 'duct-' + dShape;
+      var pb = getPriceBookEntry(dKey, m.duct.dims);
+      if (mcFt == null && pb) mcFt = pb.materialCost;
+      if (lhFt == null && pb) lhFt = pb.laborHrs;
+    }
+  }
+  mcFt = mcFt != null ? mcFt : 0;
+  lhFt = lhFt != null ? lhFt : 0;
   var lr = m.laborRate != null ? m.laborRate : 45;
   var totalMat = (mcFt * lenFt).toFixed(2);
   var totalHrs = (lhFt * lenFt).toFixed(1);
