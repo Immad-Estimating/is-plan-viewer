@@ -2079,40 +2079,42 @@ const PRICE_BOOK_TABS = {
         { key: 'spiral-endcap', label: 'End Cap' },
         { key: 'spiral-transition', label: 'Round to Rect Trans.' },
       ]},
-      { id: 'spiral-duct', title: 'Spiral — Ductwork', items: [
-        { key: 'duct-spiral-3', label: '3″ Spiral', gauge: '26' },
-        { key: 'duct-spiral-4', label: '4″ Spiral', gauge: '26' },
-        { key: 'duct-spiral-5', label: '5″ Spiral', gauge: '26' },
-        { key: 'duct-spiral-6', label: '6″ Spiral', gauge: '26' },
-        { key: 'duct-spiral-7', label: '7″ Spiral', gauge: '26' },
-        { key: 'duct-spiral-8', label: '8″ Spiral', gauge: '26' },
-        { key: 'duct-spiral-9', label: '9″ Spiral', gauge: '26' },
-        { key: 'duct-spiral-10', label: '10″ Spiral', gauge: '26' },
-        { key: 'duct-spiral-12', label: '12″ Spiral', gauge: '26' },
-        { key: 'duct-spiral-14', label: '14″ Spiral', gauge: '24' },
-        { key: 'duct-spiral-16', label: '16″ Spiral', gauge: '24' },
-        { key: 'duct-spiral-18', label: '18″ Spiral', gauge: '24' },
-        { key: 'duct-spiral-20', label: '20″ Spiral', gauge: '22' },
-        { key: 'duct-spiral-22', label: '22″ Spiral', gauge: '22' },
-        { key: 'duct-spiral-24', label: '24″ Spiral', gauge: '22' },
-        { key: 'duct-spiral-26', label: '26″ Spiral', gauge: '20' },
-        { key: 'duct-spiral-28', label: '28″ Spiral', gauge: '20' },
-        { key: 'duct-spiral-30', label: '30″ Spiral', gauge: '20' },
-        { key: 'duct-spiral-32', label: '32″ Spiral', gauge: '20' },
-        { key: 'duct-spiral-34', label: '34″ Spiral', gauge: '18' },
-        { key: 'duct-spiral-36', label: '36″ Spiral', gauge: '18' },
-        { key: 'duct-spiral-38', label: '38″ Spiral', gauge: '18' },
-        { key: 'duct-spiral-40', label: '40″ Spiral', gauge: '18' },
-        { key: 'duct-spiral-42', label: '42″ Spiral', gauge: '16' },
-        { key: 'duct-spiral-44', label: '44″ Spiral', gauge: '16' },
-        { key: 'duct-spiral-46', label: '46″ Spiral', gauge: '16' },
-        { key: 'duct-spiral-48', label: '48″ Spiral', gauge: '16' },
-        { key: 'duct-spiral-50', label: '50″ Spiral', gauge: '16' },
-        { key: 'duct-spiral-52', label: '52″ Spiral', gauge: '16' },
-        { key: 'duct-spiral-54', label: '54″ Spiral', gauge: '14' },
-        { key: 'duct-spiral-56', label: '56″ Spiral', gauge: '14' },
-        { key: 'duct-spiral-58', label: '58″ Spiral', gauge: '14' },
-        { key: 'duct-spiral-60', label: '60″ Spiral', gauge: '14' },
+      { id: 'spiral-duct', title: 'Spiral — Ductwork', hasGauge: true, items: [
+        { key: 'duct-spiral-3', label: '3″' },
+        { key: 'duct-spiral-4', label: '4″' },
+        { key: 'duct-spiral-5', label: '5″' },
+        { key: 'duct-spiral-6', label: '6″' },
+        { key: 'duct-spiral-7', label: '7″' },
+        { key: 'duct-spiral-8', label: '8″' },
+        { key: 'duct-spiral-9', label: '9″' },
+        { key: 'duct-spiral-10', label: '10″' },
+        { key: 'duct-spiral-11', label: '11″' },
+        { key: 'duct-spiral-12', label: '12″' },
+        { key: 'duct-spiral-13', label: '13″' },
+        { key: 'duct-spiral-14', label: '14″' },
+        { key: 'duct-spiral-15', label: '15″' },
+        { key: 'duct-spiral-16', label: '16″' },
+        { key: 'duct-spiral-17', label: '17″' },
+        { key: 'duct-spiral-18', label: '18″' },
+        { key: 'duct-spiral-20', label: '20″' },
+        { key: 'duct-spiral-22', label: '22″' },
+        { key: 'duct-spiral-24', label: '24″' },
+        { key: 'duct-spiral-26', label: '26″' },
+        { key: 'duct-spiral-28', label: '28″' },
+        { key: 'duct-spiral-30', label: '30″' },
+        { key: 'duct-spiral-32', label: '32″' },
+        { key: 'duct-spiral-34', label: '34″' },
+        { key: 'duct-spiral-36', label: '36″' },
+        { key: 'duct-spiral-38', label: '38″' },
+        { key: 'duct-spiral-40', label: '40″' },
+        { key: 'duct-spiral-42', label: '42″' },
+        { key: 'duct-spiral-44', label: '44″' },
+        { key: 'duct-spiral-46', label: '46″' },
+        { key: 'duct-spiral-48', label: '48″' },
+        { key: 'duct-spiral-50', label: '50″' },
+        { key: 'duct-spiral-52', label: '52″' },
+        { key: 'duct-spiral-56', label: '56″' },
+        { key: 'duct-spiral-60', label: '60″' },
       ]},
       { id: 'snaplock-fit', title: 'Snap Lock — Fittings', items: [
         { key: 'snaplock-90el', label: '90\u00b0 Elbow' },
@@ -2128,16 +2130,16 @@ const PRICE_BOOK_TABS = {
         { key: 'snaplock-transition', label: 'Round to Rect Trans.' },
       ]},
       { id: 'snaplock-duct', title: 'Snap Lock — Ductwork', items: [
-        { key: 'duct-snaplock-3', label: '3″ Snap Lock', gauge: '26' },
-        { key: 'duct-snaplock-4', label: '4″ Snap Lock', gauge: '26' },
-        { key: 'duct-snaplock-5', label: '5″ Snap Lock', gauge: '26' },
-        { key: 'duct-snaplock-6', label: '6″ Snap Lock', gauge: '26' },
-        { key: 'duct-snaplock-7', label: '7″ Snap Lock', gauge: '26' },
-        { key: 'duct-snaplock-8', label: '8″ Snap Lock', gauge: '26' },
-        { key: 'duct-snaplock-9', label: '9″ Snap Lock', gauge: '26' },
-        { key: 'duct-snaplock-10', label: '10″ Snap Lock', gauge: '26' },
-        { key: 'duct-snaplock-12', label: '12″ Snap Lock', gauge: '26' },
-        { key: 'duct-snaplock-14', label: '14″ Snap Lock', gauge: '26' },
+        { key: 'duct-snaplock-3', label: '3″' },
+        { key: 'duct-snaplock-4', label: '4″' },
+        { key: 'duct-snaplock-5', label: '5″' },
+        { key: 'duct-snaplock-6', label: '6″' },
+        { key: 'duct-snaplock-7', label: '7″' },
+        { key: 'duct-snaplock-8', label: '8″' },
+        { key: 'duct-snaplock-9', label: '9″' },
+        { key: 'duct-snaplock-10', label: '10″' },
+        { key: 'duct-snaplock-12', label: '12″' },
+        { key: 'duct-snaplock-14', label: '14″' },
       ]},
     ]
   },
@@ -2160,8 +2162,63 @@ const PRICE_BOOK_TABS = {
   }
 };
 
-var pbCollapsed = {}; // track collapsed sections by id
-let activePBTab = 'rect';
+var pbCollapsed = {};
+var pbGauge = { 'spiral-duct': '26' }; // active gauge per section
+
+// Default spiral pricing by gauge: key -> { '26': price, '22': price, ... }
+var SPIRAL_DEFAULTS = {
+  'duct-spiral-3':  { '26': 1.38, '22': 2.23, '20': 2.60 },
+  'duct-spiral-4':  { '28': 1.22, '26': 1.81, '22': 2.81, '20': 3.30 },
+  'duct-spiral-5':  { '28': 1.47, '26': 2.65, '22': 3.46, '20': 4.13 },
+  'duct-spiral-6':  { '28': 1.85, '26': 3.24, '22': 4.13, '20': 4.95 },
+  'duct-spiral-7':  { '28': 2.11, '26': 3.63, '22': 4.79, '20': 5.61 },
+  'duct-spiral-8':  { '28': 2.53, '26': 3.12, '22': 5.45, '20': 6.43 },
+  'duct-spiral-9':  { '28': 2.67, '26': 3.42, '22': 6.27, '20': 7.26 },
+  'duct-spiral-10': { '28': 2.94, '26': 3.73, '22': 6.93, '20': 8.09 },
+  'duct-spiral-11': { '28': 3.20, '26': 4.09, '22': 7.59, '20': 8.91 },
+  'duct-spiral-12': { '28': 3.46, '26': 4.45, '22': 8.25, '20': 9.73 },
+  'duct-spiral-13': { '28': 3.72, '26': 4.81, '22': 8.91, '20': 10.56 },
+  'duct-spiral-14': { '28': 3.98, '26': 5.17, '22': 9.57, '20': 11.38 },
+  'duct-spiral-15': { '26': 5.53, '22': 10.23, '20': 12.21 },
+  'duct-spiral-16': { '26': 5.89, '22': 10.89, '20': 12.87 },
+  'duct-spiral-17': { '26': 6.19, '22': 11.71, '20': 13.70 },
+  'duct-spiral-18': { '26': 6.49, '22': 12.38, '20': 14.52 },
+  'duct-spiral-20': { '26': 7.45, '24': 12.76, '22': 12.76, '20': 16.17 },
+  'duct-spiral-22': { '26': 8.06, '24': 13.96, '22': 13.96, '20': 17.82 },
+  'duct-spiral-24': { '26': 9.73, '24': 12.97, '22': 12.97, '20': 19.30 },
+  'duct-spiral-26': { '26': 11.39, '24': 13.82, '22': 13.83, '20': 20.95 },
+  'duct-spiral-28': { '26': 13.06, '24': 14.68, '22': 14.68, '20': 22.61 },
+  'duct-spiral-30': { '26': 14.72, '24': 15.54, '22': 15.54, '20': 24.09 },
+  'duct-spiral-32': { '26': 16.39, '24': 16.39, '22': 16.39, '20': 25.74 },
+  'duct-spiral-34': { '26': 17.50, '24': 17.50, '22': 17.50, '20': 27.39 },
+  'duct-spiral-36': { '26': 18.60, '24': 18.60, '22': 18.60, '20': 29.04 },
+  'duct-spiral-38': { '20': 30.52 },
+  'duct-spiral-40': { '20': 32.17 },
+  'duct-spiral-42': { '20': 33.83 },
+  'duct-spiral-44': { '20': 35.48 },
+  'duct-spiral-46': { '20': 37.13 },
+  'duct-spiral-48': { '20': 38.61 },
+  'duct-spiral-50': { '20': 40.42 },
+  'duct-spiral-52': { '20': 46.92 },
+  'duct-spiral-56': { '20': 53.41 },
+  'duct-spiral-60': { '20': 59.90 },
+};
+
+function getGaugesForSection(sectionId) {
+  if (sectionId !== 'spiral-duct') return null;
+  return ['26', '24', '22', '20', '28'];
+}
+
+function getMaterialForGauge(key, gauge) {
+  // Check user-saved price first
+  var gKey = key + '-g' + gauge;
+  var saved = priceBookCache ? priceBookCache[gKey] : null;
+  if (saved && saved.materialCost != null) return saved.materialCost;
+  // Fall back to defaults
+  var def = SPIRAL_DEFAULTS[key];
+  if (def && def[gauge] != null) return def[gauge];
+  return null;
+}
 
 window.openPriceBook = function() {
   renderPriceBook();
@@ -2182,26 +2239,48 @@ window.togglePBSection = function(sectionId) {
   renderPriceBook();
 };
 
+window.setPBGauge = function(sectionId, gauge) {
+  pbGauge[sectionId] = gauge;
+  renderPriceBook();
+};
+
 function pbInput(key, prop, value) {
   return '<input type="text" value="' + (value != null ? value : '') + '" placeholder="\u2014" style="width:60px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + key + '\',\'' + prop + '\',this.value)">';
 }
 
-function pbRow(item) {
+function pbRow(item, sectionId) {
+  var gauge = pbGauge[sectionId] || null;
+  var entry = priceBookCache ? priceBookCache[item.key] : null;
+  var lh = entry ? entry.laborHrs : null;
+  var mc;
+  if (gauge && SPIRAL_DEFAULTS[item.key]) {
+    mc = getMaterialForGauge(item.key, gauge);
+  } else {
+    mc = entry ? entry.materialCost : null;
+  }
+  var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
+  html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
+  html += '<td style="padding:4px 2px;text-align:right;color:#00ff88;font-size:11px">' + (mc != null ? '$' + mc.toFixed(2) : '\u2014') + '</td>';
+  html += '<td style="padding:4px 2px">' + pbInput(item.key, 'laborHrs', lh) + '</td>';
+  html += '</tr>';
+  return html;
+}
+
+function pbRowEditable(item) {
   var entry = priceBookCache ? priceBookCache[item.key] : null;
   var mc = entry ? entry.materialCost : null;
   var lh = entry ? entry.laborHrs : null;
-  var ga = entry && entry.gauge != null ? entry.gauge : (item.gauge || null);
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
-  html += '<td style="padding:4px 2px">' + pbInput(item.key, 'gauge', ga) + '</td>';
   html += '<td style="padding:4px 2px">' + pbInput(item.key, 'materialCost', mc) + '</td>';
   html += '<td style="padding:4px 2px">' + pbInput(item.key, 'laborHrs', lh) + '</td>';
   html += '</tr>';
   return html;
 }
 
-function pbColumnHeader() {
-  return '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Item</th><th style="padding:4px;text-align:right">Gauge</th><th style="padding:4px;text-align:right">Material $</th><th style="padding:4px;text-align:right">Labor Hrs</th></tr>';
+function pbColumnHeader(hasMaterialInput) {
+  var matLabel = hasMaterialInput ? 'Material $' : '$/Ft';
+  return '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Size</th><th style="padding:4px;text-align:right">' + matLabel + '</th><th style="padding:4px;text-align:right">Labor Hrs</th></tr>';
 }
 
 function renderPriceBook() {
@@ -2220,18 +2299,42 @@ function renderPriceBook() {
 
   var tab = PRICE_BOOK_TABS[activePBTab];
   html += '<table style="width:100%;border-collapse:collapse">';
-  for (var s = 0; s < tab.sections.length; s++) {
-    var sec = tab.sections[s];
+  for (var si = 0; si < tab.sections.length; si++) {
+    var sec = tab.sections[si];
     var collapsed = !!pbCollapsed[sec.id];
     var arrow = collapsed ? '\u25b6' : '\u25bc';
     var count = sec.items.length;
-    html += '<tr onclick="togglePBSection(\'' + sec.id + '\')" style="cursor:pointer;user-select:none">';
-    html += '<td colspan="4" style="padding:10px 4px 4px;font-size:11px;font-weight:700;color:#e94560;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e94560">';
+    var gauges = getGaugesForSection(sec.id);
+
+    // Section header row
+    html += '<tr>';
+    html += '<td colspan="3" style="padding:10px 4px 4px;font-size:11px;font-weight:700;color:#e94560;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e94560;cursor:pointer" onclick="togglePBSection(\'' + sec.id + '\')">';
     html += arrow + '  ' + sec.title + ' <span style="font-weight:400;color:#a0a0c0;font-size:10px;text-transform:none">(' + count + ')</span>';
+    // Gauge selector inline with header
+    if (gauges && !collapsed) {
+      var activeG = pbGauge[sec.id] || '26';
+      html += '<span style="float:right;font-weight:400;text-transform:none">';
+      for (var gi = 0; gi < gauges.length; gi++) {
+        var g = gauges[gi];
+        var gStyle = g === activeG
+          ? 'background:#e94560;color:#fff;border-color:#e94560'
+          : 'background:#1a1a2e;color:#a0a0c0;border-color:#0f3460';
+        html += '<button onclick="event.stopPropagation();setPBGauge(\'' + sec.id + '\',\'' + g + '\')" style="padding:2px 6px;border-radius:3px;cursor:pointer;font-size:10px;font-weight:600;border:1px solid;margin-left:3px;' + gStyle + '">' + g + 'ga</button>';
+      }
+      html += '</span>';
+    }
     html += '</td></tr>';
+
     if (!collapsed) {
-      html += pbColumnHeader();
-      for (var j = 0; j < sec.items.length; j++) html += pbRow(sec.items[j]);
+      var hasGauge = !!sec.hasGauge;
+      html += pbColumnHeader(!hasGauge);
+      for (var j = 0; j < sec.items.length; j++) {
+        if (hasGauge) {
+          html += pbRow(sec.items[j], sec.id);
+        } else {
+          html += pbRowEditable(sec.items[j]);
+        }
+      }
     }
   }
   html += '</table>';
@@ -2241,8 +2344,7 @@ function renderPriceBook() {
 
 window.updatePBEntry = async function(key, prop, value) {
   var existing = (priceBookCache && priceBookCache[key]) || { key: key };
-  if (prop === 'gauge') { existing.gauge = value.trim() || null; }
-  else { existing[prop] = value === '' ? null : parseFloat(value) || null; }
+  existing[prop] = value === '' ? null : parseFloat(value) || null;
   await savePriceBookEntry(key, existing);
 };
 
