@@ -2401,6 +2401,7 @@ window.addEventListener('mouseup', () => {
     return;
   }
   if (isDraggingStack || isDraggingCallout) {
+    const wasDraggingWholeStack = isDraggingStack;
     isDraggingStack = false;
     isDraggingCallout = false;
     dragStackId = null;
@@ -2410,6 +2411,7 @@ window.addEventListener('mouseup', () => {
     dragCalloutStart = null;
     viewer.classList.remove('grabbing');
     viewer.style.cursor = '';
+    if (wasDraggingWholeStack) hideStackPalette();
     drawMeasureOverlay();
     updatePanel();
     scheduleSave();
@@ -2530,6 +2532,8 @@ viewer.addEventListener('click', (e) => {
       if (stackHit.type === 'stackPoint') {
         selectedStackId = stackHit.stackId;
         selectedStackItemId = null;
+        const stack = (pageStacks[currentPage] || []).find(s => s.id === stackHit.stackId);
+        if (stack) showStackPalette(stack);
         drawMeasureOverlay();
         updatePanel();
         return;
