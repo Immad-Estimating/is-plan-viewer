@@ -662,14 +662,17 @@
 </div>
 
 <!-- ===== PRICE BOOK MODAL ===== -->
-<div class="modal-overlay" id="priceBookModal">
-  <div class="modal" style="width:560px;max-height:85vh;resize:both;overflow:auto;min-width:380px;min-height:300px">
-    <h3>💲 Global Price Book</h3>
-    <div style="font-size:11px;color:#a0a0c0;margin-bottom:12px">Prices apply to all projects. Set base rates per fitting type and duct type.</div>
-    <div id="priceBookContent" style="overflow-y:auto;flex:1;max-height:55vh"></div>
-    <div class="modal-btns">
-      <button class="cancel-btn" onclick="closePriceBook()">Close</button>
-    </div>
+<div id="priceBookPanel" style="display:none;position:fixed;z-index:300;background:#16213e;border:1px solid #0f3460;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.6);flex-direction:column;overflow:hidden;min-width:340px;min-height:250px">
+  <div id="pbTitleBar" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#0f3460;cursor:move;user-select:none;border-radius:10px 10px 0 0;flex-shrink:0">
+    <span style="font-weight:700;font-size:14px;color:#e94560">💲 Price Book</span>
+    <button onclick="closePriceBook()" style="background:none;border:none;color:#a0a0c0;cursor:pointer;font-size:18px;padding:0 4px;line-height:1" title="Close">×</button>
+  </div>
+  <div style="padding:8px 12px 4px;flex-shrink:0">
+    <div style="font-size:10px;color:#a0a0c0">Prices apply to all projects</div>
+  </div>
+  <div id="priceBookContent" style="overflow-y:auto;flex:1;padding:0 12px 12px"></div>
+  <div id="pbResizeHandle" style="position:absolute;bottom:0;right:0;width:16px;height:16px;cursor:nwse-resize;opacity:0.4" title="Drag to resize">
+    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M14 14L8 14L14 8Z" fill="#a0a0c0"/><path d="M14 14L11 14L14 11Z" fill="#666"/></svg>
   </div>
 </div>
 
@@ -2221,28 +2224,108 @@ function getMaterialForGauge(key, gauge) {
   return null;
 }
 
+// Price Book panel — drag, resize, persist position/size
+var _pbDrag = null;
+var _pbResize = null;
+
+function pbRestoreLayout() {
+  var saved = localStorage.getItem('pbLayout');
+  if (saved) {
+    try { return JSON.parse(saved); } catch(e) {}
+  }
+  return null;
+}
+
+function pbSaveLayout() {
+  var panel = document.getElementById('priceBookPanel');
+  if (!panel) return;
+  var layout = {
+    left: panel.style.left,
+    top: panel.style.top,
+    width: panel.style.width,
+    height: panel.style.height,
+    collapsed: pbCollapsed,
+    gauge: pbGauge,
+    tab: activePBTab
+  };
+  localStorage.setItem('pbLayout', JSON.stringify(layout));
+}
+
+function pbApplyLayout(panel) {
+  var layout = pbRestoreLayout();
+  if (layout) {
+    if (layout.left) panel.style.left = layout.left;
+    if (layout.top) panel.style.top = layout.top;
+    if (layout.width) panel.style.width = layout.width;
+    if (layout.height) panel.style.height = layout.height;
+    if (layout.collapsed) pbCollapsed = layout.collapsed;
+    if (layout.gauge) pbGauge = layout.gauge;
+    if (layout.tab) activePBTab = layout.tab;
+  } else {
+    panel.style.width = '480px';
+    panel.style.height = '520px';
+    panel.style.left = (window.innerWidth - 480) / 2 + 'px';
+    panel.style.top = (window.innerHeight - 520) / 2 + 'px';
+  }
+}
+
+function pbInitDrag() {
+  var titleBar = document.getElementById('pbTitleBar');
+  var panel = document.getElementById('priceBookPanel');
+  titleBar.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'BUTTON') return;
+    _pbDrag = { startX: e.clientX, startY: e.clientY, origLeft: parseInt(panel.style.left) || 0, origTop: parseInt(panel.style.top) || 0 };
+    e.preventDefault();
+  });
+  var resizeHandle = document.getElementById('pbResizeHandle');
+  resizeHandle.addEventListener('mousedown', function(e) {
+    _pbResize = { startX: e.clientX, startY: e.clientY, origW: panel.offsetWidth, origH: panel.offsetHeight };
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (_pbDrag) {
+      panel.style.left = (_pbDrag.origLeft + e.clientX - _pbDrag.startX) + 'px';
+      panel.style.top = (_pbDrag.origTop + e.clientY - _pbDrag.startY) + 'px';
+    }
+    if (_pbResize) {
+      var newW = Math.max(340, _pbResize.origW + e.clientX - _pbResize.startX);
+      var newH = Math.max(250, _pbResize.origH + e.clientY - _pbResize.startY);
+      panel.style.width = newW + 'px';
+      panel.style.height = newH + 'px';
+    }
+  });
+  document.addEventListener('mouseup', function() {
+    if (_pbDrag || _pbResize) { _pbDrag = null; _pbResize = null; pbSaveLayout(); }
+  });
+}
+
 window.openPriceBook = function() {
-  try {
-    renderPriceBook();
-  } catch(e) {
-    console.error('[PriceBook] Render error:', e.message, e.stack);
+  var panel = document.getElementById('priceBookPanel');
+  if (panel.style.display === 'flex') { closePriceBook(); return; } // toggle
+  pbApplyLayout(panel);
+  panel.style.display = 'flex';
+  try { renderPriceBook(); } catch(e) {
+    console.error('[PriceBook]', e);
     document.getElementById('priceBookContent').innerHTML = '<div style="color:#e94560;padding:12px">Error: ' + e.message + '</div>';
   }
-  document.getElementById('priceBookModal').classList.add('open');
 };
 
 window.closePriceBook = function() {
-  document.getElementById('priceBookModal').classList.remove('open');
+  pbSaveLayout();
+  document.getElementById('priceBookPanel').style.display = 'none';
 };
 
 window.setPBTab = function(tab) {
   activePBTab = tab;
   renderPriceBook();
+  pbSaveLayout();
 };
 
 window.togglePBSection = function(sectionId) {
   pbCollapsed[sectionId] = !pbCollapsed[sectionId];
   renderPriceBook();
+  pbSaveLayout();
 };
 
 window.setPBGauge = function(sectionId, gauge) {
@@ -6520,6 +6603,7 @@ async function init() {
     window.location.hash = '#/';
   }
   
+  pbInitDrag();
   handleRoute();
 }
 
