@@ -729,8 +729,13 @@ function openDB() {
         db.createObjectStore('priceBook', { keyPath: 'key' });
       }
     };
+    req.onblocked = () => {
+      console.warn('[IDB] Database upgrade blocked — close other tabs and reload');
+      // Force resolve with null so app doesn't hang; will retry on next operation
+      resolve(null);
+    };
     req.onsuccess = (e) => { dbInstance = e.target.result; resolve(dbInstance); };
-    req.onerror = (e) => reject(e.target.error);
+    req.onerror = (e) => { console.error('[IDB] Open error:', e.target.error); reject(e.target.error); };
   });
 }
 
@@ -746,6 +751,7 @@ async function idbGet(storeName, key) {
 
 async function idbGetAll(storeName) {
   const db = await openDB();
+  if (!db || !db.objectStoreNames.contains(storeName)) return [];
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, 'readonly');
     const req = tx.objectStore(storeName).getAll();
@@ -767,6 +773,7 @@ async function idbGetAllByIndex(storeName, indexName, value) {
 
 async function idbPut(storeName, value) {
   const db = await openDB();
+  if (!db || !db.objectStoreNames.contains(storeName)) { console.warn('[IDB] Store not found:', storeName); return; }
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, 'readwrite');
     const req = tx.objectStore(storeName).put(value);
@@ -2004,9 +2011,14 @@ async function saveProjectRateTable(projectId) {
 let priceBookCache = null; // loaded once on init, { '90el': { materialCost, laborHrs, sizeRules:{} }, ... }
 
 async function loadPriceBook() {
-  const all = await idbGetAll('priceBook');
-  priceBookCache = {};
-  for (const entry of all) priceBookCache[entry.key] = entry;
+  try {
+    const all = await idbGetAll('priceBook');
+    priceBookCache = {};
+    for (const entry of all) priceBookCache[entry.key] = entry;
+  } catch(e) {
+    console.warn('[PriceBook] Could not load:', e);
+    priceBookCache = {};
+  }
 }
 
 function getPriceBookEntry(type, sizeA) {
