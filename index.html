@@ -2248,10 +2248,21 @@ function getCostDefaults(type, sizeA, sizeB) {
   // Special case: rectTap has no prefix
   if (type === 'rectTap') pbKey = 'rectTap';
   const pb = getPriceBookEntry(pbKey, sizeA);
+  var mc = pb ? pb.materialCost : null;
+  var lh = pb ? pb.laborHrs : null;
+  // Per-size fitting lookup from defaults (e.g., spiral-wye-12 at 26ga)
+  if (mc == null && sizeA) {
+    var sizeNum = parseInt(sizeA);
+    if (sizeNum) {
+      var gauge = document.getElementById('fpGauge') ? document.getElementById('fpGauge').value : '26';
+      var sizeKey = pbKey + '-' + sizeNum;
+      mc = getMaterialForGauge(sizeKey, gauge);
+    }
+  }
   return {
     phase: rt.defaultPhase || 'rough',
-    materialCost: pb ? pb.materialCost : null,
-    laborHrs: pb ? pb.laborHrs : null,
+    materialCost: mc,
+    laborHrs: lh,
     laborRate: rt.laborRatePerHr || 45,
     costGroup: null,
     costOverride: false
@@ -2516,6 +2527,21 @@ var SPIRAL_DEFAULTS = {
   'duct-spiral-32': { '26': 16.39, '24': 16.39, '22': 16.39 },
   'duct-spiral-34': { '26': 17.50, '24': 17.50, '22': 17.50 },
   'duct-spiral-36': { '26': 18.60, '24': 18.60, '22': 18.60 },
+  // Spiral Wye fitting pricing (key: 'spiral-wye-{size}', per gauge)
+  'spiral-wye-4':  { '26': 14.03 },
+  'spiral-wye-5':  { '26': 14.03 },
+  'spiral-wye-6':  { '26': 14.03 },
+  'spiral-wye-7':  { '26': 15.68 },
+  'spiral-wye-8':  { '26': 16.50 },
+  'spiral-wye-9':  { '26': 18.14 },
+  'spiral-wye-10': { '26': 19.15 },
+  'spiral-wye-12': { '26': 25.91 },
+  'spiral-wye-14': { '26': 32.72 },
+  'spiral-wye-16': { '26': 43.34 },
+  'spiral-wye-18': { '26': 57.22 },
+  'spiral-wye-20': { '26': 68.28 },
+  'spiral-wye-22': { '26': 92.11 },
+  'spiral-wye-24': { '26': 96.95 },
 };
 
 var SNAPLOCK_DEFAULTS = {
