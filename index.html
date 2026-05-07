@@ -1789,6 +1789,7 @@ async function renderDrawingManager(projectId) {
         </div>
         <div class="di-actions">
           <button onclick="event.stopPropagation(); event.preventDefault(); renameDrawing(${d.id})" title="Rename">✏️</button>
+          <button onclick="event.stopPropagation(); event.preventDefault(); reuploadDrawing(${d.id})" title="Re-upload PDF (keeps takeoff data)">🔄</button>
           <button onclick="event.stopPropagation(); event.preventDefault(); duplicateDrawing(${d.id})" title="Duplicate">📋</button>
           <button onclick="event.stopPropagation(); event.preventDefault(); deleteDrawing(${d.id}, '${safeName}')" title="Delete">🗑️</button>
         </div>
@@ -1883,6 +1884,41 @@ function formatFileSize(bytes) {
 
 window.openDrawing = function(projectId, drawingId) {
   navigateTo(`#/project/${projectId}/drawing/${drawingId}`);
+};
+
+// Re-upload PDF into an existing drawing (replaces broken/missing PDF, keeps all takeoff data)
+window.reuploadDrawing = function(drawingId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file || file.type !== 'application/pdf') {
+      alert('⚠️ Please select a PDF file.');
+      return;
+    }
+    const drawing = await idbGet('drawings', drawingId);
+    if (!drawing) { alert('⚠️ Drawing not found.'); return; }
+    // Read new PDF blob and page count
+    const pdfBlob = file.slice(0, file.size, 'application/pdf');
+    let pageCount = 0;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const tempDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      pageCount = tempDoc.numPages;
+    } catch (err) {
+      console.warn('Could not read PDF page count:', err);
+    }
+    // Update drawing record — keep ID, takeoff data, just replace the PDF
+    drawing.pdfBlob = pdfBlob;
+    drawing.fileSize = file.size;
+    if (pageCount) drawing.pageCount = pageCount;
+    drawing.modifiedAt = Date.now();
+    await idbPut('drawings', drawing);
+    showToast(`PDF replaced for "${drawing.fileName}" — takeoff data preserved`);
+    renderDrawingManager(currentManagerProjectId);
+  };
+  input.click();
 };
 
 window.deleteDrawing = function(drawingId, fileName) {
