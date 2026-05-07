@@ -2283,6 +2283,8 @@ function getDuctCostDefaults(ductConfig) {
           mc = saved.materialCost;
         } else if (typeof SPIRAL_DEFAULTS !== 'undefined' && SPIRAL_DEFAULTS[sizeKey] && SPIRAL_DEFAULTS[sizeKey][gauge] != null) {
           mc = SPIRAL_DEFAULTS[sizeKey][gauge];
+        } else if (typeof SNAPLOCK_DEFAULTS !== 'undefined' && SNAPLOCK_DEFAULTS[sizeKey] && SNAPLOCK_DEFAULTS[sizeKey][gauge] != null) {
+          mc = SNAPLOCK_DEFAULTS[sizeKey][gauge];
         }
         // Also check for labor hrs on the base key
         var baseEntry = priceBookCache ? priceBookCache[sizeKey] : null;
@@ -2454,6 +2456,11 @@ const PRICE_BOOK_TABS = {
         { key: 'duct-snaplock-10', label: '10″' },
         { key: 'duct-snaplock-12', label: '12″' },
         { key: 'duct-snaplock-14', label: '14″' },
+        { key: 'duct-snaplock-16', label: '16″' },
+        { key: 'duct-snaplock-18', label: '18″' },
+        { key: 'duct-snaplock-20', label: '20″' },
+        { key: 'duct-snaplock-22', label: '22″' },
+        { key: 'duct-snaplock-24', label: '24″' },
       ]},
     ]
   },
@@ -2509,6 +2516,23 @@ var SPIRAL_DEFAULTS = {
   'duct-spiral-36': { '26': 18.60, '24': 18.60, '22': 18.60 },
 };
 
+var SNAPLOCK_DEFAULTS = {
+  'duct-snaplock-4':  { '26': 1.66 },
+  'duct-snaplock-5':  { '26': 2.02 },
+  'duct-snaplock-6':  { '26': 2.46 },
+  'duct-snaplock-7':  { '26': 2.79 },
+  'duct-snaplock-8':  { '26': 3.23 },
+  'duct-snaplock-9':  { '26': 3.59 },
+  'duct-snaplock-10': { '26': 4.06 },
+  'duct-snaplock-12': { '26': 4.80 },
+  'duct-snaplock-14': { '26': 5.42 },
+  'duct-snaplock-16': { '26': 9.17 },
+  'duct-snaplock-18': { '26': 9.28 },
+  'duct-snaplock-20': { '26': 9.18 },
+  'duct-snaplock-22': { '26': 15.07 },
+  'duct-snaplock-24': { '26': 16.47 },
+};
+
 function getGaugesForSection(sectionId) {
   return ['26', '24', '22'];
 }
@@ -2518,9 +2542,11 @@ function getMaterialForGauge(key, gauge) {
   var gKey = key + '-g' + gauge;
   var saved = priceBookCache ? priceBookCache[gKey] : null;
   if (saved && saved.materialCost != null) return saved.materialCost;
-  // Fall back to defaults
+  // Fall back to defaults — check both spiral and snap lock tables
   var def = SPIRAL_DEFAULTS[key];
   if (def && def[gauge] != null) return def[gauge];
+  var slDef = SNAPLOCK_DEFAULTS[key];
+  if (slDef && slDef[gauge] != null) return slDef[gauge];
   return null;
 }
 
@@ -2643,7 +2669,7 @@ function pbRow(item, sectionId) {
   var entry = priceBookCache ? priceBookCache[item.key] : null;
   var lh = entry ? entry.laborHrs : null;
   var mc;
-  if (gauge && SPIRAL_DEFAULTS[item.key]) {
+  if (gauge && (SPIRAL_DEFAULTS[item.key] || SNAPLOCK_DEFAULTS[item.key])) {
     mc = getMaterialForGauge(item.key, gauge);
   } else {
     mc = entry ? entry.materialCost : null;
