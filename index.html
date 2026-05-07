@@ -1887,6 +1887,7 @@ window.openDrawing = function(projectId, drawingId) {
 };
 
 // Re-upload PDF into an existing drawing (replaces broken/missing PDF, keeps all takeoff data)
+// Safety: validates page count matches original to prevent orphaned takeoff data
 window.reuploadDrawing = function(drawingId) {
   const input = document.createElement('input');
   input.type = 'file';
@@ -1901,18 +1902,41 @@ window.reuploadDrawing = function(drawingId) {
     if (!drawing) { alert('⚠️ Drawing not found.'); return; }
     // Read new PDF blob and page count
     const pdfBlob = file.slice(0, file.size, 'application/pdf');
-    let pageCount = 0;
+    let newPageCount = 0;
     try {
       const arrayBuffer = await file.arrayBuffer();
       const tempDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      pageCount = tempDoc.numPages;
+      newPageCount = tempDoc.numPages;
     } catch (err) {
       console.warn('Could not read PDF page count:', err);
+    }
+    const origPages = drawing.pageCount || 0;
+    // Check which pages have takeoff data
+    const pageData = await idbGetAllByIndex('pageData', 'drawingId', drawingId);
+    const pagesWithWork = pageData.filter(pd => {
+      const m = pd.measurements || [];
+      const f = pd.fittings || [];
+      const s = pd.stacks || [];
+      return m.length > 0 || f.length > 0 || s.length > 0;
+    });
+    const maxPageWithWork = pagesWithWork.reduce((max, pd) => {
+      const pageNum = parseInt(String(pd.id).split('-').pop()) || 0;
+      return Math.max(max, pageNum);
+    }, 0);
+    // BLOCK: new PDF has fewer pages than the highest page with takeoff data
+    if (newPageCount > 0 && maxPageWithWork > 0 && newPageCount < maxPageWithWork) {
+      alert(`⚠️ Cannot replace: the new PDF has ${newPageCount} page${newPageCount !== 1 ? 's' : ''} but you have takeoff work on page ${maxPageWithWork}.\n\nUpload the same file (or one with at least ${maxPageWithWork} pages) to avoid losing work.`);
+      return;
+    }
+    // WARN: page count mismatch (but no data would be lost)
+    if (origPages > 0 && newPageCount > 0 && newPageCount !== origPages) {
+      const proceed = confirm(`⚠️ Page count mismatch:\n\nOriginal: ${origPages} pages\nNew file: ${newPageCount} pages\n\nThis is meant for re-uploading the SAME file (e.g., to fix a corrupted PDF). A different file may cause takeoff positions to be wrong.\n\nContinue anyway?`);
+      if (!proceed) return;
     }
     // Update drawing record — keep ID, takeoff data, just replace the PDF
     drawing.pdfBlob = pdfBlob;
     drawing.fileSize = file.size;
-    if (pageCount) drawing.pageCount = pageCount;
+    if (newPageCount) drawing.pageCount = newPageCount;
     drawing.modifiedAt = Date.now();
     await idbPut('drawings', drawing);
     showToast(`PDF replaced for "${drawing.fileName}" — takeoff data preserved`);
