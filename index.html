@@ -2404,6 +2404,7 @@ const PRICE_BOOK_TABS = {
         { key: 'spiral-reducer', label: 'Concentric Reducer' },
         { key: 'spiral-eccReducer', label: 'Eccentric Reducer' },
         { key: 'spiral-endcap', label: 'End Cap' },
+        { key: 'spiral-coupling', label: 'Coupling' },
         { key: 'spiral-transition', label: 'Round to Rect Trans.' },
       ]},
       { id: 'spiral-duct', hasGauge: true, title: 'Spiral — Ductwork', hasGauge: true, items: [
@@ -2443,6 +2444,7 @@ const PRICE_BOOK_TABS = {
         { key: 'snaplock-reducer', label: 'Concentric Reducer' },
         { key: 'snaplock-eccReducer', label: 'Eccentric Reducer' },
         { key: 'snaplock-endcap', label: 'End Cap' },
+        { key: 'snaplock-coupling', label: 'Coupling' },
         { key: 'snaplock-transition', label: 'Round to Rect Trans.' },
       ]},
       { id: 'snaplock-duct', hasGauge: true, title: 'Snap Lock — Ductwork', items: [
@@ -4293,6 +4295,13 @@ function getFittingConnPoints(f) {
     case 'endcap': {
       // drawEndCap: single opening at x=0
       points.push(r(0, 0));
+      break;
+    }
+    case 'coupling': {
+      // drawCoupling: two openings, inline connector from -len/2 to +len/2
+      const cLen = D * 1.2;
+      points.push(r(-cLen/2, 0)); // left opening
+      points.push(r(cLen/2, 0));  // right opening
       break;
     }
     default:
@@ -6435,6 +6444,7 @@ function drawFitting(f, isSelected) {
     case 'reducer': drawReducer(D, D2, false); break;
     case 'eccReducer': drawReducer(D, D2, true); break;
     case 'endcap': drawEndCap(D); break;
+    case 'coupling': drawCoupling(D); break;
     case 'transition': drawTransition(D, D2); break;
     case 'sqwing': drawSquareWing(D); break;
     case 'rectTap': drawRectTap(D, D2); break;
@@ -6918,6 +6928,39 @@ function drawEndCap(D) {
   mCtx.lineTo(0, halfW);
   mCtx.lineTo(depth, halfW);
   mCtx.lineTo(depth, -halfW);
+  mCtx.closePath();
+  mCtx.stroke();
+}
+
+function drawCoupling(D) {
+  const halfW = D / 2;
+  const len = D * 1.2;
+  const bandW = D * 0.15; // coupling band width
+  // Outer sleeve (slightly wider than duct to show the coupling collar)
+  const sleeveH = halfW * 1.15;
+  mCtx.beginPath();
+  mCtx.moveTo(-len/2, -halfW);
+  mCtx.lineTo(-len/2, halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(len/2, -halfW);
+  mCtx.lineTo(len/2, halfW);
+  mCtx.stroke();
+  // Top and bottom lines
+  mCtx.beginPath();
+  mCtx.moveTo(-len/2, -halfW);
+  mCtx.lineTo(len/2, -halfW);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(-len/2, halfW);
+  mCtx.lineTo(len/2, halfW);
+  mCtx.stroke();
+  // Center band (the coupling collar / raised ring)
+  mCtx.beginPath();
+  mCtx.moveTo(-bandW, -sleeveH);
+  mCtx.lineTo(-bandW, sleeveH);
+  mCtx.lineTo(bandW, sleeveH);
+  mCtx.lineTo(bandW, -sleeveH);
   mCtx.closePath();
   mCtx.stroke();
 }
