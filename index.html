@@ -2571,6 +2571,7 @@ function pbSaveLayout() {
     height: panel.style.height,
     collapsed: pbCollapsed,
     gauge: pbGauge,
+    roundType: pbRoundType,
     tab: activePBTab
   };
   localStorage.setItem('pbLayout', JSON.stringify(layout));
@@ -2584,7 +2585,17 @@ function pbApplyLayout(panel) {
     if (layout.width) panel.style.width = layout.width;
     if (layout.height) panel.style.height = layout.height;
     if (layout.collapsed) pbCollapsed = layout.collapsed;
-    if (layout.gauge) pbGauge = layout.gauge;
+    if (layout.gauge) {
+      // Merge saved gauges with defaults (handles renamed section IDs)
+      for (var gk in layout.gauge) {
+        pbGauge[gk] = layout.gauge[gk];
+      }
+    }
+    if (layout.roundType) {
+      for (var rk in layout.roundType) {
+        pbRoundType[rk] = layout.roundType[rk];
+      }
+    }
     if (layout.tab) activePBTab = layout.tab;
   } else {
     panel.style.width = '480px';
@@ -2662,6 +2673,7 @@ window.togglePBRoundType = function(sectionId) {
   var current = pbRoundType[sectionId] || 'spiral';
   pbRoundType[sectionId] = current === 'spiral' ? 'snaplock' : 'spiral';
   renderPriceBook();
+  pbSaveLayout();
 };
 
 function pbInput(key, prop, value) {
