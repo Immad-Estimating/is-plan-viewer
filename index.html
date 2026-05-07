@@ -2729,7 +2729,7 @@ function pbRow(item, sectionId) {
       var szEntry = priceBookCache ? priceBookCache[sizeKey] : null;
       var szLh = szEntry ? szEntry.laborHrs : null;
       html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.15);background:rgba(15,52,96,0.15)">';
-      html += '<td style="padding:3px 4px 3px 20px;color:#a0a0c0;font-size:10px">' + sz + '\u2033</td>';
+      html += '<td onclick="togglePBItemExpand(\'' + activeKey + '\')" style="padding:3px 4px 3px 20px;color:#a0a0c0;font-size:10px;cursor:pointer">' + sz + '\u2033</td>';
       html += '<td style="padding:3px 2px">' + pbInput(szGaugeKey, 'materialCost', szMc) + '</td>';
       html += '<td style="padding:3px 2px">' + pbInput(sizeKey, 'laborHrs', szLh) + '</td>';
       html += '</tr>';
