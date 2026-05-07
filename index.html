@@ -839,7 +839,7 @@ async function idbDeleteByIndex(storeName, indexName, value) {
 // Backup & Restore (IndexedDB Export/Import)
 // =====================================================
 
-async function exportBackup() {
+window.exportBackup = async function() {
   try {
     const db = await openDB();
     if (!db) { alert('⚠️ Database not available. Try reloading the page.'); return; }
@@ -898,7 +898,7 @@ async function exportBackup() {
   }
 }
 
-async function importBackup(event) {
+window.importBackup = async function(event) {
   const file = event.target.files[0];
   event.target.value = ''; // reset so same file can be re-selected
   if (!file) return;
