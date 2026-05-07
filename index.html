@@ -842,7 +842,7 @@ async function idbDeleteByIndex(storeName, indexName, value) {
 async function exportBackup() {
   try {
     const db = await openDB();
-    if (!db) { showToast('Database not available', true); return; }
+    if (!db) { alert('⚠️ Database not available. Try reloading the page.'); return; }
     const storeNames = Array.from(db.objectStoreNames);
     const backup = {
       exportDate: new Date().toISOString(),
@@ -862,17 +862,39 @@ async function exportBackup() {
       backup.stores[name] = data;
       totalRecords += data.length;
     }
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const jsonStr = JSON.stringify(backup, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = `is-plan-viewer-backup-${dateStr}.json`;
+    // Try showSaveFilePicker (lets user choose location) — falls back to auto-download
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: fileName,
+          types: [{ description: 'JSON Backup', accept: { 'application/json': ['.json'] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
+        alert(`✅ Backup saved successfully!\n\n📁 ${handle.name}\n📊 ${totalRecords.toLocaleString()} records across ${storeNames.length} stores\n💾 File size: ${sizeMB} MB`);
+        return;
+      } catch (pickerErr) {
+        if (pickerErr.name === 'AbortError') return; // user cancelled
+        // Fall through to legacy download
+      }
+    }
+    // Legacy fallback — downloads to browser default folder
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    const dateStr = new Date().toISOString().slice(0, 10);
-    a.download = `is-plan-viewer-backup-${dateStr}.json`;
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(a.href);
-    showToast(`Backup downloaded — ${totalRecords.toLocaleString()} records across ${storeNames.length} stores`);
+    const sizeMB = (blob.size / 1024 / 1024).toFixed(1);
+    alert(`✅ Backup downloaded!\n\n📁 File: ${fileName}\n📍 Location: Your browser's Downloads folder\n📊 ${totalRecords.toLocaleString()} records across ${storeNames.length} stores\n💾 File size: ${sizeMB} MB`);
   } catch (err) {
     console.error('[Backup] Export failed:', err);
-    showToast('Backup failed — see console for details', true);
+    alert('⚠️ Backup failed. Open DevTools (F12) → Console for details.');
   }
 }
 
