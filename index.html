@@ -1772,8 +1772,8 @@ async function renderDrawingManager(projectId) {
     // Sort by uploadedAt desc
     const sorted = [...drawings].sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0));
     for (const d of sorted) {
-      const lastTouched = Math.max(d.uploadedAt || 0, d.modifiedAt || 0);
-      const dateStr = lastTouched ? formatDateTime(lastTouched) : '';
+      const createdStr = d.uploadedAt ? formatDateTime(d.uploadedAt) : '';
+      const modifiedStr = d.modifiedAt ? formatDateTime(d.modifiedAt) : '';
       const size = d.fileSize ? formatFileSize(d.fileSize) : '';
       const pages = d.pageCount ? `${d.pageCount} page${d.pageCount !== 1 ? 's' : ''}` : '';
       const safeName = escapeHtml(d.fileName).replace(/'/g, "\\'");
@@ -1783,7 +1783,8 @@ async function renderDrawingManager(projectId) {
           <div class="di-meta">
             ${pages ? `<span>${pages}</span>` : ''}
             ${size ? `<span>${size}</span>` : ''}
-            ${dateStr ? `<span>${dateStr}</span>` : ''}
+            ${createdStr ? `<span>Created: ${createdStr}</span>` : ''}
+            ${modifiedStr ? `<span>Modified: ${modifiedStr}</span>` : ''}
           </div>
         </div>
         <div class="di-actions">
@@ -2786,6 +2787,14 @@ async function saveCurrentPageData() {
     annoFillOpacity: annoFillOpacity
   });
   
+  // Update drawing modifiedAt
+  if (activeDrawingId) {
+    const drawing = await idbGet('drawings', activeDrawingId);
+    if (drawing) {
+      drawing.modifiedAt = Date.now();
+      await idbPut('drawings', drawing);
+    }
+  }
   // Update project modifiedAt
   if (activeProjectId) {
     const project = await idbGet('projects', activeProjectId);
