@@ -2405,18 +2405,18 @@ const PRICE_BOOK_TABS = {
     label: 'Round',
     sections: [
       { id: 'round-fit', hasGauge: true, title: 'Fittings', toggleType: true, items: [
-        { key: 'spiral-90el', snapKey: 'snaplock-90el', label: '90° Elbow' },
-        { key: 'spiral-45el', snapKey: 'snaplock-45el', label: '45° Elbow' },
-        { key: 'spiral-22el', snapKey: 'snaplock-22el', label: '22.5° Elbow' },
-        { key: 'spiral-tee', snapKey: 'snaplock-tee', label: 'Tee' },
-        { key: 'spiral-saddle45y', snapKey: 'snaplock-saddle45y', label: 'Saddle 45° Wye' },
-        { key: 'spiral-lateral', snapKey: 'snaplock-lateral', label: '45° Lateral' },
-        { key: 'spiral-wye', snapKey: 'snaplock-wye', label: 'Wye' },
-        { key: 'spiral-reducer', snapKey: 'snaplock-reducer', label: 'Concentric Reducer' },
-        { key: 'spiral-eccReducer', snapKey: 'snaplock-eccReducer', label: 'Eccentric Reducer' },
-        { key: 'spiral-endcap', snapKey: 'snaplock-endcap', label: 'End Cap' },
-        { key: 'spiral-coupling', snapKey: 'snaplock-coupling', label: 'Coupling' },
-        { key: 'spiral-transition', snapKey: 'snaplock-transition', label: 'Round to Rect Trans.' },
+        { key: 'spiral-90el', snapKey: 'snaplock-90el', label: '90° Elbow', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-45el', snapKey: 'snaplock-45el', label: '45° Elbow', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-22el', snapKey: 'snaplock-22el', label: '22.5° Elbow', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-tee', snapKey: 'snaplock-tee', label: 'Tee', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-saddle45y', snapKey: 'snaplock-saddle45y', label: 'Saddle 45° Wye', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-lateral', snapKey: 'snaplock-lateral', label: '45° Lateral', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-wye', snapKey: 'snaplock-wye', label: 'Wye', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-reducer', snapKey: 'snaplock-reducer', label: 'Concentric Reducer', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-eccReducer', snapKey: 'snaplock-eccReducer', label: 'Eccentric Reducer', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-endcap', snapKey: 'snaplock-endcap', label: 'End Cap', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-coupling', snapKey: 'snaplock-coupling', label: 'Coupling', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-transition', snapKey: 'snaplock-transition', label: 'Round to Rect Trans.', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
       ]},
       { id: 'round-duct', hasGauge: true, title: 'Ductwork', toggleType: true, items: [
         { key: 'duct-spiral-3', snapKey: 'duct-snaplock-3', label: '3\u2033' },
@@ -2470,6 +2470,7 @@ var pbCollapsed = {};
 var pbGauge = { 'round-fit': '26', 'round-duct': '26', 'rect-fit': '26', 'rect-duct': '26', 'oval-fit': '26', 'oval-duct': '26' }; // active gauge per section
 var activePBTab = 'rect';
 var pbRoundType = { 'round-fit': 'spiral', 'round-duct': 'spiral' }; // toggle: 'spiral' or 'snaplock'
+var pbExpandedItems = {}; // tracks which fitting rows are expanded to show per-size pricing
 
 // Default spiral pricing by gauge: key -> { '26': price, '22': price, ... }
 var SPIRAL_DEFAULTS = {
@@ -2676,6 +2677,11 @@ window.togglePBRoundType = function(sectionId) {
   pbSaveLayout();
 };
 
+window.togglePBItemExpand = function(itemKey) {
+  pbExpandedItems[itemKey] = !pbExpandedItems[itemKey];
+  renderPriceBook();
+};
+
 function pbInput(key, prop, value) {
   var clr = prop === 'materialCost' ? '#00ff88' : prop === 'laborHrs' ? '#ffaa00' : '#e0e0e0';
   return '<input type="text" value="' + (value != null ? value : '') + '" placeholder="\u2014" style="width:60px;background:#1a1a2e;border:1px solid #0f3460;color:' + clr + ';padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + key + '\',\'' + prop + '\',this.value)">';
@@ -2689,10 +2695,9 @@ function pbRow(item, sectionId) {
   if (roundType === 'snaplock' && item.snapKey) {
     activeKey = item.snapKey;
   } else if (roundType === 'snaplock' && item.snapKey === null) {
-    // This size doesn't exist in snap lock - show disabled row
     var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3);opacity:0.3">';
     html += '<td style="padding:4px;color:#666;font-size:11px">' + item.label + '</td>';
-    html += '<td style="padding:4px 2px;color:#666;font-size:11px;text-align:center" colspan="2">-</td>';
+    html += '<td style="padding:4px 2px;color:#666;font-size:11px;text-align:center" colspan="2">—</td>';
     html += '</tr>';
     return html;
   }
@@ -2705,11 +2710,31 @@ function pbRow(item, sectionId) {
     mc = entry ? entry.materialCost : null;
   }
   var gaugeKey = gauge ? activeKey + '-g' + gauge : activeKey;
+  var hasSizes = item.sizes && item.sizes.length > 0;
+  var isExpanded = hasSizes && !!pbExpandedItems[activeKey];
+  var arrow = hasSizes ? (isExpanded ? '\u25BC ' : '\u25B6 ') : '';
+  var clickAttr = hasSizes ? ' onclick="togglePBItemExpand(\'' + activeKey + '\')" style="padding:4px;color:#e0e0e0;font-size:11px;cursor:pointer"' : ' style="padding:4px;color:#e0e0e0;font-size:11px"';
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
-  html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
+  html += '<td' + clickAttr + '>' + arrow + item.label + '</td>';
   html += '<td style="padding:4px 2px">' + pbInput(gaugeKey, 'materialCost', mc) + '</td>';
   html += '<td style="padding:4px 2px">' + pbInput(activeKey, 'laborHrs', lh) + '</td>';
   html += '</tr>';
+  // Expanded per-size rows
+  if (isExpanded) {
+    for (var si = 0; si < item.sizes.length; si++) {
+      var sz = item.sizes[si];
+      var sizeKey = activeKey + '-' + sz;
+      var szMc = getMaterialForGauge(sizeKey, gauge || '26');
+      var szGaugeKey = gauge ? sizeKey + '-g' + gauge : sizeKey;
+      var szEntry = priceBookCache ? priceBookCache[sizeKey] : null;
+      var szLh = szEntry ? szEntry.laborHrs : null;
+      html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.15);background:rgba(15,52,96,0.15)">';
+      html += '<td style="padding:3px 4px 3px 20px;color:#a0a0c0;font-size:10px">' + sz + '\u2033</td>';
+      html += '<td style="padding:3px 2px">' + pbInput(szGaugeKey, 'materialCost', szMc) + '</td>';
+      html += '<td style="padding:3px 2px">' + pbInput(sizeKey, 'laborHrs', szLh) + '</td>';
+      html += '</tr>';
+    }
+  }
   return html;
 }
 
@@ -2755,7 +2780,7 @@ function renderPriceBook() {
 
     // Section header row
     html += '<tr>';
-    html += '<td colspan="3" style="padding:10px 4px 4px;font-size:11px;font-weight:700;color:#e94560;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e94560;cursor:pointer" onclick="togglePBSection(\'' + sec.id + '\')">'; 
+    html += '<td colspan="3" style="padding:10px 4px 4px;font-size:11px;font-weight:700;color:#e94560;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e94560;cursor:pointer" onclick="togglePBSection(\'' + sec.id + '\')">';
     html += arrow + '  ' + sec.title + ' <span style="font-weight:400;color:#a0a0c0;font-size:10px;text-transform:none">(' + count + ')</span>';
     // Right-side controls: toggle type + gauge selector
     html += '<span style="float:right;font-weight:400;text-transform:none;display:flex;align-items:center;gap:6px">';
