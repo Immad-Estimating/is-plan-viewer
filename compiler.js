@@ -76,6 +76,7 @@ const GROUP_DIMENSIONS = [
   { key: 'costGroup', label: 'Cost Group',     icon: '💰', extract: r => r.costGroup || 'ungrouped' },
   { key: 'gauge',     label: 'Gauge',          icon: '🔩', extract: r => r.gauge || 'default' },
   { key: 'laborCat',  label: 'Labor Category', icon: '👷', extract: r => r._laborCatLabel || 'unassigned' },
+  { key: 'system',    label: 'System',          icon: '⚙️', extract: r => r.systemSymbol || 'unassigned' },
   { key: 'page',      label: 'Page',           icon: '📄', extract: r => 'Pg ' + r._page },
   { key: 'drawing',   label: 'Drawing',        icon: '📋', extract: r => r._drawingName },
 ];
@@ -269,6 +270,7 @@ function normalizeRows(allPageData, drawingNames) {
         _laborCost: laborCost, _totalCost: matCost + laborCost,
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
         phase: m.phase || null, costGroup: m.costGroup || null, gauge: m.gauge || null,
+        systemSymbol: m.systemSymbol || null,
       });
     }
 
@@ -311,6 +313,7 @@ function normalizeRows(allPageData, drawingNames) {
         _laborCost: laborCost, _totalCost: matCost + laborCost,
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
         phase: f.phase || null, costGroup: f.costGroup || null, gauge: f.gauge || null,
+        systemSymbol: f.systemSymbol || null,
       });
     }
 
@@ -325,6 +328,7 @@ function normalizeRows(allPageData, drawingNames) {
           _lengthFt: 0, _matCost: 0, _laborHrs: 0, _laborCost: 0, _totalCost: 0,
           _laborCatHrs: { ...ec }, _laborCatCost: { ...ec }, _laborCatLabel: 'unassigned',
           phase: null, costGroup: null, gauge: null,
+          systemSymbol: null,
         });
       }
     }

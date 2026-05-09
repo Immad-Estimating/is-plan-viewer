@@ -505,6 +505,11 @@
     <button onclick="nextPage()" title="Next Page">▶</button>
     <button onclick="deleteCurrentSheet()" title="Delete this sheet" style="font-size:12px;padding:4px 8px;color:#a0a0c0">🗑️</button>
     <div class="separator"></div>
+    <select id="sysSymbolSelect" onchange="setActiveSystemSymbol(this.value)" title="Active System Symbol" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 8px;border-radius:4px;font-size:11px;max-width:120px;cursor:pointer">
+      <option value="">No System</option>
+    </select>
+    <button onclick="openSystemSymbolManager()" title="Manage System Symbols" style="background:none;border:1px solid #0f3460;color:#a0a0c0;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer">⚙</button>
+    <div class="separator"></div>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)">📐 Measure</button>
     <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)">◎ Duct</button>
     <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)">🔩 Fittings</button>
@@ -763,6 +768,32 @@
       <button class="confirm-no" id="dupCancel">Cancel</button>
       <button class="confirm-yes" id="dupDrawingOnly" style="background:#0f3460;border-color:#1a4080;font-weight:500">Drawing Only</button>
       <button class="confirm-yes" id="dupWithTakeoff" style="background:#00cc6a;border-color:#00cc6a;color:#1a1a2e">Drawing + Takeoff</button>
+    </div>
+  </div>
+</div>
+
+<!-- System Symbol Manager Modal -->
+<div class="modal-overlay" id="sysSymbolModal">
+  <div class="modal" style="max-width:520px;max-height:80vh;display:flex;flex-direction:column">
+    <h3 style="color:#e94560;margin-bottom:12px">System Symbols</h3>
+    <p style="font-size:12px;color:#a0a0c0;margin-bottom:12px">Define HVAC system symbols for this project. All items you draw will be tagged with the active system.</p>
+    <div id="sysSymbolList" style="flex:1;overflow-y:auto;margin-bottom:12px;min-height:100px"></div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <input type="text" id="sysSymNewTag" placeholder="Tag (e.g. RTU-1)" style="flex:1;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:6px 10px;border-radius:4px;font-size:13px">
+      <input type="text" id="sysSymNewDesc" placeholder="Description (optional)" style="flex:2;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:6px 10px;border-radius:4px;font-size:13px">
+      <button onclick="addSystemSymbol()" style="background:#e94560;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">+ Add</button>
+    </div>
+    <div style="border-top:1px solid #0f3460;padding-top:10px;margin-bottom:10px">
+      <p style="font-size:11px;color:#666;margin-bottom:6px">Or extract from a mechanical schedule:</p>
+      <div style="display:flex;gap:6px">
+        <input type="file" id="sysSymImageInput" accept="image/*,.pdf" style="display:none">
+        <button onclick="document.getElementById('sysSymImageInput').click()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">📷 Upload Schedule Image</button>
+        <button onclick="pasteScheduleFromClipboard()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">📋 Paste from Clipboard</button>
+      </div>
+      <div id="sysSymAiStatus" style="font-size:11px;color:#555;margin-top:6px"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button onclick="closeSysSymbolModal()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px">Close</button>
     </div>
   </div>
 </div>
@@ -2695,6 +2726,147 @@ async function saveProjectRateTable(projectId) {
   }
 }
 
+// ---- System Symbols ----
+const SYS_COLORS = ['#4dabf7','#69db7c','#ffd43b','#da77f2','#ff8787','#a9e34b','#ffa94d','#74c0fc','#f783ac','#63e6be','#d0bfff','#ffc078'];
+let _sysSymIdCounter = 0;
+
+async function loadProjectSystemSymbols(projectId) {
+  if (!projectId) { projectSystemSymbols = []; return; }
+  const project = await idbGet('projects', projectId);
+  projectSystemSymbols = (project && project.systemSymbols) || [];
+  _sysSymIdCounter = projectSystemSymbols.reduce((max, s) => Math.max(max, s.id || 0), 0);
+  updateSystemSymbolDropdown();
+}
+
+async function saveProjectSystemSymbols(projectId) {
+  if (!projectId) return;
+  const project = await idbGet('projects', projectId);
+  if (project) {
+    project.systemSymbols = projectSystemSymbols;
+    project.modifiedAt = Date.now();
+    await idbPut('projects', project);
+  }
+  updateSystemSymbolDropdown();
+}
+
+function updateSystemSymbolDropdown() {
+  const sel = document.getElementById('sysSymbolSelect');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">No System</option>';
+  for (const s of projectSystemSymbols) {
+    const opt = document.createElement('option');
+    opt.value = s.tag;
+    opt.textContent = s.tag + (s.description ? ' — ' + s.description : '');
+    opt.style.color = s.color || '#e0e0e0';
+    sel.appendChild(opt);
+  }
+  // Restore previous selection if still valid
+  if (prev && projectSystemSymbols.some(s => s.tag === prev)) sel.value = prev;
+  else { sel.value = activeSystemSymbol || ''; }
+}
+
+window.setActiveSystemSymbol = function(val) {
+  activeSystemSymbol = val || null;
+  const sel = document.getElementById('sysSymbolSelect');
+  if (sel) sel.style.borderColor = activeSystemSymbol ? (projectSystemSymbols.find(s => s.tag === activeSystemSymbol)?.color || '#e94560') : '#0f3460';
+};
+
+window.openSystemSymbolManager = function() {
+  renderSysSymbolList();
+  document.getElementById('sysSymbolModal').classList.add('open');
+};
+
+window.closeSysSymbolModal = function() {
+  document.getElementById('sysSymbolModal').classList.remove('open');
+};
+
+function renderSysSymbolList() {
+  const container = document.getElementById('sysSymbolList');
+  if (!container) return;
+  if (projectSystemSymbols.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:#444;padding:20px;font-size:12px">No system symbols yet. Add one below or extract from a schedule.</div>';
+    return;
+  }
+  let html = '';
+  for (const s of projectSystemSymbols) {
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;margin-bottom:2px;background:rgba(15,52,96,0.3)">`;
+    html += `<span style="width:10px;height:10px;border-radius:50%;background:${s.color || '#555'};flex-shrink:0"></span>`;
+    html += `<span style="font-size:13px;font-weight:600;color:#e0e0e0;min-width:70px">${escapeHtml(s.tag)}</span>`;
+    html += `<span style="flex:1;font-size:12px;color:#a0a0c0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(s.description || '')}</span>`;
+    html += `<button onclick="removeSysSymbol('${escapeHtml(s.tag).replace(/'/g, "\\\'")}')" style="background:none;border:none;color:#555;cursor:pointer;font-size:12px;padding:2px 4px" title="Remove">✕</button>`;
+    html += `</div>`;
+  }
+  container.innerHTML = html;
+}
+
+window.addSystemSymbol = async function() {
+  const tagEl = document.getElementById('sysSymNewTag');
+  const descEl = document.getElementById('sysSymNewDesc');
+  const tag = (tagEl.value || '').trim().toUpperCase();
+  if (!tag) { tagEl.focus(); return; }
+  // Check for duplicate
+  if (projectSystemSymbols.some(s => s.tag === tag)) {
+    alert('System symbol "' + tag + '" already exists.');
+    return;
+  }
+  const color = SYS_COLORS[projectSystemSymbols.length % SYS_COLORS.length];
+  projectSystemSymbols.push({ id: ++_sysSymIdCounter, tag, description: (descEl.value || '').trim(), color });
+  await saveProjectSystemSymbols(activeProjectId);
+  tagEl.value = '';
+  descEl.value = '';
+  tagEl.focus();
+  renderSysSymbolList();
+};
+
+window.removeSysSymbol = async function(tag) {
+  projectSystemSymbols = projectSystemSymbols.filter(s => s.tag !== tag);
+  if (activeSystemSymbol === tag) { activeSystemSymbol = null; }
+  await saveProjectSystemSymbols(activeProjectId);
+  renderSysSymbolList();
+};
+
+// AI Schedule Extraction (placeholder — image upload → future vision API)
+window.pasteScheduleFromClipboard = async function() {
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const imageType = item.types.find(t => t.startsWith('image/'));
+      if (imageType) {
+        const blob = await item.getType(imageType);
+        await extractSystemSymbolsFromImage(blob);
+        return;
+      }
+    }
+    document.getElementById('sysSymAiStatus').textContent = 'No image found in clipboard. Copy a screenshot of the mechanical schedule first.';
+  } catch (e) {
+    document.getElementById('sysSymAiStatus').textContent = 'Clipboard access denied. Try the upload button instead.';
+  }
+};
+
+document.getElementById('sysSymImageInput')?.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  await extractSystemSymbolsFromImage(file);
+  e.target.value = '';
+});
+
+async function extractSystemSymbolsFromImage(blob) {
+  const statusEl = document.getElementById('sysSymAiStatus');
+  statusEl.textContent = '⏳ Analyzing schedule image...';
+  statusEl.style.color = '#ffd43b';
+
+  // Convert to base64 for display / future API call
+  const reader = new FileReader();
+  reader.onload = () => {
+    // For now, show a message that AI extraction is coming
+    // In future: send base64 image to vision API endpoint
+    statusEl.innerHTML = '🚧 AI schedule extraction is being connected. For now, add system symbols manually using the fields above.<br><span style="color:#555;font-size:10px">Image received (' + (blob.size / 1024).toFixed(0) + ' KB) — will process when vision API is wired.</span>';
+    statusEl.style.color = '#a0a0c0';
+  };
+  reader.readAsDataURL(blob);
+}
+
 // ---- Global Price Book ----
 let priceBookCache = null; // loaded once on init, { '90el': { materialCost, laborHrs, sizeRules:{} }, ... }
 
@@ -3915,6 +4087,8 @@ let dragCalloutStart = null;
 // Current drawing context for auto-save
 let activeDrawingId = null;
 let activeProjectId = null;
+let activeSystemSymbol = null; // currently selected system symbol (sticky)
+let projectSystemSymbols = []; // [{id, tag, description, color}] loaded per project
 
 const canvas = document.getElementById('pdfCanvas');
 const ctx = canvas.getContext('2d');
@@ -3963,7 +4137,8 @@ async function saveCurrentPageData() {
     laborRate: m.laborRate != null ? m.laborRate : null,
     costGroup: m.costGroup || null,
     costOverride: m.costOverride || false,
-    gauge: m.gauge || null
+    gauge: m.gauge || null,
+    systemSymbol: m.systemSymbol || null
   }));
 
   const fittings = (pageFittings[pageNum] || []).map(f => ({
@@ -3975,7 +4150,8 @@ async function saveCurrentPageData() {
     laborRate: f.laborRate != null ? f.laborRate : null,
     costGroup: f.costGroup || null,
     costOverride: f.costOverride || false,
-    gauge: f.gauge || null
+    gauge: f.gauge || null,
+    systemSymbol: f.systemSymbol || null
   }));
 
   const stacks = (pageStacks[pageNum] || []).map(s => ({
@@ -4068,6 +4244,7 @@ async function loadDrawingIntoViewer(projectId, drawingId) {
   activeProjectId = projectId;
   _compilerInited = false; // reset so compiler re-inits for this drawing
   await loadProjectRateTable(projectId);
+  await loadProjectSystemSymbols(projectId);
 
   try {
     const drawing = await idbGet('drawings', drawingId);
@@ -5213,7 +5390,8 @@ function finishMeasurement() {
     laborRate: null,
     costGroup: null,
     costOverride: false,
-    gauge: null
+    gauge: null,
+    systemSymbol: activeSystemSymbol || null
   };
 
   if (!pageMeasurements[currentPage]) pageMeasurements[currentPage] = [];
@@ -7135,7 +7313,8 @@ function handleFittingClick(e) {
       laborRate: _cd.laborRate,
       costGroup: null,
       costOverride: false,
-      gauge: document.getElementById('fpGauge') ? document.getElementById('fpGauge').value : '26'
+      gauge: document.getElementById('fpGauge') ? document.getElementById('fpGauge').value : '26',
+      systemSymbol: activeSystemSymbol || null
     };
     pageFittings[currentPage].push(f);
     selectedFittingId = null;
