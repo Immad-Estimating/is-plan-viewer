@@ -199,6 +199,26 @@
   .drawing-item .di-actions button { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 18px; padding: 6px 8px; border-radius: 3px; }
   .drawing-item .di-actions button:hover { color: #e94560; background: rgba(233,69,96,0.1); }
 
+  /* Sheet list inside drawing manager */
+  .drawing-item-wrap { margin-bottom: 0; }
+  .sheet-toggle { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 11px; padding: 4px 8px; border-radius: 4px; transition: all 0.15s; display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+  .sheet-toggle:hover { color: #e94560; background: rgba(233,69,96,0.06); }
+  .sheet-toggle .st-arrow { display: inline-block; font-size: 9px; transition: transform 0.2s; }
+  .sheet-toggle .st-arrow.open { transform: rotate(90deg); }
+  .sheet-list { display: none; margin-top: 6px; padding-left: 8px; border-left: 2px solid #0f3460; }
+  .sheet-list.open { display: block; }
+  .sheet-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: #a0a0c0; transition: background 0.1s; cursor: pointer; }
+  .sheet-row:hover { background: rgba(15,52,96,0.5); color: #e0e0e0; }
+  .sheet-row .sr-num { font-size: 10px; color: #555; min-width: 28px; }
+  .sheet-row .sr-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sheet-row .sr-name:empty::before { content: 'Untitled'; color: #333; font-style: italic; }
+  .sheet-row .sr-icons { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+  .sheet-row:hover .sr-icons { opacity: 1; }
+  .sheet-row .sr-icons button { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 3px; }
+  .sheet-row .sr-icons button:hover { color: #e94560; }
+  .sheet-row .sr-badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; background: rgba(0,255,136,0.1); color: #00ff88; }
+  .sheet-row .sr-badge.empty { background: none; color: #333; }
+
   /* ===== Viewer View ===== */
   .viewer-toolbar { background: #16213e; padding: 8px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #0f3460; z-index: 100; flex-shrink: 0; }
 
@@ -471,6 +491,7 @@
     <span class="page-info" id="pageInfo">No PDF loaded</span>
     <span class="page-name-editable" id="pageName" title="Click to name this page"></span>
     <button onclick="nextPage()" title="Next Page">▶</button>
+    <button onclick="deleteCurrentSheet()" title="Delete this sheet" style="font-size:12px;padding:4px 8px;color:#a0a0c0">🗑️</button>
     <div class="separator"></div>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)">📐 Measure</button>
     <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)">◎ Duct</button>
@@ -1850,18 +1871,34 @@ async function renderDrawingManager(projectId) {
     <button class="uz-btn" onclick="document.getElementById('drawingFileInput').click()">Choose Files</button>
   </div>`;
 
+  // Load pageData for all drawings to show sheet info
+  const allPageData = [];
+  for (const d of drawings) {
+    const pd = await idbGetAllByIndex('pageData', 'drawingId', d.id);
+    allPageData.push(...pd);
+  }
+  // Index: drawingId -> { pageNum -> pageData }
+  const sheetIndex = {};
+  for (const pd of allPageData) {
+    if (!sheetIndex[pd.drawingId]) sheetIndex[pd.drawingId] = {};
+    sheetIndex[pd.drawingId][pd.pageNum] = pd;
+  }
+
   if (drawings.length === 0) {
     html += `<div class="empty-state"><div class="icon">📐</div><h3>No Drawings Yet</h3><p>Upload PDF files to get started</p></div>`;
   } else {
     html += `<div class="drawing-list">`;
-    // Sort by uploadedAt desc
     const sorted = [...drawings].sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0));
     for (const d of sorted) {
       const createdStr = d.uploadedAt ? formatDateTime(d.uploadedAt) : '';
       const modifiedStr = d.modifiedAt ? formatDateTime(d.modifiedAt) : '';
       const size = d.fileSize ? formatFileSize(d.fileSize) : '';
-      const pages = d.pageCount ? `${d.pageCount} page${d.pageCount !== 1 ? 's' : ''}` : '';
+      const pc = d.pageCount || 0;
+      const pages = pc ? `${pc} sheet${pc !== 1 ? 's' : ''}` : '';
       const safeName = escapeHtml(d.fileName).replace(/'/g, "\\'");
+      const sheets = sheetIndex[d.id] || {};
+
+      html += `<div class="drawing-item-wrap" id="dw-${d.id}">`;
       html += `<a class="drawing-item" href="#/project/${projectId}/drawing/${d.id}">
         <div class="di-info">
           <div class="di-name" id="drawingName-${d.id}">📄 ${escapeHtml(d.fileName)}</div>
@@ -1879,6 +1916,32 @@ async function renderDrawingManager(projectId) {
           <button onclick="event.stopPropagation(); event.preventDefault(); deleteDrawing(${d.id}, '${safeName}')" title="Delete">🗑️</button>
         </div>
       </a>`;
+
+      // Sheet list (expandable)
+      if (pc > 0) {
+        html += `<button class="sheet-toggle" onclick="toggleSheetList(${d.id})">`;
+        html += `<span class="st-arrow" id="stArrow-${d.id}">▶</span> Sheets (${pc})`;
+        html += `</button>`;
+        html += `<div class="sheet-list" id="sheetList-${d.id}">`;
+        for (let p = 1; p <= pc; p++) {
+          const pd = sheets[p];
+          const name = pd && pd.pageName ? pd.pageName : '';
+          const hasMeas = pd && ((pd.measurements && pd.measurements.length > 0) || (pd.fittings && pd.fittings.length > 0) || (pd.stacks && pd.stacks.length > 0));
+          const hasScale = pd && pd.scale;
+          const badge = hasMeas ? '<span class="sr-badge">✓ data</span>' : (hasScale ? '<span class="sr-badge">✓ scale</span>' : '<span class="sr-badge empty">—</span>');
+          html += `<div class="sheet-row" onclick="navigateTo('#/project/${projectId}/drawing/${d.id}'); setTimeout(()=>window._goToSheetPage && window._goToSheetPage(${p}),300)">`;
+          html += `<span class="sr-num">Pg ${p}</span>`;
+          html += `<span class="sr-name" id="shName-${d.id}-${p}">${escapeHtml(name)}</span>`;
+          html += badge;
+          html += `<span class="sr-icons">`;
+          html += `<button onclick="event.stopPropagation(); renameSheetInManager(${d.id}, ${p})" title="Rename sheet">✏️</button>`;
+          html += `<button onclick="event.stopPropagation(); deleteSheetInManager(${d.id}, ${p}, ${pc}, '${safeName}')" title="Delete sheet">🗑️</button>`;
+          html += `</span>`;
+          html += `</div>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
     }
     html += `</div>`;
   }
@@ -2201,6 +2264,186 @@ async function doDuplicate(originalDrawing, includeTakeoff) {
 
 // Global measurement counter for duplicates
 window._measIdCounter = window._measIdCounter || 0;
+
+// =====================================================
+// Sheet Management (individual pages within drawings)
+// =====================================================
+
+// Toggle sheet list in drawing manager
+window.toggleSheetList = function(drawingId) {
+  const list = document.getElementById('sheetList-' + drawingId);
+  const arrow = document.getElementById('stArrow-' + drawingId);
+  if (!list) return;
+  list.classList.toggle('open');
+  if (arrow) arrow.classList.toggle('open', list.classList.contains('open'));
+};
+
+// Navigate to a specific page after opening a drawing
+window._goToSheetPage = async function(pageNum) {
+  if (!pdfDoc || pageNum < 1 || pageNum > pdfDoc.numPages) return;
+  await saveCurrentPageData();
+  currentPage = pageNum;
+  await renderPage();
+  applyTransform();
+  saveLastPage();
+};
+
+// Rename a sheet from the drawing manager
+window.renameSheetInManager = async function(drawingId, pageNum) {
+  const el = document.getElementById('shName-' + drawingId + '-' + pageNum);
+  if (!el) return;
+  const key = drawingId + '-' + pageNum;
+  const pd = await idbGet('pageData', key);
+  const currentName = (pd && pd.pageName) || '';
+
+  el.contentEditable = 'true';
+  el.textContent = currentName;
+  el.style.outline = '1px solid #e94560';
+  el.style.borderRadius = '3px';
+  el.style.padding = '1px 4px';
+  el.style.color = '#e0e0e0';
+  el.focus();
+
+  if (currentName) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  let saved = false;
+  const save = async () => {
+    if (saved) return;
+    saved = true;
+    el.contentEditable = 'false';
+    el.style.outline = '';
+    el.style.padding = '';
+    el.style.color = '';
+    const newName = el.textContent.trim();
+    // Save to pageData
+    const existing = await idbGet('pageData', key);
+    if (existing) {
+      existing.pageName = newName;
+      await idbPut('pageData', existing);
+    } else {
+      // Create minimal pageData record for this page
+      await idbPut('pageData', {
+        id: key, drawingId, pageNum,
+        scale: null, measurements: [], fittings: [], stacks: [],
+        pageName: newName, annoSize: 1, annoTextOpacity: 1, annoFillOpacity: 0.85
+      });
+    }
+    el.textContent = newName;
+  };
+  el.addEventListener('blur', save, { once: true });
+  el.addEventListener('keydown', function handler(e) {
+    if (e.key === 'Enter') { e.preventDefault(); el.blur(); el.removeEventListener('keydown', handler); }
+    if (e.key === 'Escape') { el.textContent = currentName; el.blur(); el.removeEventListener('keydown', handler); }
+  });
+};
+
+// Delete a single sheet from a drawing (from drawing manager)
+window.deleteSheetInManager = function(drawingId, pageNum, totalPages, drawingName) {
+  if (totalPages <= 1) {
+    showConfirm(`This is the only sheet in "${drawingName}". Delete the entire drawing?`, async () => {
+      await idbDeleteByIndex('pageData', 'drawingId', drawingId);
+      await idbDelete('drawings', drawingId);
+      if (currentManagerProjectId) {
+        const project = await idbGet('projects', currentManagerProjectId);
+        if (project) {
+          project.modifiedAt = Date.now();
+          project.drawingCount = Math.max(0, (project.drawingCount || 1) - 1);
+          await idbPut('projects', project);
+        }
+      }
+      renderDrawingManager(currentManagerProjectId);
+    });
+    return;
+  }
+  showConfirm(`Delete sheet ${pageNum} from "${drawingName}"? This will remove the page and any takeoff data on it.`, async () => {
+    await _deleteSheetFromDrawing(drawingId, pageNum);
+    renderDrawingManager(currentManagerProjectId);
+  });
+};
+
+// Delete current sheet from viewer
+window.deleteCurrentSheet = function() {
+  if (!pdfDoc || !activeDrawingId) return;
+  const total = pdfDoc.numPages;
+  const pg = currentPage;
+  if (total <= 1) {
+    showConfirm('This is the only sheet. Delete the entire drawing?', async () => {
+      await idbDeleteByIndex('pageData', 'drawingId', activeDrawingId);
+      await idbDelete('drawings', activeDrawingId);
+      if (activeProjectId) {
+        const project = await idbGet('projects', activeProjectId);
+        if (project) {
+          project.modifiedAt = Date.now();
+          project.drawingCount = Math.max(0, (project.drawingCount || 1) - 1);
+          await idbPut('projects', project);
+        }
+      }
+      navigateTo(activeProjectId ? `#/project/${activeProjectId}` : '#/');
+    });
+    return;
+  }
+  showConfirm(`Delete sheet ${pg} of ${total}? All takeoff data on this page will be lost.`, async () => {
+    await _deleteSheetFromDrawing(activeDrawingId, pg);
+    // Reload the drawing in the viewer
+    const newTotal = total - 1;
+    if (currentPage > newTotal) currentPage = newTotal;
+    await loadDrawingIntoViewer(activeProjectId, activeDrawingId);
+  });
+};
+
+// Core sheet deletion: removes page from PDF blob, shifts pageData, updates drawing record
+async function _deleteSheetFromDrawing(drawingId, pageNum) {
+  const drawing = await idbGet('drawings', drawingId);
+  if (!drawing || !drawing.pdfBlob) return;
+
+  const totalPages = drawing.pageCount || 1;
+
+  // Rebuild PDF without the deleted page using pdf.js to render remaining pages to a new PDF
+  // Since we can't truly splice a PDF in the browser without a PDF write library,
+  // we'll mark the page as deleted by:
+  // 1. Delete pageData for the removed page
+  // 2. Shift all higher pageData down by 1
+  // 3. Update drawing.pageCount
+  // 4. Store list of deleted page indices on the drawing record
+  //    (the viewer will skip these when rendering)
+
+  // Delete takeoff data for the removed page
+  const key = drawingId + '-' + pageNum;
+  try { await idbDelete('pageData', key); } catch (e) {}
+
+  // Shift higher pages down
+  for (let p = pageNum + 1; p <= totalPages; p++) {
+    const oldKey = drawingId + '-' + p;
+    const pd = await idbGet('pageData', oldKey);
+    if (pd) {
+      // Delete old record
+      await idbDelete('pageData', oldKey);
+      // Re-insert with new page number
+      pd.id = drawingId + '-' + (p - 1);
+      pd.pageNum = p - 1;
+      await idbPut('pageData', pd);
+    }
+  }
+
+  // Track deleted original page indices so viewer can skip them
+  if (!drawing.deletedPages) drawing.deletedPages = [];
+  // Map through existing deleted pages to find the original index
+  let origPage = pageNum;
+  const sorted = [...drawing.deletedPages].sort((a, b) => a - b);
+  for (const dp of sorted) {
+    if (dp <= origPage) origPage++;
+  }
+  drawing.deletedPages.push(origPage);
+  drawing.pageCount = totalPages - 1;
+  drawing.modifiedAt = Date.now();
+  await idbPut('drawings', drawing);
+}
 
 window.goBackFromViewer = async function() {
   await saveCurrentPageData();
@@ -3825,8 +4068,12 @@ async function loadDrawingIntoViewer(projectId, drawingId) {
     console.log('[viewer] arrayBuffer size:', arrayBuffer.byteLength);
     pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     console.log('[viewer] PDF loaded, pages:', pdfDoc.numPages);
+    // Track deleted pages for page mapping
+    window._activeDeletedPages = drawing.deletedPages || [];
+    // Logical page count = original pages minus deleted ones
+    const logicalPages = pdfDoc.numPages - window._activeDeletedPages.length;
     // Restore last viewed page or start at page 1
-    currentPage = (drawing.lastPage && drawing.lastPage >= 1 && drawing.lastPage <= pdfDoc.numPages) ? drawing.lastPage : 1;
+    currentPage = (drawing.lastPage && drawing.lastPage >= 1 && drawing.lastPage <= logicalPages) ? drawing.lastPage : 1;
     dropZone.classList.add('hidden');
     await renderPage();
     console.log('[viewer] renderPage done, canvas:', canvas.width, 'x', canvas.height);
@@ -6566,9 +6813,24 @@ function updatePageNameDisplay() {
   });
 })();
 
+// Map logical page (after deletions) to original PDF page number
+function _logicalToOrigPage(logicalPage) {
+  if (!activeDrawingId) return logicalPage;
+  // _activeDeletedPages is set when drawing is loaded
+  const deleted = window._activeDeletedPages || [];
+  if (deleted.length === 0) return logicalPage;
+  const sorted = [...deleted].sort((a, b) => a - b);
+  let orig = logicalPage;
+  for (const dp of sorted) {
+    if (dp <= orig) orig++;
+  }
+  return orig;
+}
+
 async function renderPage() {
   if (!pdfDoc) return;
-  const page = await pdfDoc.getPage(currentPage);
+  const origPage = _logicalToOrigPage(currentPage);
+  const page = await pdfDoc.getPage(origPage);
   const viewport = page.getViewport({ scale: 2 });
   canvas.width = viewport.width;
   canvas.height = viewport.height;
@@ -6576,7 +6838,8 @@ async function renderPage() {
 
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  document.getElementById('pageInfo').textContent = `${currentPage} / ${pdfDoc.numPages}`;
+  const logicalTotal = pdfDoc.numPages - (window._activeDeletedPages || []).length;
+  document.getElementById('pageInfo').textContent = `${currentPage} / ${logicalTotal}`;
   updatePageNameDisplay();
   syncAnnoSliders();
   applyTransform();
@@ -6651,7 +6914,8 @@ window.prevPage = async function() {
 };
 
 window.nextPage = async function() {
-  if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+  const logicalTotal = pdfDoc ? pdfDoc.numPages - (window._activeDeletedPages || []).length : 0;
+  if (!pdfDoc || currentPage >= logicalTotal) return;
   await saveCurrentPageData();
   currentPage++;
   await renderPage();
