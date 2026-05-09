@@ -3026,7 +3026,7 @@ var RECT_PERIM_CLASSES = [
 
 function renderRectDuctCalcSection(sec, gauge) {
   var html = '';
-  html += '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Perimeter Class</th><th style="padding:4px;text-align:center;width:55px">Raw $/LF</th><th style="padding:4px;text-align:center;width:55px">Shop +$</th><th style="padding:4px;text-align:center;width:55px">Labor Hrs</th></tr>';
+  html += '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Perimeter Class</th><th style="padding:4px;text-align:center;width:55px">Raw $/LF</th><th style="padding:4px;text-align:center;width:55px">Shop +$/LF</th><th style="padding:4px;text-align:center;width:55px">Labor Hrs/LF</th></tr>';
   for (var i = 0; i < RECT_PERIM_CLASSES.length; i++) {
     var pc = RECT_PERIM_CLASSES[i];
     var calc = calcRectDuctRawPerLF(pc.midPerim, gauge);
