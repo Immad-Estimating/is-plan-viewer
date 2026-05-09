@@ -104,6 +104,8 @@ let _projectRateTable = null;
 
 // Pinned labor category columns: { 'laborHrs': Set(['rough','trim']), 'laborCost': Set() }
 let _pinnedCats = { laborHrs: new Set(), laborCost: new Set() };
+// Collapsed state: pinned cats remembered but sub-columns hidden
+let _lbrCollapsed = { laborHrs: false, laborCost: false };
 
 // ── CSS ───────────────────────────────────────────────────────────────
 const CSS = `
@@ -149,15 +151,24 @@ const CSS = `
 .cmp-empty-icon { font-size: 32px; margin-bottom: 8px; }
 
 /* Labor breakdown header — hover target */
-.cmp-lbr-th { position: relative; cursor: pointer; }
+.cmp-lbr-th { position: relative; }
 .cmp-lbr-th:hover { color: #e94560; }
 
-/* Labor popover — appears on hover, stays on pin */
+/* Header content: label + dot cluster */
+.cmp-lbr-inner { display: flex; align-items: center; justify-content: flex-end; gap: 4px; cursor: pointer; }
+.cmp-lbr-label { white-space: nowrap; }
+.cmp-dot-cluster { display: inline-flex; gap: 2px; align-items: center; padding: 1px 3px; border-radius: 6px; background: rgba(15,52,96,0.6); transition: all 0.2s; }
+.cmp-dot-cluster:empty { display: none; }
+.cmp-dot-cluster .cd { width: 6px; height: 6px; border-radius: 50%; transition: all 0.25s; }
+.cmp-dot-cluster.expanded .cd { width: 4px; height: 4px; opacity: 0.4; }
+
+/* Labor popover — appears on hover */
 .cmp-lbr-pop { display: none; position: absolute; top: 100%; right: 0; z-index: 20; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 6px; padding: 6px 0; min-width: 150px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
-.cmp-lbr-th:hover .cmp-lbr-pop, .cmp-lbr-pop.pinned-open { display: block; }
+.cmp-lbr-th:hover .cmp-lbr-pop { display: block; }
 .cmp-lbr-row { display: flex; align-items: center; padding: 4px 10px; gap: 6px; cursor: pointer; font-size: 11px; transition: background 0.1s; }
 .cmp-lbr-row:hover { background: rgba(233,69,96,0.08); }
-.cmp-lbr-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.cmp-lbr-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transition: box-shadow 0.15s; }
+.cmp-lbr-row.pinned .cmp-lbr-dot { box-shadow: 0 0 4px currentColor; }
 .cmp-lbr-name { flex: 1; color: #a0a0c0; }
 .cmp-lbr-row.pinned .cmp-lbr-name { color: #e0e0e0; font-weight: 600; }
 .cmp-lbr-pin { font-size: 9px; color: #555; }
@@ -357,8 +368,8 @@ function getEffectiveColumns() {
   for (const c of DATA_COLUMNS) {
     if (!_activeColumns.includes(c.key) && !c.alwaysOn) continue;
     result.push(c);
-    // Insert pinned category columns right after the parent
-    if (c.hasBreakdown) {
+    // Insert pinned category columns right after the parent (only if not collapsed)
+    if (c.hasBreakdown && !_lbrCollapsed[c.key]) {
       const pinned = _pinnedCats[c.key];
       if (pinned && pinned.size > 0) {
         for (const cat of LABOR_CATEGORIES) {
@@ -440,11 +451,26 @@ function renderCompiler() {
         // Pinned sub-column
         html += `<th class="num pinned-cat" style="--cat-color:${c.color}" title="${c.fullLabel} — click to unpin" onclick="window._cmpUnpinCat('${c.parentKey}','${c.catKey}')">${c.label}</th>`;
       } else if (c.hasBreakdown && _activeColumns.includes(c.key)) {
-        // Labor column with hover popover
         const pinned = _pinnedCats[c.key] || new Set();
+        const isCollapsed = _lbrCollapsed[c.key];
+        const hasPins = pinned.size > 0;
+
         html += `<th class="num cmp-lbr-th" id="lbrTh_${c.key}">`;
-        html += `${c.label}`;
-        // Popover dropdown
+
+        // Inner: label + dot cluster, click toggles collapse
+        html += `<div class="cmp-lbr-inner" onclick="event.stopPropagation(); window._cmpToggleLbrCollapse('${c.key}')">`;
+        html += `<span class="cmp-lbr-label">${c.label}</span>`;
+        if (hasPins) {
+          html += `<span class="cmp-dot-cluster ${isCollapsed ? '' : 'expanded'}">`;
+          for (const cat of LABOR_CATEGORIES) {
+            if (!pinned.has(cat.key)) continue;
+            html += `<span class="cd" style="background:${cat.color}" title="${cat.label}"></span>`;
+          }
+          html += `</span>`;
+        }
+        html += `</div>`;
+
+        // Popover (hover)
         html += `<div class="cmp-lbr-pop" id="lbrPop_${c.key}">`;
         for (const cat of LABOR_CATEGORIES) {
           const isPinned = pinned.has(cat.key);
@@ -578,6 +604,12 @@ window._cmpToggleCol = function(key) {
 
 window._cmpToggleCollapse = function(path) { _collapsed[path] = !_collapsed[path]; renderCompiler(); };
 
+// Collapse/expand pinned labor sub-columns (pins remembered)
+window._cmpToggleLbrCollapse = function(key) {
+  _lbrCollapsed[key] = !_lbrCollapsed[key];
+  renderCompiler();
+};
+
 // Pin/unpin a labor category as a sub-column
 window._cmpTogglePin = function(parentKey, catKey) {
   if (!_pinnedCats[parentKey]) _pinnedCats[parentKey] = new Set();
@@ -585,6 +617,8 @@ window._cmpTogglePin = function(parentKey, catKey) {
     _pinnedCats[parentKey].delete(catKey);
   } else {
     _pinnedCats[parentKey].add(catKey);
+    // Auto-expand when pinning a new category
+    _lbrCollapsed[parentKey] = false;
   }
   renderCompiler();
 };
