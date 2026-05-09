@@ -1,24 +1,31 @@
 // =====================================================
 // IS Plan Viewer — Multi-Select & Bulk Edit
 // =====================================================
-// Handles multi-item selection on the canvas and bulk
-// property changes. Loaded as ES module by index.html.
+// Selection modes: Rectangle (Q), Lasso (L), Deselect (Alt+click)
 // =====================================================
 
 // ── State ─────────────────────────────────────────────
 let _selectedMeasIds = new Set();
 let _selectedFitIds = new Set();
 let _enabled = false;
-let _boxStart = null;    // {sx, sy} screen coords for selection box
-let _boxEnd = null;
-let _boxActive = false;
-let _panelEl = null;     // bulk edit panel container
+let _panelEl = null;
 
-// References to main app state (set via init)
+// Drag state
+let _dragStart = null;   // {sx, sy, px, py}
+let _dragActive = false;
+
+// Lasso state
+let _lassoMode = false;  // true = freehand lasso, false = rectangle
+let _lassoPoints = [];   // [{sx,sy,px,py}] screen+pdf coords during drag
+let _lassoEl = null;     // SVG overlay element
+
+// Deselect mode
+let _deselectMode = false;
+
+// App references
 let _getPageMeasurements = null;
 let _getPageFittings = null;
 let _getCurrentPage = null;
-let _getScreenToPdf = null;
 let _scheduleSave = null;
 let _drawOverlay = null;
 let _updatePanel = null;
@@ -26,8 +33,13 @@ let _getProjectSystemSymbols = null;
 
 // ── CSS ───────────────────────────────────────────────
 const CSS = `
-/* Selection box overlay */
+/* Selection box overlay (rectangle mode) */
 .ms-box { position: absolute; border: 1px dashed #ffd43b; background: rgba(255,212,59,0.06); pointer-events: none; z-index: 15; }
+
+/* Lasso SVG overlay */
+.ms-lasso-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 15; overflow: visible; }
+.ms-lasso-path { fill: rgba(255,212,59,0.06); stroke: #ffd43b; stroke-width: 1.5; stroke-dasharray: 5 3; }
+.ms-lasso-path.deselect { fill: rgba(233,69,96,0.06); stroke: #e94560; }
 
 /* Bulk edit panel */
 .ms-panel { display: none; position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 60; background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 10px 14px; box-shadow: 0 8px 28px rgba(0,0,0,0.5); min-width: 320px; max-width: 480px; }
@@ -37,21 +49,22 @@ const CSS = `
 .ms-panel-count { font-size: 11px; color: #a0a0c0; }
 .ms-panel-close { background: none; border: none; color: #555; cursor: pointer; font-size: 14px; padding: 2px 6px; }
 .ms-panel-close:hover { color: #e94560; }
-
 .ms-panel-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center; }
 .ms-panel-grid label { font-size: 11px; color: #a0a0c0; text-align: right; white-space: nowrap; }
 .ms-panel-grid select, .ms-panel-grid input { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-size: 11px; }
 .ms-panel-grid select:focus, .ms-panel-grid input:focus { outline: none; border-color: #ffd43b; }
-
 .ms-panel-actions { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
-.ms-apply-btn { background: #ffd43b; color: #1a1a2e; border: none; padding: 5px 14px; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.12s; }
+.ms-apply-btn { background: #ffd43b; color: #1a1a2e; border: none; padding: 5px 14px; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; }
 .ms-apply-btn:hover { background: #ffe066; }
 .ms-clear-btn { background: none; border: 1px solid #0f3460; color: #a0a0c0; padding: 5px 12px; border-radius: 5px; font-size: 11px; cursor: pointer; }
 .ms-clear-btn:hover { border-color: #e94560; color: #e94560; }
 
-/* Hint bar */
-.ms-hint { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 55; background: rgba(255,212,59,0.12); border: 1px solid rgba(255,212,59,0.3); border-radius: 6px; padding: 4px 14px; font-size: 11px; color: #ffd43b; pointer-events: none; white-space: nowrap; display: none; }
-.ms-hint.show { display: block; }
+/* Mode indicator */
+.ms-mode-badge { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 55; border-radius: 6px; padding: 4px 14px; font-size: 11px; font-weight: 600; pointer-events: none; white-space: nowrap; display: none; }
+.ms-mode-badge.show { display: block; }
+.ms-mode-badge.select { background: rgba(255,212,59,0.12); border: 1px solid rgba(255,212,59,0.3); color: #ffd43b; }
+.ms-mode-badge.lasso { background: rgba(255,212,59,0.12); border: 1px solid rgba(255,212,59,0.3); color: #ffd43b; }
+.ms-mode-badge.deselect { background: rgba(233,69,96,0.12); border: 1px solid rgba(233,69,96,0.3); color: #e94560; }
 `;
 
 let _cssInjected = false;
@@ -63,55 +76,45 @@ function injectCSS() {
   _cssInjected = true;
 }
 
-// ── Selection logic ───────────────────────────────────
+// ── Core selection ────────────────────────────────────
 
-function getSelectionCount() {
-  return _selectedMeasIds.size + _selectedFitIds.size;
-}
+function getSelectionCount() { return _selectedMeasIds.size + _selectedFitIds.size; }
 
 function clearSelection() {
   _selectedMeasIds.clear();
   _selectedFitIds.clear();
-  _boxStart = null;
-  _boxEnd = null;
-  _boxActive = false;
+  _dragStart = null;
+  _dragActive = false;
+  _lassoPoints = [];
   hidePanel();
   hideBox();
+  hideLasso();
   if (_drawOverlay) _drawOverlay();
 }
 
 function toggleMeasSelection(id) {
-  if (_selectedMeasIds.has(id)) _selectedMeasIds.delete(id);
-  else _selectedMeasIds.add(id);
+  if (_deselectMode) { _selectedMeasIds.delete(id); }
+  else if (_selectedMeasIds.has(id)) { _selectedMeasIds.delete(id); }
+  else { _selectedMeasIds.add(id); }
   onSelectionChanged();
 }
 
 function toggleFitSelection(id) {
-  if (_selectedFitIds.has(id)) _selectedFitIds.delete(id);
-  else _selectedFitIds.add(id);
+  if (_deselectMode) { _selectedFitIds.delete(id); }
+  else if (_selectedFitIds.has(id)) { _selectedFitIds.delete(id); }
+  else { _selectedFitIds.add(id); }
   onSelectionChanged();
 }
 
-function selectItemsInRect(x1, y1, x2, y2) {
-  // x1,y1,x2,y2 in PDF coordinates
-  const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
-  const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
-  const page = _getCurrentPage();
+function addToSelection(measIds, fitIds) {
+  for (const id of measIds) _selectedMeasIds.add(id);
+  for (const id of fitIds) _selectedFitIds.add(id);
+  onSelectionChanged();
+}
 
-  const measurements = _getPageMeasurements(page) || [];
-  for (const m of measurements) {
-    if (!m.points || m.points.length === 0) continue;
-    const inside = m.points.some(p => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY);
-    if (inside) _selectedMeasIds.add(m.id);
-  }
-
-  const fittings = _getPageFittings(page) || [];
-  for (const f of fittings) {
-    if (f.x >= minX && f.x <= maxX && f.y >= minY && f.y <= maxY) {
-      _selectedFitIds.add(f.id);
-    }
-  }
-
+function removeFromSelection(measIds, fitIds) {
+  for (const id of measIds) _selectedMeasIds.delete(id);
+  for (const id of fitIds) _selectedFitIds.delete(id);
   onSelectionChanged();
 }
 
@@ -121,7 +124,7 @@ function onSelectionChanged() {
   if (_drawOverlay) _drawOverlay();
 }
 
-// ── Selection box (drag rectangle) ────────────────────
+// ── Rectangle selection ───────────────────────────────
 
 let _boxEl = null;
 
@@ -131,30 +134,121 @@ function showBox(sx, sy, ex, ey) {
     _boxEl.className = 'ms-box';
     document.getElementById('viewer')?.appendChild(_boxEl);
   }
-  const l = Math.min(sx, ex), t = Math.min(sy, ey);
-  const w = Math.abs(ex - sx), h = Math.abs(ey - sy);
-  _boxEl.style.left = l + 'px';
-  _boxEl.style.top = t + 'px';
-  _boxEl.style.width = w + 'px';
-  _boxEl.style.height = h + 'px';
+  _boxEl.style.left = Math.min(sx, ex) + 'px';
+  _boxEl.style.top = Math.min(sy, ey) + 'px';
+  _boxEl.style.width = Math.abs(ex - sx) + 'px';
+  _boxEl.style.height = Math.abs(ey - sy) + 'px';
   _boxEl.style.display = 'block';
+  if (_deselectMode) { _boxEl.style.borderColor = '#e94560'; _boxEl.style.background = 'rgba(233,69,96,0.06)'; }
+  else { _boxEl.style.borderColor = '#ffd43b'; _boxEl.style.background = 'rgba(255,212,59,0.06)'; }
 }
 
-function hideBox() {
-  if (_boxEl) _boxEl.style.display = 'none';
+function hideBox() { if (_boxEl) _boxEl.style.display = 'none'; }
+
+function selectItemsInRect(x1, y1, x2, y2) {
+  const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+  const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+  const page = _getCurrentPage();
+  const measHits = [], fitHits = [];
+
+  for (const m of (_getPageMeasurements(page) || [])) {
+    if (!m.points || m.points.length === 0) continue;
+    if (m.points.some(p => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY)) measHits.push(m.id);
+  }
+  for (const f of (_getPageFittings(page) || [])) {
+    if (f.x >= minX && f.x <= maxX && f.y >= minY && f.y <= maxY) fitHits.push(f.id);
+  }
+
+  if (_deselectMode) removeFromSelection(measHits, fitHits);
+  else addToSelection(measHits, fitHits);
+}
+
+// ── Lasso selection ───────────────────────────────────
+
+function ensureLassoSvg() {
+  if (!_lassoEl) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('ms-lasso-svg');
+    document.getElementById('viewer')?.appendChild(svg);
+    _lassoEl = svg;
+  }
+  return _lassoEl;
+}
+
+function drawLassoPath() {
+  const svg = ensureLassoSvg();
+  const vr = document.getElementById('viewer')?.getBoundingClientRect();
+  if (!vr || _lassoPoints.length < 2) { svg.innerHTML = ''; return; }
+
+  let d = `M ${_lassoPoints[0].sx - vr.left} ${_lassoPoints[0].sy - vr.top}`;
+  for (let i = 1; i < _lassoPoints.length; i++) {
+    d += ` L ${_lassoPoints[i].sx - vr.left} ${_lassoPoints[i].sy - vr.top}`;
+  }
+  d += ' Z';
+
+  svg.innerHTML = `<path class="ms-lasso-path${_deselectMode ? ' deselect' : ''}" d="${d}"/>`;
+}
+
+function hideLasso() {
+  if (_lassoEl) _lassoEl.innerHTML = '';
+  _lassoPoints = [];
+}
+
+function selectItemsInLasso() {
+  if (_lassoPoints.length < 3) return;
+  const page = _getCurrentPage();
+  const poly = _lassoPoints.map(p => ({ x: p.px, y: p.py }));
+  const measHits = [], fitHits = [];
+
+  for (const m of (_getPageMeasurements(page) || [])) {
+    if (!m.points || m.points.length === 0) continue;
+    if (m.points.some(p => pointInPolygon(p.x, p.y, poly))) measHits.push(m.id);
+  }
+  for (const f of (_getPageFittings(page) || [])) {
+    if (pointInPolygon(f.x, f.y, poly)) fitHits.push(f.id);
+  }
+
+  if (_deselectMode) removeFromSelection(measHits, fitHits);
+  else addToSelection(measHits, fitHits);
+}
+
+// Ray casting point-in-polygon
+function pointInPolygon(px, py, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+    if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// ── Mode badge ────────────────────────────────────────
+
+let _badgeEl = null;
+
+function updateModeBadge() {
+  if (!_badgeEl) {
+    _badgeEl = document.createElement('div');
+    _badgeEl.className = 'ms-mode-badge';
+    document.getElementById('viewer')?.appendChild(_badgeEl);
+  }
+  if (_deselectMode) {
+    _badgeEl.textContent = '✕ Deselect Mode (Alt)';
+    _badgeEl.className = 'ms-mode-badge show deselect';
+  } else if (_lassoMode) {
+    _badgeEl.textContent = '✦ Lasso Select (L)';
+    _badgeEl.className = 'ms-mode-badge show lasso';
+  } else {
+    _badgeEl.className = 'ms-mode-badge';
+  }
 }
 
 // ── Bulk edit panel ───────────────────────────────────
 
-function showPanel() {
-  if (!_panelEl) createPanel();
-  updatePanelContent();
-  _panelEl.classList.add('open');
-}
-
-function hidePanel() {
-  if (_panelEl) _panelEl.classList.remove('open');
-}
+function showPanel() { if (!_panelEl) createPanel(); updatePanelContent(); _panelEl.classList.add('open'); }
+function hidePanel() { if (_panelEl) _panelEl.classList.remove('open'); }
 
 function createPanel() {
   _panelEl = document.createElement('div');
@@ -169,13 +263,9 @@ function updatePanelContent() {
   const mCount = _selectedMeasIds.size;
   const fCount = _selectedFitIds.size;
   const syms = _getProjectSystemSymbols ? _getProjectSystemSymbols() : [];
-
-  // Read current common values (if all selected share a value, show it)
   const page = _getCurrentPage();
-  const meas = _getPageMeasurements(page) || [];
-  const fits = _getPageFittings(page) || [];
-  const selMeas = meas.filter(m => _selectedMeasIds.has(m.id));
-  const selFits = fits.filter(f => _selectedFitIds.has(f.id));
+  const selMeas = (_getPageMeasurements(page) || []).filter(m => _selectedMeasIds.has(m.id));
+  const selFits = (_getPageFittings(page) || []).filter(f => _selectedFitIds.has(f.id));
   const allItems = [...selMeas, ...selFits];
 
   const commonSys = getCommonProp(allItems, 'systemSymbol');
@@ -183,50 +273,25 @@ function updatePanelContent() {
   const commonGroup = getCommonProp(allItems, 'costGroup');
   const commonGauge = getCommonProp(allItems, 'gauge');
 
-  let html = '';
-  html += `<div class="ms-panel-head">`;
+  let html = `<div class="ms-panel-head">`;
   html += `<span class="ms-panel-title">Bulk Edit</span>`;
   html += `<span class="ms-panel-count">${count} item${count !== 1 ? 's' : ''} (${mCount} duct${mCount !== 1 ? 's' : ''}, ${fCount} fitting${fCount !== 1 ? 's' : ''})</span>`;
   html += `<button class="ms-panel-close" onclick="window._msClose()">✕</button>`;
-  html += `</div>`;
+  html += `</div><div class="ms-panel-grid">`;
 
-  html += `<div class="ms-panel-grid">`;
-
-  // System Tag
-  html += `<label>System Tag</label>`;
-  html += `<select id="msBulkSys"><option value="">— no change —</option>`;
-  html += `<option value="__clear__"${commonSys === null ? ' selected' : ''}>(clear)</option>`;
-  for (const s of syms) {
-    const sel = commonSys === s.tag ? ' selected' : '';
-    html += `<option value="${escAttr(s.tag)}"${sel}>${escAttr(s.tag)}${s.description ? ' — ' + escAttr(s.description) : ''}</option>`;
-  }
+  html += `<label>System Tag</label><select id="msBulkSys"><option value="">— no change —</option><option value="__clear__"${commonSys === null ? ' selected' : ''}>(clear)</option>`;
+  for (const s of syms) html += `<option value="${escAttr(s.tag)}"${commonSys === s.tag ? ' selected' : ''}>${escAttr(s.tag)}${s.description ? ' — ' + escAttr(s.description) : ''}</option>`;
   html += `</select>`;
 
-  // Phase
-  html += `<label>Phase</label>`;
-  html += `<select id="msBulkPhase"><option value="">— no change —</option>`;
-  html += `<option value="__clear__">(clear)</option>`;
-  const phases = ['rough','trim','air-handler','startup','controls','insulation','venting','stocking','qc'];
-  for (const p of phases) {
-    const sel = commonPhase === p ? ' selected' : '';
-    html += `<option value="${p}"${sel}>${p}</option>`;
-  }
+  html += `<label>Phase</label><select id="msBulkPhase"><option value="">— no change —</option><option value="__clear__">(clear)</option>`;
+  for (const p of ['rough','trim','air-handler','startup','controls','insulation','venting','stocking','qc']) html += `<option value="${p}"${commonPhase === p ? ' selected' : ''}>${p}</option>`;
   html += `</select>`;
 
-  // Cost Group
-  html += `<label>Cost Group</label>`;
-  html += `<input type="text" id="msBulkGroup" placeholder="Leave blank = no change" value="${commonGroup || ''}">`;
+  html += `<label>Cost Group</label><input type="text" id="msBulkGroup" placeholder="Leave blank = no change" value="${commonGroup || ''}">`;
 
-  // Gauge
-  html += `<label>Gauge</label>`;
-  html += `<select id="msBulkGauge"><option value="">— no change —</option>`;
-  for (const g of ['26','24','22','20','18','16']) {
-    const sel = commonGauge === g ? ' selected' : '';
-    html += `<option value="${g}"${sel}>${g} ga</option>`;
-  }
-  html += `</select>`;
-
-  html += `</div>`;
+  html += `<label>Gauge</label><select id="msBulkGauge"><option value="">— no change —</option>`;
+  for (const g of ['26','24','22','20','18','16']) html += `<option value="${g}"${commonGauge === g ? ' selected' : ''}>${g} ga</option>`;
+  html += `</select></div>`;
 
   html += `<div class="ms-panel-actions">`;
   html += `<button class="ms-clear-btn" onclick="window._msClearSel()">Deselect All</button>`;
@@ -239,69 +304,47 @@ function updatePanelContent() {
 function getCommonProp(items, prop) {
   if (items.length === 0) return undefined;
   const val = items[0][prop] || null;
-  for (let i = 1; i < items.length; i++) {
-    if ((items[i][prop] || null) !== val) return undefined; // mixed
-  }
+  for (let i = 1; i < items.length; i++) { if ((items[i][prop] || null) !== val) return undefined; }
   return val;
 }
 
 function escAttr(s) { return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
 
-// ── Apply bulk changes ────────────────────────────────
-
 function applyBulkChanges() {
   const page = _getCurrentPage();
   const meas = _getPageMeasurements(page) || [];
   const fits = _getPageFittings(page) || [];
-
   const sysVal = document.getElementById('msBulkSys')?.value;
   const phaseVal = document.getElementById('msBulkPhase')?.value;
   const groupVal = document.getElementById('msBulkGroup')?.value;
   const gaugeVal = document.getElementById('msBulkGauge')?.value;
-
   let changed = 0;
 
-  for (const m of meas) {
-    if (!_selectedMeasIds.has(m.id)) continue;
-    if (sysVal === '__clear__') { m.systemSymbol = null; changed++; }
-    else if (sysVal) { m.systemSymbol = sysVal; changed++; }
-    if (phaseVal === '__clear__') { m.phase = null; changed++; }
-    else if (phaseVal) { m.phase = phaseVal; changed++; }
-    if (groupVal !== undefined && groupVal !== '') { m.costGroup = groupVal; changed++; }
-    if (gaugeVal) { m.gauge = gaugeVal; changed++; }
-  }
+  const apply = (item) => {
+    if (sysVal === '__clear__') { item.systemSymbol = null; changed++; }
+    else if (sysVal) { item.systemSymbol = sysVal; changed++; }
+    if (phaseVal === '__clear__') { item.phase = null; changed++; }
+    else if (phaseVal) { item.phase = phaseVal; changed++; }
+    if (groupVal !== undefined && groupVal !== '') { item.costGroup = groupVal; changed++; }
+    if (gaugeVal) { item.gauge = gaugeVal; changed++; }
+  };
 
-  for (const f of fits) {
-    if (!_selectedFitIds.has(f.id)) continue;
-    if (sysVal === '__clear__') { f.systemSymbol = null; changed++; }
-    else if (sysVal) { f.systemSymbol = sysVal; changed++; }
-    if (phaseVal === '__clear__') { f.phase = null; changed++; }
-    else if (phaseVal) { f.phase = phaseVal; changed++; }
-    if (groupVal !== undefined && groupVal !== '') { f.costGroup = groupVal; changed++; }
-    if (gaugeVal) { f.gauge = gaugeVal; changed++; }
-  }
+  for (const m of meas) { if (_selectedMeasIds.has(m.id)) apply(m); }
+  for (const f of fits) { if (_selectedFitIds.has(f.id)) apply(f); }
 
   if (changed > 0 && _scheduleSave) _scheduleSave();
   if (_updatePanel) _updatePanel();
   clearSelection();
 }
 
-// ── Hint bar ──────────────────────────────────────────
+// ── Geometry helper ───────────────────────────────────
 
-let _hintEl = null;
-
-function showHint() {
-  if (!_hintEl) {
-    _hintEl = document.createElement('div');
-    _hintEl.className = 'ms-hint';
-    _hintEl.textContent = 'Multi-select: Shift+Click items or Shift+Drag to box select';
-    document.getElementById('viewer')?.appendChild(_hintEl);
-  }
-  _hintEl.classList.add('show');
-}
-
-function hideHint() {
-  if (_hintEl) _hintEl.classList.remove('show');
+function pointToSegDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  let t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
 // ── Public API ────────────────────────────────────────
@@ -312,7 +355,6 @@ const MultiSelect = {
     _getPageMeasurements = opts.getPageMeasurements;
     _getPageFittings = opts.getPageFittings;
     _getCurrentPage = opts.getCurrentPage;
-    _getScreenToPdf = opts.screenToPdf;
     _scheduleSave = opts.scheduleSave;
     _drawOverlay = opts.drawOverlay;
     _updatePanel = opts.updatePanel;
@@ -320,103 +362,83 @@ const MultiSelect = {
     _enabled = true;
   },
 
-  // Called by main app on Shift+mousedown
+  // Mode toggles
+  get lassoMode() { return _lassoMode; },
+  set lassoMode(v) { _lassoMode = v; updateModeBadge(); },
+
+  get deselectMode() { return _deselectMode; },
+  set deselectMode(v) { _deselectMode = v; updateModeBadge(); },
+
+  // Mouse handlers — called from index.html
   onShiftMouseDown(e, screenToPdf) {
     if (!_enabled) return false;
     const pt = screenToPdf(e.clientX, e.clientY);
-
-    // Check if clicking on a specific item
-    if (e.type === 'mousedown') {
-      _boxStart = { sx: e.clientX, sy: e.clientY, px: pt.x, py: pt.y };
-      _boxActive = false;
-      return true; // consumed
-    }
-    return false;
+    _dragStart = { sx: e.clientX, sy: e.clientY, px: pt.x, py: pt.y };
+    _dragActive = false;
+    _lassoPoints = [{ sx: e.clientX, sy: e.clientY, px: pt.x, py: pt.y }];
+    return true;
   },
 
   onShiftMouseMove(e, screenToPdf) {
-    if (!_boxStart) return;
-    const dx = Math.abs(e.clientX - _boxStart.sx);
-    const dy = Math.abs(e.clientY - _boxStart.sy);
-    if (dx > 4 || dy > 4) _boxActive = true;
+    if (!_dragStart) return;
+    const dx = Math.abs(e.clientX - _dragStart.sx);
+    const dy = Math.abs(e.clientY - _dragStart.sy);
+    if (dx > 4 || dy > 4) _dragActive = true;
 
-    if (_boxActive) {
-      // Get viewer-relative coords
-      const vr = document.getElementById('viewer')?.getBoundingClientRect();
-      if (vr) {
-        showBox(
-          _boxStart.sx - vr.left, _boxStart.sy - vr.top,
-          e.clientX - vr.left, e.clientY - vr.top
-        );
+    if (_dragActive) {
+      const pt = screenToPdf(e.clientX, e.clientY);
+      if (_lassoMode) {
+        _lassoPoints.push({ sx: e.clientX, sy: e.clientY, px: pt.x, py: pt.y });
+        drawLassoPath();
+      } else {
+        const vr = document.getElementById('viewer')?.getBoundingClientRect();
+        if (vr) showBox(_dragStart.sx - vr.left, _dragStart.sy - vr.top, e.clientX - vr.left, e.clientY - vr.top);
       }
     }
   },
 
   onShiftMouseUp(e, screenToPdf) {
-    if (!_boxStart) return;
+    if (!_dragStart) return;
 
-    if (_boxActive) {
-      // Box select
-      const pt = screenToPdf(e.clientX, e.clientY);
-      if (!e.ctrlKey && !e.metaKey) {
-        // Fresh selection unless Ctrl held
-        _selectedMeasIds.clear();
-        _selectedFitIds.clear();
+    if (_dragActive) {
+      if (_lassoMode) {
+        selectItemsInLasso();
+        hideLasso();
+      } else {
+        const pt = screenToPdf(e.clientX, e.clientY);
+        selectItemsInRect(_dragStart.px, _dragStart.py, pt.x, pt.y);
+        hideBox();
       }
-      selectItemsInRect(_boxStart.px, _boxStart.py, pt.x, pt.y);
-      hideBox();
     } else {
-      // Single click — find what's under cursor and toggle
+      // Single click — toggle item
       const pt = screenToPdf(e.clientX, e.clientY);
       const page = _getCurrentPage();
-      const displayScale = 1; // hit test at PDF scale
 
-      // Check fittings first
       const fits = _getPageFittings(page) || [];
-      let hitFit = null;
-      let minDist = 20;
-      for (const f of fits) {
-        const d = Math.hypot(f.x - pt.x, f.y - pt.y);
-        if (d < minDist) { minDist = d; hitFit = f; }
-      }
-      if (hitFit) { toggleFitSelection(hitFit.id); _boxStart = null; return; }
+      let hitFit = null, minDist = 20;
+      for (const f of fits) { const d = Math.hypot(f.x - pt.x, f.y - pt.y); if (d < minDist) { minDist = d; hitFit = f; } }
+      if (hitFit) { toggleFitSelection(hitFit.id); _dragStart = null; return; }
 
-      // Check measurements
       const meas = _getPageMeasurements(page) || [];
       for (const m of meas) {
         if (!m.points || m.points.length < 2) continue;
         for (let i = 0; i < m.points.length - 1; i++) {
           const a = m.points[i], b = m.points[i + 1];
-          const d = pointToSegDist(pt.x, pt.y, a.x, a.y, b.x, b.y);
-          if (d < 15) { toggleMeasSelection(m.id); _boxStart = null; return; }
+          if (pointToSegDist(pt.x, pt.y, a.x, a.y, b.x, b.y) < 15) { toggleMeasSelection(m.id); _dragStart = null; return; }
         }
       }
     }
 
-    _boxStart = null;
-    _boxActive = false;
+    _dragStart = null;
+    _dragActive = false;
+    _lassoPoints = [];
   },
 
-  // Check if an item is in the multi-selection (for rendering highlights)
   isMeasSelected(id) { return _selectedMeasIds.has(id); },
   isFitSelected(id) { return _selectedFitIds.has(id); },
   getSelectionCount,
   clearSelection,
-
-  // Show/hide hint
-  showHint, hideHint,
 };
-
-// ── Geometry helper ───────────────────────────────────
-
-function pointToSegDist(px, py, ax, ay, bx, by) {
-  const dx = bx - ax, dy = by - ay;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
-  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
-}
 
 // ── Global handlers ───────────────────────────────────
 

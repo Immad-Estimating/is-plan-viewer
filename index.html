@@ -518,7 +518,8 @@
     </select>
     <button onclick="openSystemSymbolManager()" title="Manage System Symbols" style="background:none;border:1px solid #0f3460;color:#a0a0c0;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer">⚙</button>
     <div class="separator"></div>
-    <button id="multiSelectBtn" onclick="toggleMultiSelectMode()" title="Multi-Select" class="tool-has-tip">🔶 Select<span class="tool-tip">Multi-Select<br><b>Q</b> = toggle mode on/off<br><b>Shift+Click</b> = pick items<br><b>Shift+Drag</b> = box select<br><b>Esc</b> = clear selection<br><b>Ctrl+Shift+Drag</b> = add to selection</span></button>
+    <button id="multiSelectBtn" onclick="toggleMultiSelectMode()" title="Multi-Select" class="tool-has-tip">🔶 Select<span class="tool-tip">Rectangle Select<br><b>Q</b> = toggle mode<br>Click = pick items<br>Drag = box select<br><b>Esc</b> = clear<br><b>Alt</b> = hold to deselect</span></button>
+    <button id="lassoBtn" onclick="toggleLassoMode()" title="Lasso Select" class="tool-has-tip">➰ Lasso<span class="tool-tip">Freehand Lasso<br><b>L</b> = toggle mode<br>Draw around items to select<br>For overlapping ductwork<br><b>Alt</b> = hold to deselect</span></button>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)" class="tool-has-tip">📐 Measure<span class="tool-tip">Measure Tool<br><b>M</b> = toggle<br>Click points to measure<br><b>Enter</b> = finish line</span></button>
     <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)" class="tool-has-tip">◎ Duct<span class="tool-tip">Duct Draw<br><b>D</b> = toggle<br>Draws measured duct runs<br>Auto-tags size &amp; gauge</span></button>
     <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)" class="tool-has-tip">🔩 Fittings<span class="tool-tip">Fittings Palette<br><b>T</b> = toggle<br><b>R</b> = rotate · <b>X</b> = mirror<br>Click canvas to place</span></button>
@@ -4952,6 +4953,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   else if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); window.toggleMultiSelectMode(); }
+  else if (e.key === 'l' || e.key === 'L') { e.preventDefault(); window.toggleLassoMode(); }
   else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
   else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); window.toggleDuctDraw(); }
   else if ((e.key === 'e' || e.key === 'E') && selectedEndpointMeasId != null && selectedEndpointIdx != null && !elevationInputActive) {
@@ -5335,22 +5337,63 @@ function renderSavedCustomScales() {
 // ---- Measure mode ----
 // Multi-select mode: persistent select mode (no need to hold Shift)
 let multiSelectModeOn = false;
+
+function exitDrawModes() {
+  if (measureMode) toggleMeasureMode();
+  if (ductDrawMode) toggleDuctDraw();
+  if (fittingMode) toggleFittingMode();
+  if (stackMode) toggleStackMode();
+}
+
 window.toggleMultiSelectMode = function() {
+  // If lasso is on, switch to rect
+  if (MultiSelect.lassoMode) {
+    MultiSelect.lassoMode = false;
+    document.getElementById('lassoBtn')?.classList.remove('active-select');
+  }
   multiSelectModeOn = !multiSelectModeOn;
   const btn = document.getElementById('multiSelectBtn');
   if (btn) btn.classList.toggle('active-select', multiSelectModeOn);
-  // Exit other modes when entering select mode
   if (multiSelectModeOn) {
-    if (measureMode) toggleMeasureMode();
-    if (ductDrawMode) toggleDuctDraw();
-    if (fittingMode) toggleFittingMode();
-    if (stackMode) toggleStackMode();
+    exitDrawModes();
     viewer.style.cursor = 'crosshair';
   } else {
     viewer.style.cursor = '';
     MultiSelect.clearSelection();
   }
 };
+
+window.toggleLassoMode = function() {
+  // If rect select is on, switch to lasso
+  const wasLasso = MultiSelect.lassoMode;
+  if (!multiSelectModeOn && !wasLasso) {
+    // Entering lasso from scratch
+    multiSelectModeOn = true;
+    exitDrawModes();
+    viewer.style.cursor = 'crosshair';
+    document.getElementById('multiSelectBtn')?.classList.add('active-select');
+  }
+  MultiSelect.lassoMode = !wasLasso;
+  document.getElementById('lassoBtn')?.classList.toggle('active-select', MultiSelect.lassoMode);
+  document.getElementById('multiSelectBtn')?.classList.toggle('active-select', multiSelectModeOn && !MultiSelect.lassoMode);
+  if (!MultiSelect.lassoMode && !multiSelectModeOn) {
+    viewer.style.cursor = '';
+  }
+};
+
+// Alt key = deselect mode (hold)
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Alt' && multiSelectModeOn) {
+    MultiSelect.deselectMode = true;
+    viewer.style.cursor = 'not-allowed';
+  }
+});
+document.addEventListener('keyup', (e) => {
+  if (e.key === 'Alt') {
+    MultiSelect.deselectMode = false;
+    if (multiSelectModeOn) viewer.style.cursor = 'crosshair';
+  }
+});
 
 window.toggleMeasureMode = function() {
   if (multiSelectModeOn) toggleMultiSelectMode();
