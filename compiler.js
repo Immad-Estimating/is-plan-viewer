@@ -92,7 +92,7 @@ const DATA_COLUMNS = [
 
 // ── State ─────────────────────────────────────────────────────────────
 let _container = null;
-let _scope = 'project';
+let _scope = 'project';  // 'selection' | 'project'
 let _projectId = null;
 let _drawingId = null;
 let _activeGroups = ['itemType'];
@@ -109,6 +109,11 @@ let _lbrCollapsed = { laborHrs: false, laborCost: false };
 
 // Filters: { dimensionKey: Set of allowed values } — null means no filter (all pass)
 let _filters = {};
+
+// Selection scope: IDs from multi-select on canvas
+let _selMeasIds = null;   // Set or null
+let _selFitIds = null;
+let _selStackIds = null;
 
 // ── CSS ───────────────────────────────────────────────────────────────
 const CSS = `
@@ -288,6 +293,7 @@ function normalizeRows(allPageData, drawingNames) {
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
         phase: m.phase || null, costGroup: m.costGroup || null, gauge: m.gauge || null,
         systemSymbol: m.systemSymbol || null,
+        _sourceType: 'measurement', _sourceId: m.id,
       });
     }
 
@@ -331,6 +337,7 @@ function normalizeRows(allPageData, drawingNames) {
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
         phase: f.phase || null, costGroup: f.costGroup || null, gauge: f.gauge || null,
         systemSymbol: f.systemSymbol || null,
+        _sourceType: 'fitting', _sourceId: f.id,
       });
     }
 
@@ -346,6 +353,7 @@ function normalizeRows(allPageData, drawingNames) {
           _laborCatHrs: { ...ec }, _laborCatCost: { ...ec }, _laborCatLabel: 'unassigned',
           phase: null, costGroup: null, gauge: null,
           systemSymbol: null,
+          _sourceType: 'stack', _sourceId: it.id, _sourceStackId: s.id,
         });
       }
     }
@@ -463,7 +471,7 @@ function renderCompiler() {
 
   // Scope toggle
   html += `<div class="cmp-scope">
-    <button class="${_scope === 'drawing' ? 'active' : ''}" onclick="window._cmpSetScope('drawing')">This Drawing</button>
+    <button class="${_scope === 'selection' ? 'active' : ''}" onclick="window._cmpSetScope('selection')">${_selMeasIds || _selFitIds || _selStackIds ? 'Selection (' + ((_selMeasIds ? _selMeasIds.size : 0) + (_selFitIds ? _selFitIds.size : 0) + (_selStackIds ? _selStackIds.size : 0)) + ')' : 'Selection'}</button>
     <button class="${_scope === 'project' ? 'active' : ''}" onclick="window._cmpSetScope('project')">Entire Project</button>
   </div>`;
 
@@ -640,17 +648,31 @@ async function loadCompilerData() {
   _drawingNames = {};
   for (const d of drawings) _drawingNames[d.id] = d.fileName || `Drawing ${d.id}`;
 
-  let allPageData;
-  if (_scope === 'drawing' && _drawingId) {
+  // Always load current drawing's data (for selection scope) + optionally all
+  let allPageData = [];
+  if (_scope === 'selection' && _drawingId) {
+    // Only current drawing for selection mode
     allPageData = await cGetByIndex('pageData', 'drawingId', _drawingId);
   } else {
-    allPageData = [];
     for (const d of drawings) {
       const pd = await cGetByIndex('pageData', 'drawingId', d.id);
       allPageData.push(...pd);
     }
   }
-  _rows = normalizeRows(allPageData, _drawingNames);
+
+  let rows = normalizeRows(allPageData, _drawingNames);
+
+  // In selection scope, filter to only selected item IDs
+  if (_scope === 'selection' && (_selMeasIds || _selFitIds || _selStackIds)) {
+    rows = rows.filter(r => {
+      if (r._sourceType === 'measurement' && _selMeasIds && _selMeasIds.has(r._sourceId)) return true;
+      if (r._sourceType === 'fitting' && _selFitIds && _selFitIds.has(r._sourceId)) return true;
+      if (r._sourceType === 'stack' && _selStackIds && _selStackIds.has(r._sourceStackId)) return true;
+      return false;
+    });
+  }
+
+  _rows = rows;
 }
 
 // ── Public API ────────────────────────────────────────────────────────
@@ -661,15 +683,30 @@ const Compiler = {
     _container = container;
     _projectId = projectId;
     _drawingId = drawingId;
-    _scope = drawingId ? 'drawing' : 'project';
+    _scope = 'selection'; // default to selection view
     await this.refresh();
   },
   async refresh() {
     await loadCompilerData();
     renderCompiler();
   },
-  setDrawing(drawingId) { _drawingId = drawingId; if (_scope === 'drawing') this.refresh(); },
+  setDrawing(drawingId) { _drawingId = drawingId; if (_scope === 'selection') this.refresh(); },
   setProject(projectId) { _projectId = projectId; this.refresh(); },
+
+  // Push canvas selection into compiler
+  setSelection(measIds, fitIds, stackIds) {
+    _selMeasIds = measIds && measIds.size > 0 ? new Set(measIds) : null;
+    _selFitIds = fitIds && fitIds.size > 0 ? new Set(fitIds) : null;
+    _selStackIds = stackIds && stackIds.size > 0 ? new Set(stackIds) : null;
+    if (_scope === 'selection') this.refresh();
+  },
+
+  clearSelectionScope() {
+    _selMeasIds = null;
+    _selFitIds = null;
+    _selStackIds = null;
+    if (_scope === 'selection') this.refresh();
+  },
 };
 
 // ── Global handlers ───────────────────────────────────────────────────

@@ -500,6 +500,11 @@ const MultiSelect = {
   isStackSelected(id) { return _selectedStackIds.has(id); },
   getSelectionCount,
   clearSelection,
+
+  // Expose current selection sets (for compiler integration)
+  getSelectedMeasIds() { return _selectedMeasIds; },
+  getSelectedFitIds() { return _selectedFitIds; },
+  getSelectedStackIds() { return _selectedStackIds; },
 };
 
 // ── Global handlers ───────────────────────────────────

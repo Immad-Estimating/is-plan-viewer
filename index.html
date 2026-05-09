@@ -6906,6 +6906,21 @@ window.switchPanelTab = function(tab) {
   }
 };
 
+// Sync canvas selection into compiler (debounced)
+let _selSyncTimer = null;
+function _syncSelectionToCompiler() {
+  if (!_compilerInited || _activePanelTab !== 'comp') return;
+  if (_selSyncTimer) clearTimeout(_selSyncTimer);
+  _selSyncTimer = setTimeout(() => {
+    Compiler.setSelection(
+      MultiSelect.getSelectedMeasIds(),
+      MultiSelect.getSelectedFitIds(),
+      MultiSelect.getSelectedStackIds()
+    );
+    Compiler.refresh();
+  }, 150);
+}
+
 async function refreshCompiler() {
   const el = document.getElementById('compilerContent');
   if (!el) return;
@@ -6915,8 +6930,14 @@ async function refreshCompiler() {
   } else {
     Compiler.setDrawing(activeDrawingId);
     if (activeProjectId) Compiler.setProject(activeProjectId);
-    await Compiler.refresh();
   }
+  // Push current canvas selection into compiler
+  Compiler.setSelection(
+    MultiSelect.getSelectedMeasIds(),
+    MultiSelect.getSelectedFitIds(),
+    MultiSelect.getSelectedStackIds()
+  );
+  await Compiler.refresh();
 }
 
 function updatePanel() {
@@ -8535,7 +8556,7 @@ async function init() {
     getCurrentPage: () => currentPage,
     screenToPdf: screenToPdf,
     scheduleSave: scheduleSave,
-    drawOverlay: drawMeasureOverlay,
+    drawOverlay: () => { drawMeasureOverlay(); _syncSelectionToCompiler(); },
     updatePanel: updatePanel,
     getProjectSystemSymbols: () => projectSystemSymbols,
   });
