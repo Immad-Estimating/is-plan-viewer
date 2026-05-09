@@ -2885,27 +2885,37 @@ function getLaborBreakdown(baseKey, applicableCats) {
 // Active radar chart state
 var radarChartTarget = null; // base key of item being edited
 var radarChartItemType = null; // 'duct','fitting','accessory','equipment'
+var radarChartSubType = null; // 'spiral','snaplock', or null
 
 // Render a radar chart as SVG for a given item
-function renderRadarChart(baseKey, itemType) {
-  // All categories shown, but only applicable ones are editable
+function renderRadarChart(baseKey, itemType, subType) {
+  // subType: 'spiral', 'snaplock', or null
   var allCats = LABOR_CATEGORIES;
   var breakdown = getLaborBreakdown(baseKey, allCats);
   var n = allCats.length;
   var isSheetMetal = (itemType === 'duct' || itemType === 'fitting');
-  // For sheet metal: only 'rough' is editable, rest grayed out
-  var cx = 85, cy = 85, r = 65;
+  var isSnapLock = subType === 'snaplock';
+  // Determine which categories are enabled per item
+  function isCatEnabled(cat) {
+    if (!isSheetMetal) return cat.applies.indexOf(itemType) !== -1;
+    // Sheet metal: rough always on, stocking always on, trim only for snap lock
+    if (cat.key === 'rough') return true;
+    if (cat.key === 'stocking') return true;
+    if (cat.key === 'trim' && isSnapLock) return true;
+    return false;
+  }
+  var cx = 100, cy = 100, r = 80;
   var maxVal = 2;
   for (var i = 0; i < breakdown.length; i++) {
     if (breakdown[i].hrs > maxVal) maxVal = Math.ceil(breakdown[i].hrs);
   }
 
   // --- Layout: flex row with radar on left, sliders on right ---
-  var html = '<div style="display:flex;gap:12px;align-items:flex-start">';
+  var html = '<div style="display:flex;gap:16px;align-items:flex-start">';
 
   // --- LEFT: Radar chart SVG ---
   html += '<div style="flex-shrink:0">';
-  html += '<svg width="180" height="185" viewBox="0 0 180 185">';
+  html += '<svg width="220" height="220" viewBox="0 0 220 220">';
   // Background rings
   for (var ring = 1; ring <= 4; ring++) {
     var rr = r * ring / 4;
@@ -2919,15 +2929,15 @@ function renderRadarChart(baseKey, itemType) {
   // Axis lines + labels
   for (var j = 0; j < n; j++) {
     var cat = allCats[j];
-    var enabled = !isSheetMetal || cat.key === 'rough';
+    var enabled = isCatEnabled(cat);
     var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
     var ex = cx + r * Math.cos(angle);
     var ey = cy + r * Math.sin(angle);
     html += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="' + (enabled ? '#0f3460' : '#0a1a30') + '" stroke-width="0.5"/>';
-    var lx = cx + (r + 14) * Math.cos(angle);
-    var ly = cy + (r + 14) * Math.sin(angle);
+    var lx = cx + (r + 18) * Math.cos(angle);
+    var ly = cy + (r + 18) * Math.sin(angle);
     var anchor = Math.abs(Math.cos(angle)) < 0.1 ? 'middle' : (Math.cos(angle) > 0 ? 'start' : 'end');
-    html += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 3).toFixed(1) + '" fill="' + (enabled ? cat.color : '#333') + '" font-size="7" text-anchor="' + anchor + '" font-weight="600">' + cat.short + '</text>';
+    html += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 4).toFixed(1) + '" fill="' + (enabled ? cat.color : '#333') + '" font-size="11" text-anchor="' + anchor + '" font-weight="700">' + cat.short + '</text>';
   }
   // Data polygon
   var dataPts = [];
@@ -2941,26 +2951,27 @@ function renderRadarChart(baseKey, itemType) {
   // Vertex dots
   for (var j = 0; j < n; j++) {
     var cat = allCats[j];
-    var enabled = !isSheetMetal || cat.key === 'rough';
+    var enabled = isCatEnabled(cat);
     var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
     var val = breakdown[j].hrs / maxVal;
     if (val > 1) val = 1;
     var dx = cx + r * val * Math.cos(angle);
     var dy = cy + r * val * Math.sin(angle);
-    html += '<circle cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="3.5" fill="' + (enabled ? cat.color : '#333') + '" stroke="' + (enabled ? '#fff' : '#222') + '" stroke-width="0.8"/>';
+    html += '<circle cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="4.5" fill="' + (enabled ? cat.color : '#333') + '" stroke="' + (enabled ? '#fff' : '#222') + '" stroke-width="1"/>';
   }
   html += '</svg>';
   // Category inputs below chart
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px">';
   for (var j = 0; j < n; j++) {
     var cat = allCats[j];
-    var enabled = !isSheetMetal || cat.key === 'rough';
+    var enabled = isCatEnabled(cat);
     var catKey = lhCatKey(baseKey, cat.key);
-    html += '<div style="display:flex;align-items:center;gap:2px;opacity:' + (enabled ? '1' : '0.3') + '">';
-    html += '<span style="color:' + cat.color + ';font-size:8px;font-weight:600;width:18px">' + cat.short + '</span>';
+    html += '<div style="display:flex;align-items:center;gap:4px;opacity:' + (enabled ? '1' : '0.3') + '">';
+    html += '<span style="color:' + cat.color + ';font-size:11px;font-weight:700;width:24px">' + cat.short + '</span>';
     html += '<input type="text" value="' + (breakdown[j].hrs || '') + '" placeholder="0" ';
-    html += (enabled ? '' : 'disabled ') + 'style="width:36px;background:#1a1a2e;border:1px solid ' + (enabled ? '#0f3460' : '#0a1a30') + ';color:' + (enabled ? cat.color : '#333') + ';padding:2px 3px;border-radius:3px;font-size:9px;text-align:right" ';
+    html += (enabled ? '' : 'disabled ') + 'style="width:44px;background:#1a1a2e;border:1px solid ' + (enabled ? '#0f3460' : '#0a1a30') + ';color:' + (enabled ? cat.color : '#333') + ';padding:3px 4px;border-radius:3px;font-size:12px;text-align:right" ';
     html += 'onchange="updateRadarHrs(\'' + catKey + '\',this.value)">';
+    html += '<span style="color:#555;font-size:10px">h</span>';
     html += '</div>';
   }
   html += '</div>';
@@ -2972,12 +2983,12 @@ function renderRadarChart(baseKey, itemType) {
   var currentPCIdx = pbPerimClass['rect-fit'] || 0;
   // Main size slider
   html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
-  html += '<span style="color:#a0a0c0;font-size:8px;font-weight:600">SIZE</span>';
+  html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">SIZE</span>';
   html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length - 1) + '" value="' + currentPCIdx + '" ';
-  html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:20px;height:120px;accent-color:#e94560" ';
+  html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:140px;accent-color:#e94560" ';
   html += 'oninput="radarSliderPerim(this.value)">';
   var pcLabel = RECT_PERIM_CLASSES[currentPCIdx] ? RECT_PERIM_CLASSES[currentPCIdx].label : '';
-  html += '<span style="color:#e94560;font-size:8px;text-align:center;max-width:50px">' + pcLabel + '</span>';
+  html += '<span style="color:#e94560;font-size:12px;font-weight:600;text-align:center;max-width:60px">' + pcLabel + '</span>';
   html += '</div>';
   html += '</div>'; // end right
 
@@ -2988,9 +2999,6 @@ function renderRadarChart(baseKey, itemType) {
 window.radarSliderPerim = function(idx) {
   var i = parseInt(idx);
   pbPerimClass['rect-fit'] = i;
-  // Also update the radar chart target to reflect new perim class
-  // The baseKey for rect fittings includes perim, so we need to close and reopen
-  radarChartTarget = null;
   renderPriceBook();
   pbSaveLayout();
 };
@@ -3002,13 +3010,15 @@ window.updateRadarHrs = async function(catKey, value) {
   renderPriceBook();
 };
 
-window.toggleRadarChart = function(baseKey, itemType) {
+window.toggleRadarChart = function(baseKey, itemType, subType) {
   if (radarChartTarget === baseKey) {
     radarChartTarget = null;
     radarChartItemType = null;
+    radarChartSubType = null;
   } else {
     radarChartTarget = baseKey;
     radarChartItemType = itemType;
+    radarChartSubType = subType || null;
   }
   renderPriceBook();
 };
@@ -3096,8 +3106,13 @@ function pbRow(item, sectionId) {
   // Labor: total hours across all categories + radar chart trigger
   var lhItemType = isRectFit ? 'fitting' : (sectionId === 'rect-acc' ? 'accessory' : (sectionId && sectionId.indexOf('-duct') !== -1 ? 'duct' : 'fitting'));
   var lhBaseKey = isRectFit ? lhKey : activeKey;
+  // Determine sub-type for spiral/snaplock context
+  var lhSubType = '';
+  var rt = pbRoundType[sectionId];
+  if (rt === 'snaplock') lhSubType = 'snaplock';
+  else if (sectionId && sectionId.indexOf('round') !== -1) lhSubType = 'spiral';
   var totalLh = getTotalLaborHrs(lhBaseKey);
-  html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + lhBaseKey + '\',\'' + lhItemType + '\')" title="Click to edit labor breakdown">';
+  html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + lhBaseKey + '\',\'' + lhItemType + '\',\'' + lhSubType + '\')" title="Click to edit labor breakdown">';
   html += '<span style="color:#ffaa00;font-size:11px">' + (totalLh > 0 ? totalLh.toFixed(2) + 'h' : '\u2014') + '</span>';
   html += ' <span style="color:#555;font-size:9px">\u25BC</span>';
   html += '</td>';
@@ -3106,7 +3121,7 @@ function pbRow(item, sectionId) {
   if (radarChartTarget === lhBaseKey) {
     var colSpan = hasShopAdder ? 4 : 3;
     html += '<tr><td colspan="' + colSpan + '" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
-    html += renderRadarChart(lhBaseKey, lhItemType);
+    html += renderRadarChart(lhBaseKey, lhItemType, radarChartSubType);
     html += '</td></tr>';
   }
 
@@ -3306,7 +3321,7 @@ function renderRectDuctCalcSection(sec, gauge) {
       + 'onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)">';
     html += '</td>';
     // Labor hrs
-    html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + classKey + '\',\'duct\')" title="Click to edit labor breakdown">';
+    html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + classKey + '\',\'duct\',\'\')" title="Click to edit labor breakdown">';
     html += '<span style="color:#ffaa00;font-size:11px">' + (totalDuctLh > 0 ? totalDuctLh.toFixed(2) + 'h' : '\u2014') + '</span>';
     html += ' <span style="color:#555;font-size:9px">\u25BC</span>';
     html += '</td>';
@@ -3314,7 +3329,7 @@ function renderRectDuctCalcSection(sec, gauge) {
     // Radar chart row
     if (radarChartTarget === classKey) {
       html += '<tr><td colspan="4" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
-      html += renderRadarChart(classKey, 'duct');
+      html += renderRadarChart(classKey, 'duct', radarChartSubType);
       html += '</td></tr>';
     }
   }
