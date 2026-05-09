@@ -2385,7 +2385,7 @@ const PRICE_BOOK_TABS = {
     label: 'Rectangular',
     sections: [
       { id: 'rect-shop', hasGauge: false, title: 'Shop Settings', isShopSettings: true, items: [] },
-      { id: 'rect-fit', hasGauge: true, title: 'Fittings', hasPerimClass: true, hasShopAdder: true, items: [
+      { id: 'rect-fit', hasGauge: true, title: 'Fittings', hasShopAdder: true, items: [
         { key: 'rect-90el', label: '90\u00b0 Elbow' },
         { key: 'rect-45el', label: '45\u00b0 Elbow' },
         { key: 'rect-22el', label: '22.5\u00b0 Elbow' },
@@ -2840,11 +2840,7 @@ window.togglePBItemExpand = function(itemKey) {
   renderPriceBook();
 };
 
-window.setPBPerimClass = function(sectionId, idx) {
-  pbPerimClass[sectionId] = idx;
-  renderPriceBook();
-  pbSaveLayout();
-};
+
 
 window.togglePBSizePairExpand = function(pairKey) {
   pbExpandedItems[pairKey] = !pbExpandedItems[pairKey];
@@ -2970,7 +2966,7 @@ function renderRadarChart(baseKey, itemType, subType) {
     html += '<span style="color:' + cat.color + ';font-size:11px;font-weight:700;width:24px">' + cat.short + '</span>';
     html += '<input type="text" value="' + (breakdown[j].hrs || '') + '" placeholder="0" ';
     html += (enabled ? '' : 'disabled ') + 'style="width:44px;background:#1a1a2e;border:1px solid ' + (enabled ? '#0f3460' : '#0a1a30') + ';color:' + (enabled ? cat.color : '#333') + ';padding:3px 4px;border-radius:3px;font-size:12px;text-align:right" ';
-    html += 'onchange="updateRadarHrs(\'' + catKey + '\',this.value)">';
+    html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onchange="updateRadarHrs(\'' + catKey + '\',this.value)">';
     html += '<span style="color:#555;font-size:10px">h</span>';
     html += '</div>';
   }
@@ -2986,6 +2982,7 @@ function renderRadarChart(baseKey, itemType, subType) {
   html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">SIZE</span>';
   html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length - 1) + '" value="' + currentPCIdx + '" ';
   html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:140px;accent-color:#e94560" ';
+  html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
   html += 'oninput="radarSliderPerim(this.value)">';
   var pcLabel = RECT_PERIM_CLASSES[currentPCIdx] ? RECT_PERIM_CLASSES[currentPCIdx].label : '';
   html += '<span style="color:#e94560;font-size:12px;font-weight:600;text-align:center;max-width:60px">' + pcLabel + '</span>';
@@ -3411,19 +3408,7 @@ function renderPriceBook() {
     }
     html += '</span>';
     html += '</td></tr>';
-    // Perimeter class selector row (below section header, above items)
-    if (sec.hasPerimClass && !collapsed) {
-      var activePC = pbPerimClass[sec.id] || 0;
-      html += '<tr><td colspan="4" style="padding:4px;background:rgba(15,52,96,0.15)">';
-      html += '<div style="display:flex;flex-wrap:wrap;gap:3px">';
-      for (var pci = 0; pci < RECT_PERIM_CLASSES.length; pci++) {
-        var pcStyle = pci === activePC
-          ? 'background:rgba(233,69,96,0.2);color:#e94560;border-color:#e94560'
-          : 'background:#1a1a2e;color:#a0a0c0;border-color:#0f3460';
-        html += '<button onclick="setPBPerimClass(\'' + sec.id + '\',' + pci + ')" style="padding:2px 5px;border-radius:3px;cursor:pointer;font-size:9px;font-weight:600;border:1px solid;white-space:nowrap;' + pcStyle + '">' + RECT_PERIM_CLASSES[pci].label + '</button>';
-      }
-      html += '</div></td></tr>';
-    }
+
 
     if (!collapsed) {
       // Special rendering for Shop Settings section
