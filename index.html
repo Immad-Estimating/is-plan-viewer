@@ -2836,6 +2836,8 @@ window.togglePBRoundType = function(sectionId) {
 };
 
 window.togglePBItemExpand = function(itemKey) {
+  // Don't collapse if a radar chart is open for a child of this item
+  if (pbExpandedItems[itemKey] && radarChartTarget && radarChartTarget.indexOf(itemKey) === 0) return;
   pbExpandedItems[itemKey] = !pbExpandedItems[itemKey];
   renderPriceBook();
 };
