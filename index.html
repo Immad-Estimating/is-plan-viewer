@@ -267,6 +267,7 @@
   /* Side panel */
   .side-panel { width: 0; overflow: hidden; background: #16213e; border-left: 1px solid #0f3460; transition: width 0.2s ease; flex-shrink: 0; display: flex; flex-direction: column; }
   .side-panel.open { width: 300px; }
+  .side-panel.open.wide { width: 460px; }
   .side-panel-header { padding: 12px 14px; border-bottom: 1px solid #0f3460; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
   .side-panel-header h3 { font-size: 14px; color: #e94560; }
   .side-panel-header button { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 16px; }
@@ -476,6 +477,7 @@
     <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)">🔩 Fittings</button>
     <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)">📌 Stack</button>
     <button id="panelBtn" onclick="togglePanel()" title="Analysis Panel">📊 Analysis</button>
+    <button id="compilerBtn" onclick="toggleCompiler()" title="Compiler">⚙️ Compiler</button>
     <button onclick="openPriceBook()" title="Global Price Book">💲 Prices</button>
 
   </div>
@@ -656,11 +658,15 @@
     <!-- Side Panel -->
     <div class="side-panel" id="sidePanel">
       <div class="side-panel-header">
-        <h3>Measurements</h3>
-        <button onclick="togglePanel()" title="Close">✕</button>
+        <div style="display:flex;gap:2px">
+          <button id="panelTabMeas" onclick="switchPanelTab('meas')" style="padding:4px 10px;border-radius:4px 4px 0 0;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #0f3460;border-bottom:none;background:#e94560;color:#fff">📊 Measurements</button>
+          <button id="panelTabComp" onclick="switchPanelTab('comp')" style="padding:4px 10px;border-radius:4px 4px 0 0;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #0f3460;border-bottom:none;background:#1a1a2e;color:#a0a0c0">⚙️ Compiler</button>
+        </div>
+        <button onclick="closePanel()" title="Close">✕</button>
       </div>
       <div class="side-panel-content" id="panelContent"></div>
-      <div class="side-panel-footer">
+      <div class="side-panel-content" id="compilerContent" style="display:none"></div>
+      <div class="side-panel-footer" id="panelFooterMeas">
         <button onclick="clearAllMeasurements()">Clear All</button>
       </div>
     </div>
@@ -730,6 +736,7 @@
 
 <script type="module">
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
+import Compiler from './compiler.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -3661,7 +3668,11 @@ let saveTimer = null;
 function scheduleSave() {
   if (!activeDrawingId) return;
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => saveCurrentPageData(), 500);
+  saveTimer = setTimeout(async () => {
+    await saveCurrentPageData();
+    // Auto-refresh compiler if it's open
+    if (_activePanelTab === 'comp' && _compilerInited && sidePanel.classList.contains('open')) refreshCompiler();
+  }, 500);
   _snapPreviewCache = null; // invalidate snap cache when items change
 }
 
@@ -3792,6 +3803,7 @@ async function loadPageDataForDrawing(drawingId) {
 async function loadDrawingIntoViewer(projectId, drawingId) {
   activeDrawingId = drawingId;
   activeProjectId = projectId;
+  _compilerInited = false; // reset so compiler re-inits for this drawing
   await loadProjectRateTable(projectId);
 
   try {
@@ -6277,14 +6289,79 @@ window.editMeasCost = function(id) {
 };
 
 
+let _activePanelTab = 'meas'; // 'meas' | 'comp'
+let _compilerInited = false;
+
 window.togglePanel = function() {
   sidePanel.classList.toggle('open');
   const btn = document.getElementById('panelBtn');
   btn.classList.toggle('active', sidePanel.classList.contains('open'));
   const toggle = document.getElementById('panelToggle');
   toggle.textContent = sidePanel.classList.contains('open') ? '▶' : '◀';
-  updatePanel();
+  if (_activePanelTab === 'meas') updatePanel();
+  else refreshCompiler();
 };
+
+window.closePanel = function() {
+  sidePanel.classList.remove('open');
+  document.getElementById('panelBtn').classList.remove('active');
+  document.getElementById('compilerBtn').classList.remove('active');
+  document.getElementById('panelToggle').textContent = '◀';
+};
+
+window.toggleCompiler = function() {
+  const wasOpen = sidePanel.classList.contains('open') && _activePanelTab === 'comp';
+  if (wasOpen) { window.closePanel(); return; }
+  sidePanel.classList.add('open');
+  document.getElementById('panelToggle').textContent = '▶';
+  switchPanelTab('comp');
+};
+
+window.switchPanelTab = function(tab) {
+  _activePanelTab = tab;
+  const measContent = document.getElementById('panelContent');
+  const compContent = document.getElementById('compilerContent');
+  const measFooter = document.getElementById('panelFooterMeas');
+  const tabMeas = document.getElementById('panelTabMeas');
+  const tabComp = document.getElementById('panelTabComp');
+  const btnPanel = document.getElementById('panelBtn');
+  const btnCompiler = document.getElementById('compilerBtn');
+
+  if (tab === 'meas') {
+    measContent.style.display = '';
+    compContent.style.display = 'none';
+    measFooter.style.display = '';
+    sidePanel.classList.remove('wide');
+    tabMeas.style.background = '#e94560'; tabMeas.style.color = '#fff';
+    tabComp.style.background = '#1a1a2e'; tabComp.style.color = '#a0a0c0';
+    btnPanel.classList.add('active');
+    btnCompiler.classList.remove('active');
+    updatePanel();
+  } else {
+    measContent.style.display = 'none';
+    compContent.style.display = '';
+    measFooter.style.display = 'none';
+    sidePanel.classList.add('wide');
+    tabComp.style.background = '#e94560'; tabComp.style.color = '#fff';
+    tabMeas.style.background = '#1a1a2e'; tabMeas.style.color = '#a0a0c0';
+    btnCompiler.classList.add('active');
+    btnPanel.classList.remove('active');
+    refreshCompiler();
+  }
+};
+
+async function refreshCompiler() {
+  const el = document.getElementById('compilerContent');
+  if (!el) return;
+  if (!_compilerInited) {
+    await Compiler.init(el, activeProjectId, activeDrawingId);
+    _compilerInited = true;
+  } else {
+    Compiler.setDrawing(activeDrawingId);
+    if (activeProjectId) Compiler.setProject(activeProjectId);
+    await Compiler.refresh();
+  }
+}
 
 function updatePanel() {
   const content = document.getElementById('panelContent');
