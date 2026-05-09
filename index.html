@@ -3014,8 +3014,10 @@ function renderRadarChart(baseKey, itemType, subType) {
 window.radarSliderRoundSize = function(idx, currentKey) {
   var roundSizes = [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24];
   var newSize = roundSizes[parseInt(idx)] || 12;
-  // Replace the size suffix in the key (e.g., 'spiral-90el-12' -> 'spiral-90el-14')
   var newKey = currentKey.replace(/-(\d+)$/, '-' + newSize);
+  // Ensure parent fitting stays expanded
+  var parentKey = currentKey.replace(/-(\d+)$/, '');
+  pbExpandedItems[parentKey] = true;
   radarChartTarget = newKey;
   renderPriceBook();
 };
