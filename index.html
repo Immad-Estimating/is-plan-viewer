@@ -394,6 +394,7 @@
     <input type="text" class="search-box" id="dashboardSearch" placeholder="Search projects..." oninput="filterProjects()">
     <button class="new-project-btn" onclick="openNewProjectModal()">+ New Project</button>
     <div class="separator"></div>
+    <button style="background:#0f3460;color:#e0e0e0;border:1px solid #1a4080;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap" onclick="openPriceBook()" title="Global Price Book">💲 Prices</button>
     <button style="background:#0f3460;color:#e0e0e0;border:1px solid #1a4080;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap" onclick="exportBackup()" title="Download all takeoff data as JSON backup">💾 Backup</button>
     <button style="background:#0f3460;color:#e0e0e0;border:1px solid #1a4080;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap" onclick="document.getElementById('restoreFileInput').click()" title="Restore takeoff data from JSON backup">📂 Restore</button>
     <input type="file" id="restoreFileInput" accept=".json" style="display:none" onchange="importBackup(event)">
@@ -590,9 +591,17 @@
       <div class="fitting-grid" id="fittingGrid"></div>
       <div class="fitting-dims">
         <label>A:</label>
-        <input type="text" id="fpSizeA" value="14" placeholder="14">
-        <label>B:</label>
-        <input type="text" id="fpSizeB" value="" placeholder="opt">
+        <input type="text" id="fpSizeA" value="14" placeholder="14" oninput="updateFPCostPreview()">
+        <label id="fpSizeBLabel">B:</label>
+        <input type="text" id="fpSizeB" value="" placeholder="opt" oninput="updateFPCostPreview()">
+      </div>
+      <div class="fitting-dims" style="margin-top:4px">
+        <label>Ga:</label>
+        <select id="fpGauge" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px" onchange="updateFPCostPreview()">
+          <option value="26">26 ga</option>
+          <option value="24">24 ga</option>
+          <option value="22">22 ga</option>
+        </select>
       </div>
       <div class="fitting-rotation">
         <label>Rot:</label>
@@ -601,13 +610,10 @@
         <button onclick="rotateFittingInput(90)">↷</button>
         <label>°</label>
       </div>
-      <div class="fitting-dims" style="margin-top:4px">
-        <label>Ga:</label>
-        <select id="fpGauge" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px">
-          <option value="26">26 ga</option>
-          <option value="24">24 ga</option>
-          <option value="22">22 ga</option>
-        </select>
+      <div id="fpCostPreview" style="display:none;margin-top:6px;padding:8px;background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;font-size:11px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:#a0a0c0">Material</span><span id="fpCostMat" style="color:#00ff88">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:#a0a0c0">Labor Hrs</span><span id="fpCostLab" style="color:#ffaa00">—</span></div>
+        <div style="display:flex;justify-content:space-between;padding-top:3px;border-top:1px solid #0f3460;font-weight:600"><span style="color:#e0e0e0">Total</span><span id="fpCostTotal" style="color:#e0e0e0">—</span></div>
       </div>
     </div>
     <!-- Annotation controls -->
@@ -2422,7 +2428,7 @@ const PRICE_BOOK_TABS = {
         { key: 'spiral-starting-collar', snapKey: 'snaplock-starting-collar', label: 'Starting Collar', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
         { key: 'spiral-boot', snapKey: 'snaplock-boot', label: 'Register Boot', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
         { key: 'spiral-flex-conn', snapKey: 'snaplock-flex-conn', label: 'Flex Connector', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-test-hole', snapKey: 'snaplock-test-hole', label: 'Test Hole Fitting', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+
       ]},
       { id: 'round-duct', hasGauge: true, title: 'Ductwork', toggleType: true, items: [
         { key: 'duct-spiral-3', snapKey: 'duct-snaplock-3', label: '3\u2033' },
@@ -5967,7 +5973,101 @@ window.selectFittingType = function(type) {
   // Show/hide sizeB based on type
   const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap'].includes(type);  // sqwing uses only sizeA (WxH)
   document.getElementById('fpSizeB').style.display = needsB ? '' : 'none';
-  document.getElementById('fpSizeB').previousElementSibling.style.display = needsB ? '' : 'none';
+  document.getElementById('fpSizeBLabel').style.display = needsB ? '' : 'none';
+  // Update B label based on fitting type
+  const isReducerType = ['reducer','eccReducer'].includes(type);
+  document.getElementById('fpSizeBLabel').textContent = isReducerType ? 'Out:' : 'Br:';
+  // Clear sizeB when switching to non-B fitting
+  if (!needsB) document.getElementById('fpSizeB').value = '';
+  updateFPCostPreview();
+};
+
+// Live cost preview in fitting palette — looks up price book for current size/gauge/type combo
+window.updateFPCostPreview = function() {
+  var panel = document.getElementById('fpCostPreview');
+  if (!selectedFittingType) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  var type = selectedFittingType;
+  var sizeA = document.getElementById('fpSizeA').value || '';
+  var sizeB = document.getElementById('fpSizeB').value || '';
+  var gauge = document.getElementById('fpGauge').value || '26';
+  var shape = currentFittingShape || 'round';
+  var prefix = shape === 'round' ? 'spiral' : shape;
+  var baseKey = type === 'rectTap' ? 'rectTap' : prefix + '-' + type;
+  var sizeNum = parseInt(sizeA);
+  var sizeBNum = parseInt(sizeB);
+  var isReducerType = ['reducer','eccReducer'].includes(type);
+  var hasBranch = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap'].includes(type);
+  // Validate sizeB for reducers: outlet must be <= inlet
+  if (isReducerType && sizeBNum && sizeNum && sizeBNum > sizeNum) {
+    document.getElementById('fpCostMat').textContent = '\u26a0 Out > In';
+    document.getElementById('fpCostMat').style.color = '#e94560';
+    document.getElementById('fpCostLab').textContent = '\u2014';
+    document.getElementById('fpCostTotal').textContent = '\u2014';
+    return;
+  }
+  // Determine lookup key
+  var mc = null;
+  var lh = null;
+  if (hasBranch && sizeNum && sizeBNum && sizeBNum !== sizeNum) {
+    // Two-dimension lookup: main x branch (or inlet x outlet)
+    var pairKey = baseKey + '-' + sizeNum + 'x' + sizeBNum;
+    mc = getMaterialForGauge(pairKey, gauge);
+    var pairEntry = priceBookCache ? priceBookCache[pairKey] : null;
+    lh = pairEntry ? pairEntry.laborHrs : null;
+    // Fallback to single-size if no pair price found
+    if (mc == null) {
+      var sizeKey = baseKey + '-' + sizeNum;
+      mc = getMaterialForGauge(sizeKey, gauge);
+    }
+    if (lh == null) {
+      var sizeKey2 = baseKey + '-' + sizeNum;
+      var szEntry = priceBookCache ? priceBookCache[sizeKey2] : null;
+      lh = szEntry ? szEntry.laborHrs : null;
+    }
+  } else if (sizeNum) {
+    // Single dimension (or B same as A = same-size fitting)
+    var sizeKey = baseKey + '-' + sizeNum;
+    mc = getMaterialForGauge(sizeKey, gauge);
+    var szEntry = priceBookCache ? priceBookCache[sizeKey] : null;
+    lh = szEntry ? szEntry.laborHrs : null;
+  }
+  // Fallback to base key
+  if (mc == null) {
+    var gKey = gauge ? baseKey + '-g' + gauge : baseKey;
+    var baseEntry = priceBookCache ? priceBookCache[gKey] : null;
+    if (baseEntry) mc = baseEntry.materialCost;
+    if (mc == null) {
+      baseEntry = priceBookCache ? priceBookCache[baseKey] : null;
+      if (baseEntry) mc = baseEntry.materialCost;
+    }
+  }
+  if (lh == null) {
+    var baseEntry2 = priceBookCache ? priceBookCache[baseKey] : null;
+    if (baseEntry2) lh = baseEntry2.laborHrs;
+  }
+  var lr = 45; // default labor rate
+  var matEl = document.getElementById('fpCostMat');
+  var labEl = document.getElementById('fpCostLab');
+  var totEl = document.getElementById('fpCostTotal');
+  matEl.style.color = '#00ff88';
+  if (mc != null) {
+    matEl.textContent = '$' + mc.toFixed(2);
+  } else {
+    matEl.textContent = '\u2014';
+  }
+  if (lh != null) {
+    labEl.textContent = lh + 'h';
+  } else {
+    labEl.textContent = '\u2014';
+  }
+  if (mc != null && lh != null) {
+    totEl.textContent = '$' + (mc + lh * lr).toFixed(2);
+  } else if (mc != null) {
+    totEl.textContent = '$' + mc.toFixed(2) + ' + labor';
+  } else {
+    totEl.textContent = '\u2014';
+  }
 };
 
 window.rotateFittingInput = function(deg) {
