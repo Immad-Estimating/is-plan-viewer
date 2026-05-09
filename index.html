@@ -2479,7 +2479,7 @@ var pbGauge = { 'round-fit': '26', 'round-duct': '26', 'rect-fit': '26', 'rect-d
 var activePBTab = 'rect';
 var pbRoundType = { 'round-fit': 'spiral', 'round-duct': 'spiral' }; // toggle: 'spiral' or 'snaplock'
 var pbExpandedItems = {}; // tracks which fitting rows are expanded to show per-size pricing
-var pbPairInputs = {}; // tracks secondary-size input values per fitting-size key in drawing context (e.g., 'spiral-reducer-14' -> '10')
+
 
 // Default spiral pricing by gauge: key -> { '26': price, '22': price, ... }
 var SPIRAL_DEFAULTS = {
@@ -2696,18 +2696,7 @@ window.togglePBSizePairExpand = function(pairKey) {
   renderPriceBook();
 };
 
-// Drawing context: set the secondary size for a fitting row and re-render to update price lookup
-window.pbSetPairInput = function(szKey, value, mainSz) {
-  var secNum = parseInt(value);
-  if (value === '' || isNaN(secNum)) {
-    delete pbPairInputs[szKey];
-  } else {
-    // Clamp: secondary can't exceed main size
-    if (secNum > mainSz) secNum = mainSz;
-    pbPairInputs[szKey] = secNum;
-  }
-  renderPriceBook();
-};
+
 
 function pbInput(key, prop, value) {
   var clr = prop === 'materialCost' ? '#00ff88' : prop === 'laborHrs' ? '#ffaa00' : '#e0e0e0';
@@ -2739,7 +2728,6 @@ function pbRow(item, sectionId) {
   var gaugeKey = gauge ? activeKey + '-g' + gauge : activeKey;
   var hasSizes = item.sizes && item.sizes.length > 0;
   var hasPairs = item.sizePairs && hasSizes;
-  var inDrawing = !!activeDrawingId; // drawing context vs dashboard
   var isExpanded = hasSizes && !!pbExpandedItems[activeKey];
   var arrow = hasSizes ? (isExpanded ? '\u25BC ' : '\u25B6 ') : '';
   var clickAttr = hasSizes ? ' onclick="togglePBItemExpand(\'' + activeKey + '\')" style="padding:4px;color:#e0e0e0;font-size:11px;cursor:pointer"' : ' style="padding:4px;color:#e0e0e0;font-size:11px"';
@@ -2749,51 +2737,8 @@ function pbRow(item, sectionId) {
   html += '<td style="padding:4px 2px">' + pbInput(activeKey, 'laborHrs', lh) + '</td>';
   html += '</tr>';
 
-  // ---- DRAWING CONTEXT: compact inline secondary-size input per main size ----
-  if (isExpanded && inDrawing) {
-    var isReducer = activeKey.indexOf('reducer') !== -1 || activeKey.indexOf('eccReducer') !== -1;
-    var secLabel = isReducer ? 'Out' : 'Br';
-    for (var si = 0; si < item.sizes.length; si++) {
-      var sz = item.sizes[si];
-      var szKey = activeKey + '-' + sz;
-      // Read the current secondary size from pbPairInputs state (default: same as main = single-size pricing)
-      var curSec = (pbPairInputs[szKey] != null) ? pbPairInputs[szKey] : '';
-      var secNum = parseInt(curSec);
-      // Determine lookup key: pair if secondary is valid & different, else single-size
-      var lookupKey, lookupGaugeKey;
-      if (hasPairs && secNum && secNum !== sz && secNum <= sz) {
-        lookupKey = activeKey + '-' + sz + 'x' + secNum;
-      } else {
-        lookupKey = szKey;
-      }
-      lookupGaugeKey = gauge ? lookupKey + '-g' + gauge : lookupKey;
-      var szMc = getMaterialForGauge(lookupKey, gauge || '26');
-      // Fallback to single-size if pair not found
-      if (szMc == null && lookupKey !== szKey) szMc = getMaterialForGauge(szKey, gauge || '26');
-      var szEntry = priceBookCache ? priceBookCache[lookupKey] : null;
-      var szLh = szEntry ? szEntry.laborHrs : null;
-      if (szLh == null && lookupKey !== szKey) {
-        var fallback = priceBookCache ? priceBookCache[szKey] : null;
-        szLh = fallback ? fallback.laborHrs : null;
-      }
-      html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.15);background:rgba(15,52,96,0.15)">';
-      html += '<td style="padding:3px 4px 3px 20px;color:#00c8ff;font-size:12px;white-space:nowrap">';
-      html += sz + '\u2033';
-      // Show inline secondary-size input only for sizePairs fittings
-      if (hasPairs) {
-        html += ' <span style="color:#a0a0c0;font-size:10px">' + secLabel + ':</span>';
-        html += '<input type="text" value="' + (curSec || '') + '" placeholder="\u2014" ';
-        html += 'style="width:32px;background:#1a1a2e;border:1px solid #0f3460;color:#a0c8ff;padding:2px 3px;border-radius:3px;font-size:11px;text-align:center;margin-left:2px" ';
-        html += 'onchange="pbSetPairInput(\'' + szKey + '\',this.value,' + sz + ')">';
-      }
-      html += '</td>';
-      html += '<td style="padding:3px 2px">' + pbInput(lookupGaugeKey, 'materialCost', szMc) + '</td>';
-      html += '<td style="padding:3px 2px">' + pbInput(lookupKey, 'laborHrs', szLh) + '</td>';
-      html += '</tr>';
-    }
-  }
-  // ---- DASHBOARD CONTEXT: full expandable tree with sub-rows ----
-  else if (isExpanded && hasPairs && !inDrawing) {
+  // ---- Two-dimension pricing: expandable tree with sub-rows ----
+  if (isExpanded && hasPairs) {
     var isReducer = activeKey.indexOf('reducer') !== -1 || activeKey.indexOf('eccReducer') !== -1;
     var mainLabel = isReducer ? 'Inlet' : 'Main';
     var subLabel = isReducer ? 'Outlet' : 'Branch';
