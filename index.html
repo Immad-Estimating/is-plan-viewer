@@ -3144,7 +3144,7 @@ function pbRow(item, sectionId) {
   // Radar chart row (if this item is active)
   if (radarChartTarget === lhBaseKey) {
     var colSpan = hasShopAdder ? 4 : 3;
-    html += '<tr><td colspan="' + colSpan + '" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+    html += '<tr onclick="event.stopPropagation()"><td colspan="' + colSpan + '" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
     html += renderRadarChart(lhBaseKey, lhItemType, radarChartSubType);
     html += '</td></tr>';
   }
@@ -3175,7 +3175,7 @@ function pbRow(item, sectionId) {
       html += ' <span style="color:#555;font-size:9px">\u25BC</span></td>';
       html += '</tr>';
       if (radarChartTarget === szKey) {
-        html += '<tr><td colspan="3" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+        html += '<tr onclick="event.stopPropagation()"><td colspan="3" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
         html += renderRadarChart(szKey, 'fitting', radarChartSubType);
         html += '</td></tr>';
       }
@@ -3199,7 +3199,7 @@ function pbRow(item, sectionId) {
           html += '<span style="color:#ffaa00;font-size:10px">' + (pairTotalLh > 0 ? pairTotalLh.toFixed(2) + 'h' : '\u2014') + '</span></td>';
           html += '</tr>';
           if (radarChartTarget === pairKey) {
-            html += '<tr><td colspan="3" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+            html += '<tr onclick="event.stopPropagation()"><td colspan="3" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
             html += renderRadarChart(pairKey, 'fitting', radarChartSubType);
             html += '</td></tr>';
           }
@@ -3219,6 +3219,12 @@ function pbRow(item, sectionId) {
       var szLh = szLhEntry2 ? szLhEntry2.laborHrs : (szEntry ? szEntry.laborHrs : null);
       html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.15);background:rgba(15,52,96,0.15)">';
       html += '<td onclick="togglePBItemExpand(\'' + activeKey + '\')" style="padding:3px 4px 3px 20px;color:#00c8ff;font-size:12px;cursor:pointer" onmouseover="this.style.color=\'#4dd9ff\'" onmouseout="this.style.color=\'#00c8ff\'">' + sz + '\u2033</td>';
+      // Radar chart row for this size
+      if (radarChartTarget === sizeKey) {
+        html += '<tr onclick="event.stopPropagation()"><td colspan="3" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+        html += renderRadarChart(sizeKey, 'fitting', radarChartSubType);
+        html += '</td></tr>';
+      }
       html += '<td style="padding:3px 2px">' + pbInput(szGaugeKey, 'materialCost', szMc) + '</td>';
       var szTotLh = getTotalLaborHrs(sizeKey);
       var szSub = (pbRoundType[sectionId] === 'snaplock') ? 'snaplock' : 'spiral';
@@ -3226,11 +3232,6 @@ function pbRow(item, sectionId) {
       html += '<span style="color:#ffaa00;font-size:11px">' + (szTotLh > 0 ? szTotLh.toFixed(2) + 'h' : '\u2014') + '</span>';
       html += ' <span style="color:#555;font-size:9px">\u25BC</span></td>';
       html += '</tr>';
-      if (radarChartTarget === sizeKey) {
-        html += '<tr><td colspan="3" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
-        html += renderRadarChart(sizeKey, 'fitting', radarChartSubType);
-        html += '</td></tr>';
-      }
     }
   }
   return html;
@@ -3261,7 +3262,7 @@ function pbRowEditable(item, sectionId) {
   // Radar chart row
   if (radarChartTarget === item.key) {
     var colSpan = hasShopAdder ? 4 : 3;
-    html += '<tr><td colspan="' + colSpan + '" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+    html += '<tr onclick="event.stopPropagation()"><td colspan="' + colSpan + '" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
     html += renderRadarChart(item.key, hasShopAdder ? 'accessory' : 'duct');
     html += '</td></tr>';
   }
@@ -3377,7 +3378,7 @@ function renderRectDuctCalcSection(sec, gauge) {
     html += '</tr>';
     // Radar chart row
     if (radarChartTarget === classKey) {
-      html += '<tr><td colspan="4" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+      html += '<tr onclick="event.stopPropagation()"><td colspan="4" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
       html += renderRadarChart(classKey, 'duct', radarChartSubType);
       html += '</td></tr>';
     }
