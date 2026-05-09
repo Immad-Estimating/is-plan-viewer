@@ -2854,9 +2854,128 @@ window.togglePBSizePairExpand = function(pairKey) {
 
 
 // Build labor-category-aware key: appends '-lc-{category}' to base key for laborHrs
-function lhCatKey(baseKey) {
-  return baseKey + '-lc-' + activeLaborCat;
+function lhCatKey(baseKey, cat) {
+  return baseKey + '-lc-' + (cat || activeLaborCat);
 }
+
+// Get total labor hours across all categories for an item
+function getTotalLaborHrs(baseKey, applicableCats) {
+  var total = 0;
+  var cats = applicableCats || LABOR_CATEGORIES;
+  for (var i = 0; i < cats.length; i++) {
+    var k = lhCatKey(baseKey, cats[i].key);
+    var entry = priceBookCache ? priceBookCache[k] : null;
+    if (entry && entry.laborHrs) total += entry.laborHrs;
+  }
+  return total;
+}
+
+// Get labor hours per category for an item (for radar chart)
+function getLaborBreakdown(baseKey, applicableCats) {
+  var cats = applicableCats || LABOR_CATEGORIES;
+  var result = [];
+  for (var i = 0; i < cats.length; i++) {
+    var k = lhCatKey(baseKey, cats[i].key);
+    var entry = priceBookCache ? priceBookCache[k] : null;
+    result.push({ cat: cats[i], hrs: (entry && entry.laborHrs) ? entry.laborHrs : 0 });
+  }
+  return result;
+}
+
+// Active radar chart state
+var radarChartTarget = null; // base key of item being edited
+var radarChartItemType = null; // 'duct','fitting','accessory','equipment'
+
+// Render a radar chart as SVG for a given item
+function renderRadarChart(baseKey, itemType) {
+  var cats = LABOR_CATEGORIES.filter(function(c) { return c.applies.indexOf(itemType) !== -1; });
+  if (cats.length < 3) return ''; // need at least 3 axes
+  var breakdown = getLaborBreakdown(baseKey, cats);
+  var n = cats.length;
+  var cx = 90, cy = 90, r = 70;
+  var maxVal = 2; // default max hours per axis
+  // Find actual max to scale
+  for (var i = 0; i < breakdown.length; i++) {
+    if (breakdown[i].hrs > maxVal) maxVal = Math.ceil(breakdown[i].hrs);
+  }
+  var svg = '<svg width="180" height="200" viewBox="0 0 180 200" style="display:block;margin:0 auto">';
+  // Background rings
+  for (var ring = 1; ring <= 4; ring++) {
+    var rr = r * ring / 4;
+    var pts = [];
+    for (var j = 0; j < n; j++) {
+      var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
+      pts.push((cx + rr * Math.cos(angle)).toFixed(1) + ',' + (cy + rr * Math.sin(angle)).toFixed(1));
+    }
+    svg += '<polygon points="' + pts.join(' ') + '" fill="none" stroke="#0f3460" stroke-width="0.5"/>';
+  }
+  // Axis lines + labels
+  for (var j = 0; j < n; j++) {
+    var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
+    var ex = cx + r * Math.cos(angle);
+    var ey = cy + r * Math.sin(angle);
+    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="#0f3460" stroke-width="0.5"/>';
+    // Label
+    var lx = cx + (r + 14) * Math.cos(angle);
+    var ly = cy + (r + 14) * Math.sin(angle);
+    var anchor = Math.abs(Math.cos(angle)) < 0.1 ? 'middle' : (Math.cos(angle) > 0 ? 'start' : 'end');
+    svg += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 3).toFixed(1) + '" fill="' + cats[j].color + '" font-size="8" text-anchor="' + anchor + '" font-weight="600">' + cats[j].short + '</text>';
+  }
+  // Data polygon
+  var dataPts = [];
+  for (var j = 0; j < n; j++) {
+    var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
+    var val = breakdown[j].hrs / maxVal;
+    if (val > 1) val = 1;
+    var dx = cx + r * val * Math.cos(angle);
+    var dy = cy + r * val * Math.sin(angle);
+    dataPts.push(dx.toFixed(1) + ',' + dy.toFixed(1));
+  }
+  svg += '<polygon points="' + dataPts.join(' ') + '" fill="rgba(233,69,96,0.2)" stroke="#e94560" stroke-width="1.5"/>';
+  // Vertex dots (clickable)
+  for (var j = 0; j < n; j++) {
+    var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
+    var val = breakdown[j].hrs / maxVal;
+    if (val > 1) val = 1;
+    var dx = cx + r * val * Math.cos(angle);
+    var dy = cy + r * val * Math.sin(angle);
+    svg += '<circle cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="4" fill="' + cats[j].color + '" stroke="#fff" stroke-width="1" style="cursor:pointer"/>';
+  }
+  // Max value label
+  svg += '<text x="' + cx + '" y="195" fill="#666" font-size="8" text-anchor="middle">max: ' + maxVal + 'h per axis</text>';
+  svg += '</svg>';
+  // Input fields below chart
+  var inputs = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px">';
+  for (var j = 0; j < n; j++) {
+    var catKey = lhCatKey(baseKey, cats[j].key);
+    inputs += '<div style="display:flex;align-items:center;gap:3px">';
+    inputs += '<span style="color:' + cats[j].color + ';font-size:9px;font-weight:600;width:20px">' + cats[j].short + '</span>';
+    inputs += '<input type="text" value="' + (breakdown[j].hrs || '') + '" placeholder="0" ';
+    inputs += 'style="width:40px;background:#1a1a2e;border:1px solid #0f3460;color:' + cats[j].color + ';padding:2px 4px;border-radius:3px;font-size:10px;text-align:right" ';
+    inputs += 'onchange="updateRadarHrs(\'' + catKey + '\',this.value)">';
+    inputs += '<span style="color:#555;font-size:8px">h</span></div>';
+  }
+  inputs += '</div>';
+  return svg + inputs;
+}
+
+window.updateRadarHrs = async function(catKey, value) {
+  var existing = (priceBookCache && priceBookCache[catKey]) || { key: catKey };
+  existing.laborHrs = value === '' ? null : parseFloat(value) || null;
+  await savePriceBookEntry(catKey, existing);
+  renderPriceBook();
+};
+
+window.toggleRadarChart = function(baseKey, itemType) {
+  if (radarChartTarget === baseKey) {
+    radarChartTarget = null;
+    radarChartItemType = null;
+  } else {
+    radarChartTarget = baseKey;
+    radarChartItemType = itemType;
+  }
+  renderPriceBook();
+};
 
 function pbInput(key, prop, value) {
   var clr = prop === 'materialCost' ? '#00ff88' : prop === 'laborHrs' ? '#ffaa00' : '#e0e0e0';
@@ -2938,8 +3057,22 @@ function pbRow(item, sectionId) {
     var shopAdder = shopSaved ? shopSaved.materialCost : null;
     html += '<td style="padding:4px 2px"><input type="text" value="' + (shopAdder != null ? shopAdder : '') + '" placeholder="\u2014" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)"></td>';
   }
-  html += '<td style="padding:4px 2px">' + pbInput(lhCatKey(lhKey), 'laborHrs', lh) + '</td>';
+  // Labor: total hours across all categories + radar chart trigger
+  var lhItemType = isRectFit ? 'fitting' : (sectionId === 'rect-acc' ? 'accessory' : (sectionId && sectionId.indexOf('-duct') !== -1 ? 'duct' : 'fitting'));
+  var lhBaseKey = isRectFit ? lhKey : activeKey;
+  var totalLh = getTotalLaborHrs(lhBaseKey);
+  html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + lhBaseKey + '\',\'' + lhItemType + '\')" title="Click to edit labor breakdown">';
+  html += '<span style="color:#ffaa00;font-size:11px">' + (totalLh > 0 ? totalLh.toFixed(2) + 'h' : '\u2014') + '</span>';
+  html += ' <span style="color:#555;font-size:9px">\u25BC</span>';
+  html += '</td>';
   html += '</tr>';
+  // Radar chart row (if this item is active)
+  if (radarChartTarget === lhBaseKey) {
+    var colSpan = hasShopAdder ? 4 : 3;
+    html += '<tr><td colspan="' + colSpan + '" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+    html += renderRadarChart(lhBaseKey, lhItemType);
+    html += '</td></tr>';
+  }
 
   // ---- Two-dimension pricing: expandable tree with sub-rows ----
   if (isExpanded && hasPairs) {
@@ -3018,8 +3151,20 @@ function pbRowEditable(item, sectionId) {
     var shopAdder = shopSaved ? shopSaved.materialCost : null;
     html += '<td style="padding:4px 2px"><input type="text" value="' + (shopAdder != null ? shopAdder : '') + '" placeholder="\u2014" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)"></td>';
   }
-  html += '<td style="padding:4px 2px">' + pbInput(lhCatKey(item.key), 'laborHrs', lh) + '</td>';
+  // Labor: total hours + radar trigger
+  var totalLh = getTotalLaborHrs(item.key);
+  html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + item.key + '\',\'' + (hasShopAdder ? 'accessory' : 'duct') + '\')" title="Click to edit labor breakdown">';
+  html += '<span style="color:#ffaa00;font-size:11px">' + (totalLh > 0 ? totalLh.toFixed(2) + 'h' : '\u2014') + '</span>';
+  html += ' <span style="color:#555;font-size:9px">\u25BC</span>';
+  html += '</td>';
   html += '</tr>';
+  // Radar chart row
+  if (radarChartTarget === item.key) {
+    var colSpan = hasShopAdder ? 4 : 3;
+    html += '<tr><td colspan="' + colSpan + '" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+    html += renderRadarChart(item.key, hasShopAdder ? 'accessory' : 'duct');
+    html += '</td></tr>';
+  }
   return html;
 }
 
@@ -3102,10 +3247,8 @@ function renderRectDuctCalcSection(sec, gauge) {
     var shopKey = classKey + '-shop';
     var shopSaved = priceBookCache ? priceBookCache[shopKey] : null;
     var shopAdder = shopSaved ? shopSaved.materialCost : null;
-    // Labor hrs (keyed by category)
-    var lhCK = lhCatKey(classKey);
-    var lhSaved = priceBookCache ? priceBookCache[lhCK] : null;
-    var displayLh = lhSaved ? lhSaved.laborHrs : null;
+    // Labor hrs: total across all categories
+    var totalDuctLh = getTotalLaborHrs(classKey);
     html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
     html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + pc.label + ' <span style="color:#555;font-size:9px">' + calc.weightPerLF.toFixed(1) + ' lbs/LF</span></td>';
     // Raw material column
@@ -3127,8 +3270,17 @@ function renderRectDuctCalcSection(sec, gauge) {
       + 'onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)">';
     html += '</td>';
     // Labor hrs
-    html += '<td style="padding:4px 2px">' + pbInput(lhCK, 'laborHrs', displayLh) + '</td>';
+    html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + classKey + '\',\'duct\')" title="Click to edit labor breakdown">';
+    html += '<span style="color:#ffaa00;font-size:11px">' + (totalDuctLh > 0 ? totalDuctLh.toFixed(2) + 'h' : '\u2014') + '</span>';
+    html += ' <span style="color:#555;font-size:9px">\u25BC</span>';
+    html += '</td>';
     html += '</tr>';
+    // Radar chart row
+    if (radarChartTarget === classKey) {
+      html += '<tr><td colspan="4" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+      html += renderRadarChart(classKey, 'duct');
+      html += '</td></tr>';
+    }
   }
   return html;
 }
@@ -3159,19 +3311,6 @@ function renderPriceBook() {
       ? 'background:rgba(233,69,96,0.15);border-color:#e94560;color:#e94560'
       : 'background:#1a1a2e;border-color:#0f3460;color:#a0a0c0';
     html += '<button onclick="setPBTab(\'' + t + '\')" style="flex:1;padding:6px 4px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;border:1px solid;' + style + '">' + PRICE_BOOK_TABS[t].label + '</button>';
-  }
-  html += '</div>';
-
-  // Labor category selector
-  html += '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;padding:4px 0;border-bottom:1px solid #0f3460">';
-  html += '<span style="color:#666;font-size:10px;padding:2px 4px;align-self:center">Labor:</span>';
-  for (var lci = 0; lci < LABOR_CATEGORIES.length; lci++) {
-    var lc = LABOR_CATEGORIES[lci];
-    var lcActive = lc.key === activeLaborCat;
-    var lcStyle = lcActive
-      ? 'background:' + lc.color + '22;color:' + lc.color + ';border-color:' + lc.color
-      : 'background:#1a1a2e;color:#555;border-color:#0f3460';
-    html += '<button onclick="setLaborCat(\'' + lc.key + '\')" style="padding:2px 6px;border-radius:3px;cursor:pointer;font-size:9px;font-weight:600;border:1px solid;white-space:nowrap;' + lcStyle + '" title="' + lc.label + '">' + lc.short + '</button>';
   }
   html += '</div>';
 
