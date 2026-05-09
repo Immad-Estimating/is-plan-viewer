@@ -7702,7 +7702,8 @@ window.clearAllStacks = function() {
 
 function drawStack(stack) {
   const isStackSelected = selectedStackId === stack.id;
-  const stackColor = isStackSelected ? '#e94560' : '#00ff88';
+  const isMultiSel = MultiSelect.isStackSelected(stack.id);
+  const stackColor = isStackSelected ? '#e94560' : isMultiSel ? '#ffd43b' : '#00ff88';
 
   // Draw leader lines and callout boxes for each item
   for (const item of stack.items) {
@@ -7718,7 +7719,7 @@ function drawStack(stack) {
     mCtx.beginPath();
     mCtx.moveTo(stack.x, stack.y);
     mCtx.lineTo(item.callout.x, item.callout.y);
-    mCtx.strokeStyle = isItemSelected ? '#e94560' : '#00ff88';
+    mCtx.strokeStyle = isItemSelected ? '#e94560' : isMultiSel ? '#ffd43b' : '#00ff88';
     mCtx.lineWidth = 1.5;
     mCtx.setLineDash([4, 4]);
     mCtx.stroke();
@@ -7727,7 +7728,7 @@ function drawStack(stack) {
     // Draw fitting or duct run at stack point (scale-accurate representation)
     if (item.type === 'ductrun') {
       const itemShape = item.shape || (item.sizeB ? 'rect' : 'round');
-      const ductColor = isItemSelected ? '#e94560' : '#00ff88';
+      const ductColor = isItemSelected ? '#e94560' : isMultiSel ? '#ffd43b' : '#00ff88';
       mCtx.save();
       mCtx.strokeStyle = ductColor;
       mCtx.lineWidth = 2.5;
@@ -7830,7 +7831,7 @@ function drawStack(stack) {
     // Shape icon - drawn before text
     const iconX = bx + 12;
     const iconY = item.callout.y;
-    const iconColor = isItemSelected ? '#e94560' : '#00ff88';
+    const iconColor = isItemSelected ? '#e94560' : isMultiSel ? '#ffd43b' : '#00ff88';
     const itemShape = item.shape || (item.sizeB ? 'rect' : 'round');
     mCtx.save();
     mCtx.strokeStyle = iconColor;
@@ -8530,6 +8531,7 @@ async function init() {
   MultiSelect.init({
     getPageMeasurements: (p) => pageMeasurements[p] || [],
     getPageFittings: (p) => pageFittings[p] || [],
+    getPageStacks: (p) => pageStacks[p] || [],
     getCurrentPage: () => currentPage,
     screenToPdf: screenToPdf,
     scheduleSave: scheduleSave,

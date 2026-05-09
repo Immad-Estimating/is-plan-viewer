@@ -7,6 +7,7 @@
 // ── State ─────────────────────────────────────────────
 let _selectedMeasIds = new Set();
 let _selectedFitIds = new Set();
+let _selectedStackIds = new Set();  // entire stacks
 let _enabled = false;
 let _panelEl = null;
 
@@ -25,6 +26,7 @@ let _deselectMode = false;
 // App references
 let _getPageMeasurements = null;
 let _getPageFittings = null;
+let _getPageStacks = null;
 let _getCurrentPage = null;
 let _scheduleSave = null;
 let _drawOverlay = null;
@@ -78,11 +80,12 @@ function injectCSS() {
 
 // ── Core selection ────────────────────────────────────
 
-function getSelectionCount() { return _selectedMeasIds.size + _selectedFitIds.size; }
+function getSelectionCount() { return _selectedMeasIds.size + _selectedFitIds.size + _selectedStackIds.size; }
 
 function clearSelection() {
   _selectedMeasIds.clear();
   _selectedFitIds.clear();
+  _selectedStackIds.clear();
   _dragStart = null;
   _dragActive = false;
   _lassoPoints = [];
@@ -106,15 +109,24 @@ function toggleFitSelection(id) {
   onSelectionChanged();
 }
 
-function addToSelection(measIds, fitIds) {
-  for (const id of measIds) _selectedMeasIds.add(id);
-  for (const id of fitIds) _selectedFitIds.add(id);
+function toggleStackSelection(id) {
+  if (_deselectMode) { _selectedStackIds.delete(id); }
+  else if (_selectedStackIds.has(id)) { _selectedStackIds.delete(id); }
+  else { _selectedStackIds.add(id); }
   onSelectionChanged();
 }
 
-function removeFromSelection(measIds, fitIds) {
+function addToSelection(measIds, fitIds, stackIds) {
+  for (const id of measIds) _selectedMeasIds.add(id);
+  for (const id of fitIds) _selectedFitIds.add(id);
+  if (stackIds) for (const id of stackIds) _selectedStackIds.add(id);
+  onSelectionChanged();
+}
+
+function removeFromSelection(measIds, fitIds, stackIds) {
   for (const id of measIds) _selectedMeasIds.delete(id);
   for (const id of fitIds) _selectedFitIds.delete(id);
+  if (stackIds) for (const id of stackIds) _selectedStackIds.delete(id);
   onSelectionChanged();
 }
 
@@ -149,7 +161,7 @@ function selectItemsInRect(x1, y1, x2, y2) {
   const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
   const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
   const page = _getCurrentPage();
-  const measHits = [], fitHits = [];
+  const measHits = [], fitHits = [], stackHits = [];
 
   for (const m of (_getPageMeasurements(page) || [])) {
     if (!m.points || m.points.length === 0) continue;
@@ -158,9 +170,17 @@ function selectItemsInRect(x1, y1, x2, y2) {
   for (const f of (_getPageFittings(page) || [])) {
     if (f.x >= minX && f.x <= maxX && f.y >= minY && f.y <= maxY) fitHits.push(f.id);
   }
+  // Stacks: check stack center point OR any callout position
+  for (const s of (_getPageStacks(page) || [])) {
+    const centerIn = s.x >= minX && s.x <= maxX && s.y >= minY && s.y <= maxY;
+    const calloutIn = (s.items || []).some(it =>
+      it.callout && it.callout.x >= minX && it.callout.x <= maxX && it.callout.y >= minY && it.callout.y <= maxY
+    );
+    if (centerIn || calloutIn) stackHits.push(s.id);
+  }
 
-  if (_deselectMode) removeFromSelection(measHits, fitHits);
-  else addToSelection(measHits, fitHits);
+  if (_deselectMode) removeFromSelection(measHits, fitHits, stackHits);
+  else addToSelection(measHits, fitHits, stackHits);
 }
 
 // ── Lasso selection ───────────────────────────────────
@@ -198,7 +218,7 @@ function selectItemsInLasso() {
   if (_lassoPoints.length < 3) return;
   const page = _getCurrentPage();
   const poly = _lassoPoints.map(p => ({ x: p.px, y: p.py }));
-  const measHits = [], fitHits = [];
+  const measHits = [], fitHits = [], stackHits = [];
 
   for (const m of (_getPageMeasurements(page) || [])) {
     if (!m.points || m.points.length === 0) continue;
@@ -207,9 +227,17 @@ function selectItemsInLasso() {
   for (const f of (_getPageFittings(page) || [])) {
     if (pointInPolygon(f.x, f.y, poly)) fitHits.push(f.id);
   }
+  // Stacks: check center point or callout positions
+  for (const s of (_getPageStacks(page) || [])) {
+    const centerIn = pointInPolygon(s.x, s.y, poly);
+    const calloutIn = (s.items || []).some(it =>
+      it.callout && pointInPolygon(it.callout.x, it.callout.y, poly)
+    );
+    if (centerIn || calloutIn) stackHits.push(s.id);
+  }
 
-  if (_deselectMode) removeFromSelection(measHits, fitHits);
-  else addToSelection(measHits, fitHits);
+  if (_deselectMode) removeFromSelection(measHits, fitHits, stackHits);
+  else addToSelection(measHits, fitHits, stackHits);
 }
 
 // Ray casting point-in-polygon
@@ -262,11 +290,15 @@ function updatePanelContent() {
   const count = getSelectionCount();
   const mCount = _selectedMeasIds.size;
   const fCount = _selectedFitIds.size;
+  const sCount = _selectedStackIds.size;
   const syms = _getProjectSystemSymbols ? _getProjectSystemSymbols() : [];
   const page = _getCurrentPage();
   const selMeas = (_getPageMeasurements(page) || []).filter(m => _selectedMeasIds.has(m.id));
   const selFits = (_getPageFittings(page) || []).filter(f => _selectedFitIds.has(f.id));
-  const allItems = [...selMeas, ...selFits];
+  const selStacks = (_getPageStacks(page) || []).filter(s => _selectedStackIds.has(s.id));
+  // Flatten stack items for property reading
+  const stackItems = selStacks.flatMap(s => s.items || []);
+  const allItems = [...selMeas, ...selFits, ...stackItems];
 
   const commonSys = getCommonProp(allItems, 'systemSymbol');
   const commonPhase = getCommonProp(allItems, 'phase');
@@ -275,7 +307,11 @@ function updatePanelContent() {
 
   let html = `<div class="ms-panel-head">`;
   html += `<span class="ms-panel-title">Bulk Edit</span>`;
-  html += `<span class="ms-panel-count">${count} item${count !== 1 ? 's' : ''} (${mCount} duct${mCount !== 1 ? 's' : ''}, ${fCount} fitting${fCount !== 1 ? 's' : ''})</span>`;
+  const parts = [];
+  if (mCount > 0) parts.push(`${mCount} duct${mCount !== 1 ? 's' : ''}`);
+  if (fCount > 0) parts.push(`${fCount} fitting${fCount !== 1 ? 's' : ''}`);
+  if (sCount > 0) parts.push(`${sCount} stack${sCount !== 1 ? 's' : ''}`);
+  html += `<span class="ms-panel-count">${count} item${count !== 1 ? 's' : ''} (${parts.join(', ')})</span>`;
   html += `<button class="ms-panel-close" onclick="window._msClose()">✕</button>`;
   html += `</div><div class="ms-panel-grid">`;
 
@@ -331,6 +367,12 @@ function applyBulkChanges() {
 
   for (const m of meas) { if (_selectedMeasIds.has(m.id)) apply(m); }
   for (const f of fits) { if (_selectedFitIds.has(f.id)) apply(f); }
+  // Apply to all items within selected stacks
+  const stacks = _getPageStacks(page) || [];
+  for (const s of stacks) {
+    if (!_selectedStackIds.has(s.id)) continue;
+    for (const it of (s.items || [])) apply(it);
+  }
 
   if (changed > 0 && _scheduleSave) _scheduleSave();
   if (_updatePanel) _updatePanel();
@@ -354,6 +396,7 @@ const MultiSelect = {
     injectCSS();
     _getPageMeasurements = opts.getPageMeasurements;
     _getPageFittings = opts.getPageFittings;
+    _getPageStacks = opts.getPageStacks;
     _getCurrentPage = opts.getCurrentPage;
     _scheduleSave = opts.scheduleSave;
     _drawOverlay = opts.drawOverlay;
@@ -410,15 +453,33 @@ const MultiSelect = {
         hideBox();
       }
     } else {
-      // Single click — toggle item
+      // Single click — toggle item (check stacks, fittings, measurements)
       const pt = screenToPdf(e.clientX, e.clientY);
       const page = _getCurrentPage();
 
+      // Priority 1: stacks (center point or callout boxes)
+      const stacks = _getPageStacks(page) || [];
+      for (let si = stacks.length - 1; si >= 0; si--) {
+        const s = stacks[si];
+        // Check callout positions
+        for (const it of (s.items || [])) {
+          if (it.callout && Math.hypot(it.callout.x - pt.x, it.callout.y - pt.y) < 20) {
+            toggleStackSelection(s.id); _dragStart = null; return;
+          }
+        }
+        // Check center point
+        if (Math.hypot(s.x - pt.x, s.y - pt.y) < (s._hitRadius || 14)) {
+          toggleStackSelection(s.id); _dragStart = null; return;
+        }
+      }
+
+      // Priority 2: fittings
       const fits = _getPageFittings(page) || [];
       let hitFit = null, minDist = 20;
       for (const f of fits) { const d = Math.hypot(f.x - pt.x, f.y - pt.y); if (d < minDist) { minDist = d; hitFit = f; } }
       if (hitFit) { toggleFitSelection(hitFit.id); _dragStart = null; return; }
 
+      // Priority 3: measurements
       const meas = _getPageMeasurements(page) || [];
       for (const m of meas) {
         if (!m.points || m.points.length < 2) continue;
@@ -436,6 +497,7 @@ const MultiSelect = {
 
   isMeasSelected(id) { return _selectedMeasIds.has(id); },
   isFitSelected(id) { return _selectedFitIds.has(id); },
+  isStackSelected(id) { return _selectedStackIds.has(id); },
   getSelectionCount,
   clearSelection,
 };
