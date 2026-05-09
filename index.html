@@ -2888,17 +2888,24 @@ var radarChartItemType = null; // 'duct','fitting','accessory','equipment'
 
 // Render a radar chart as SVG for a given item
 function renderRadarChart(baseKey, itemType) {
-  var cats = LABOR_CATEGORIES.filter(function(c) { return c.applies.indexOf(itemType) !== -1; });
-  if (cats.length < 3) return ''; // need at least 3 axes
-  var breakdown = getLaborBreakdown(baseKey, cats);
-  var n = cats.length;
-  var cx = 90, cy = 90, r = 70;
-  var maxVal = 2; // default max hours per axis
-  // Find actual max to scale
+  // All categories shown, but only applicable ones are editable
+  var allCats = LABOR_CATEGORIES;
+  var breakdown = getLaborBreakdown(baseKey, allCats);
+  var n = allCats.length;
+  var isSheetMetal = (itemType === 'duct' || itemType === 'fitting');
+  // For sheet metal: only 'rough' is editable, rest grayed out
+  var cx = 85, cy = 85, r = 65;
+  var maxVal = 2;
   for (var i = 0; i < breakdown.length; i++) {
     if (breakdown[i].hrs > maxVal) maxVal = Math.ceil(breakdown[i].hrs);
   }
-  var svg = '<svg width="180" height="200" viewBox="0 0 180 200" style="display:block;margin:0 auto">';
+
+  // --- Layout: flex row with radar on left, sliders on right ---
+  var html = '<div style="display:flex;gap:12px;align-items:flex-start">';
+
+  // --- LEFT: Radar chart SVG ---
+  html += '<div style="flex-shrink:0">';
+  html += '<svg width="180" height="185" viewBox="0 0 180 185">';
   // Background rings
   for (var ring = 1; ring <= 4; ring++) {
     var rr = r * ring / 4;
@@ -2907,19 +2914,20 @@ function renderRadarChart(baseKey, itemType) {
       var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
       pts.push((cx + rr * Math.cos(angle)).toFixed(1) + ',' + (cy + rr * Math.sin(angle)).toFixed(1));
     }
-    svg += '<polygon points="' + pts.join(' ') + '" fill="none" stroke="#0f3460" stroke-width="0.5"/>';
+    html += '<polygon points="' + pts.join(' ') + '" fill="none" stroke="#0f3460" stroke-width="0.5"/>';
   }
   // Axis lines + labels
   for (var j = 0; j < n; j++) {
+    var cat = allCats[j];
+    var enabled = !isSheetMetal || cat.key === 'rough';
     var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
     var ex = cx + r * Math.cos(angle);
     var ey = cy + r * Math.sin(angle);
-    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="#0f3460" stroke-width="0.5"/>';
-    // Label
+    html += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="' + (enabled ? '#0f3460' : '#0a1a30') + '" stroke-width="0.5"/>';
     var lx = cx + (r + 14) * Math.cos(angle);
     var ly = cy + (r + 14) * Math.sin(angle);
     var anchor = Math.abs(Math.cos(angle)) < 0.1 ? 'middle' : (Math.cos(angle) > 0 ? 'start' : 'end');
-    svg += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 3).toFixed(1) + '" fill="' + cats[j].color + '" font-size="8" text-anchor="' + anchor + '" font-weight="600">' + cats[j].short + '</text>';
+    html += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 3).toFixed(1) + '" fill="' + (enabled ? cat.color : '#333') + '" font-size="7" text-anchor="' + anchor + '" font-weight="600">' + cat.short + '</text>';
   }
   // Data polygon
   var dataPts = [];
@@ -2927,37 +2935,65 @@ function renderRadarChart(baseKey, itemType) {
     var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
     var val = breakdown[j].hrs / maxVal;
     if (val > 1) val = 1;
-    var dx = cx + r * val * Math.cos(angle);
-    var dy = cy + r * val * Math.sin(angle);
-    dataPts.push(dx.toFixed(1) + ',' + dy.toFixed(1));
+    dataPts.push((cx + r * val * Math.cos(angle)).toFixed(1) + ',' + (cy + r * val * Math.sin(angle)).toFixed(1));
   }
-  svg += '<polygon points="' + dataPts.join(' ') + '" fill="rgba(233,69,96,0.2)" stroke="#e94560" stroke-width="1.5"/>';
-  // Vertex dots (clickable)
+  html += '<polygon points="' + dataPts.join(' ') + '" fill="rgba(233,69,96,0.2)" stroke="#e94560" stroke-width="1.5"/>';
+  // Vertex dots
   for (var j = 0; j < n; j++) {
+    var cat = allCats[j];
+    var enabled = !isSheetMetal || cat.key === 'rough';
     var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
     var val = breakdown[j].hrs / maxVal;
     if (val > 1) val = 1;
     var dx = cx + r * val * Math.cos(angle);
     var dy = cy + r * val * Math.sin(angle);
-    svg += '<circle cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="4" fill="' + cats[j].color + '" stroke="#fff" stroke-width="1" style="cursor:pointer"/>';
+    html += '<circle cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="3.5" fill="' + (enabled ? cat.color : '#333') + '" stroke="' + (enabled ? '#fff' : '#222') + '" stroke-width="0.8"/>';
   }
-  // Max value label
-  svg += '<text x="' + cx + '" y="195" fill="#666" font-size="8" text-anchor="middle">max: ' + maxVal + 'h per axis</text>';
-  svg += '</svg>';
-  // Input fields below chart
-  var inputs = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px">';
+  html += '</svg>';
+  // Category inputs below chart
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">';
   for (var j = 0; j < n; j++) {
-    var catKey = lhCatKey(baseKey, cats[j].key);
-    inputs += '<div style="display:flex;align-items:center;gap:3px">';
-    inputs += '<span style="color:' + cats[j].color + ';font-size:9px;font-weight:600;width:20px">' + cats[j].short + '</span>';
-    inputs += '<input type="text" value="' + (breakdown[j].hrs || '') + '" placeholder="0" ';
-    inputs += 'style="width:40px;background:#1a1a2e;border:1px solid #0f3460;color:' + cats[j].color + ';padding:2px 4px;border-radius:3px;font-size:10px;text-align:right" ';
-    inputs += 'onchange="updateRadarHrs(\'' + catKey + '\',this.value)">';
-    inputs += '<span style="color:#555;font-size:8px">h</span></div>';
+    var cat = allCats[j];
+    var enabled = !isSheetMetal || cat.key === 'rough';
+    var catKey = lhCatKey(baseKey, cat.key);
+    html += '<div style="display:flex;align-items:center;gap:2px;opacity:' + (enabled ? '1' : '0.3') + '">';
+    html += '<span style="color:' + cat.color + ';font-size:8px;font-weight:600;width:18px">' + cat.short + '</span>';
+    html += '<input type="text" value="' + (breakdown[j].hrs || '') + '" placeholder="0" ';
+    html += (enabled ? '' : 'disabled ') + 'style="width:36px;background:#1a1a2e;border:1px solid ' + (enabled ? '#0f3460' : '#0a1a30') + ';color:' + (enabled ? cat.color : '#333') + ';padding:2px 3px;border-radius:3px;font-size:9px;text-align:right" ';
+    html += 'onchange="updateRadarHrs(\'' + catKey + '\',this.value)">';
+    html += '</div>';
   }
-  inputs += '</div>';
-  return svg + inputs;
+  html += '</div>';
+  html += '</div>'; // end left
+
+  // --- RIGHT: Size slider(s) ---
+  html += '<div style="display:flex;flex-direction:column;gap:8px;min-width:40px;align-items:center">';
+  // Determine current perimeter class index
+  var currentPCIdx = pbPerimClass['rect-fit'] || 0;
+  // Main size slider
+  html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+  html += '<span style="color:#a0a0c0;font-size:8px;font-weight:600">SIZE</span>';
+  html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length - 1) + '" value="' + currentPCIdx + '" ';
+  html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:20px;height:120px;accent-color:#e94560" ';
+  html += 'oninput="radarSliderPerim(this.value)">';
+  var pcLabel = RECT_PERIM_CLASSES[currentPCIdx] ? RECT_PERIM_CLASSES[currentPCIdx].label : '';
+  html += '<span style="color:#e94560;font-size:8px;text-align:center;max-width:50px">' + pcLabel + '</span>';
+  html += '</div>';
+  html += '</div>'; // end right
+
+  html += '</div>'; // end flex row
+  return html;
 }
+
+window.radarSliderPerim = function(idx) {
+  var i = parseInt(idx);
+  pbPerimClass['rect-fit'] = i;
+  // Also update the radar chart target to reflect new perim class
+  // The baseKey for rect fittings includes perim, so we need to close and reopen
+  radarChartTarget = null;
+  renderPriceBook();
+  pbSaveLayout();
+};
 
 window.updateRadarHrs = async function(catKey, value) {
   var existing = (priceBookCache && priceBookCache[catKey]) || { key: catKey };
