@@ -370,6 +370,18 @@
   @keyframes cardFlash { 0%,100% { border-color: #0f3460; } 25%,75% { border-color: #00ff88; box-shadow: 0 0 12px rgba(0,255,136,0.3); } }
   .project-card.flash { animation: cardFlash 1.2s ease; }
 
+  /* Infinite scroll: card entrance animation */
+  @keyframes cardSlideIn { from { opacity: 0; transform: translateY(16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .project-card.entering { animation: cardSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+  /* Infinite scroll: loader sentinel */
+  .scroll-sentinel { display: flex; justify-content: center; align-items: center; padding: 32px 0 24px; }
+  .scroll-ring { width: 36px; height: 36px; border-radius: 50%; border: 3px solid #0f3460; border-top-color: #e94560; animation: ringPulse 1s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  @keyframes ringPulse { 0% { transform: rotate(0deg); border-top-color: #e94560; box-shadow: 0 0 8px rgba(233,69,96,0.2); } 50% { border-top-color: #00ff88; box-shadow: 0 0 14px rgba(0,255,136,0.25); } 100% { transform: rotate(360deg); border-top-color: #e94560; box-shadow: 0 0 8px rgba(233,69,96,0.2); } }
+  .scroll-sentinel.done .scroll-ring { animation: none; border-color: transparent; opacity: 0; transition: opacity 0.4s; }
+  .scroll-sentinel.done::after { content: ''; display: block; width: 60px; height: 2px; background: linear-gradient(90deg, transparent, #0f3460, transparent); border-radius: 1px; }
+  .scroll-count { font-size: 11px; color: #555; text-align: center; margin-top: 4px; letter-spacing: 0.3px; }
+
   /* Responsive */
   @media (max-width: 900px) {
     .dashboard-body { flex-direction: column; }
@@ -1116,8 +1128,13 @@ document.addEventListener('click', (e) => {
 });
 
 // =====================================================
-// Dashboard
+// Dashboard (paginated infinite scroll)
 // =====================================================
+const DASH_PAGE_SIZE = 36;
+let _dashSorted = [];  // full filtered+sorted list for current render
+let _dashShown = 0;    // how many cards currently in DOM
+let _dashObserver = null;
+
 async function renderDashboard() {
   const projects = await idbGetAll('projects');
   const searchQuery = document.getElementById('dashboardSearch').value.trim();
@@ -1126,29 +1143,33 @@ async function renderDashboard() {
   // Also render QB panel
   renderQBPanel();
 
-  // Get drawing counts for each project
-  const drawingCounts = {};
-  const allDrawings = await idbGetAll('drawings');
-  for (const d of allDrawings) {
-    drawingCounts[d.projectId] = (drawingCounts[d.projectId] || 0) + 1;
+  // Drawing counts are cached on project records — migrate any legacy projects missing it
+  let needsMigration = projects.some(p => p.drawingCount === undefined);
+  if (needsMigration) {
+    const allDrawings = await idbGetAll('drawings');
+    const counts = {};
+    for (const d of allDrawings) counts[d.projectId] = (counts[d.projectId] || 0) + 1;
+    for (const p of projects) {
+      if (p.drawingCount === undefined) {
+        p.drawingCount = counts[p.id] || 0;
+        await idbPut('projects', p);
+      }
+    }
   }
 
   let filtered = projects;
   if (searchQuery) {
-    // Search local projects
     const localMatches = projects.filter(p => fuzzyMatch(p.name || '', searchQuery) || fuzzyMatch(p.client || '', searchQuery));
-    // Search QB projects that aren't already local
     const localQbIds = new Set(projects.filter(p => p.qbId).map(p => p.qbId));
     const qbMatches = searchQBProjects(searchQuery).filter(q => !localQbIds.has(q.id));
 
     if (qbMatches.length > 0 && localMatches.length === 0) {
-      // Show QB results as importable
-      content.innerHTML = renderProjectGrid(localMatches, drawingCounts) + renderQBSuggestions(qbMatches);
+      content.innerHTML = renderProjectGrid(localMatches) + renderQBSuggestions(qbMatches);
       return;
     }
     filtered = localMatches;
     if (qbMatches.length > 0) {
-      content.innerHTML = renderProjectGrid(filtered, drawingCounts) + renderQBSuggestions(qbMatches);
+      content.innerHTML = renderProjectGrid(filtered) + renderQBSuggestions(qbMatches);
       return;
     }
   }
@@ -1158,17 +1179,70 @@ async function renderDashboard() {
     return;
   }
 
-  content.innerHTML = renderProjectGrid(filtered, drawingCounts);
+  content.innerHTML = renderProjectGrid(filtered);
 }
 
-function renderProjectGrid(projects, drawingCounts) {
+function renderProjectGrid(projects) {
   if (projects.length === 0) return '';
-  // Sort by modifiedAt desc
-  const sorted = [...projects].sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0));
-  return `<div class="project-grid">${sorted.map(p => renderProjectCard(p, drawingCounts[p.id] || 0)).join('')}</div>`;
+  _dashSorted = [...projects].sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0));
+  _dashShown = 0;
+
+  // Tear down previous observer
+  if (_dashObserver) { _dashObserver.disconnect(); _dashObserver = null; }
+
+  const firstBatch = _dashSorted.slice(0, DASH_PAGE_SIZE);
+  _dashShown = firstBatch.length;
+
+  let html = `<div class="project-grid" id="projGrid">${firstBatch.map(p => renderProjectCard(p, p.drawingCount || 0)).join('')}</div>`;
+
+  // Sentinel for infinite scroll (only if more to load)
+  if (_dashSorted.length > DASH_PAGE_SIZE) {
+    html += `<div class="scroll-sentinel" id="scrollSentinel"><div class="scroll-ring"></div></div>`;
+    html += `<div class="scroll-count" id="scrollCount">${_dashShown} of ${_dashSorted.length} projects</div>`;
+    // Wire up intersection observer after next paint
+    requestAnimationFrame(() => {
+      const sentinel = document.getElementById('scrollSentinel');
+      if (!sentinel) return;
+      _dashObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) _dashLoadMore();
+      }, { root: document.getElementById('dashboardContent'), rootMargin: '200px' });
+      _dashObserver.observe(sentinel);
+    });
+  }
+
+  return html;
+}
+
+function _dashLoadMore() {
+  if (_dashShown >= _dashSorted.length) return;
+  const grid = document.getElementById('projGrid');
+  const sentinel = document.getElementById('scrollSentinel');
+  const countEl = document.getElementById('scrollCount');
+  if (!grid) return;
+
+  const nextBatch = _dashSorted.slice(_dashShown, _dashShown + DASH_PAGE_SIZE);
+  for (let i = 0; i < nextBatch.length; i++) {
+    const p = nextBatch[i];
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderProjectCard(p, p.drawingCount || 0);
+    const card = tmp.firstElementChild;
+    card.classList.add('entering');
+    card.style.animationDelay = `${i * 30}ms`;
+    grid.appendChild(card);
+  }
+  _dashShown += nextBatch.length;
+
+  if (countEl) countEl.textContent = `${_dashShown} of ${_dashSorted.length} projects`;
+
+  if (_dashShown >= _dashSorted.length) {
+    if (sentinel) sentinel.classList.add('done');
+    if (countEl) countEl.textContent = `All ${_dashSorted.length} projects loaded`;
+    if (_dashObserver) { _dashObserver.disconnect(); _dashObserver = null; }
+  }
 }
 
 function renderProjectCard(project, drawingCount) {
+  const dc = drawingCount != null ? drawingCount : (project.drawingCount || 0);
   const date = project.modifiedAt ? new Date(project.modifiedAt).toLocaleDateString() : 'Never';
   const stageBadge = project.stage ? `<span class="stage-badge ${getStageCssClass(project.stage)}">${escapeHtml(project.stage)}</span>` : '';
   const clientLine = project.client ? `<div class="card-meta">${escapeHtml(project.client)}${project.builder ? ' / ' + escapeHtml(project.builder) : ''}</div>` : '';
@@ -1183,7 +1257,7 @@ function renderProjectCard(project, drawingCount) {
     </div>
     ${clientLine}
     <div class="card-stats">
-      <span>📄 ${drawingCount} drawing${drawingCount !== 1 ? 's' : ''}</span>
+      <span>📄 ${dc} drawing${dc !== 1 ? 's' : ''}</span>
       <span>📅 ${date}</span>
     </div>
   </a>`;
@@ -1552,6 +1626,7 @@ window.importQBProject = async function(qbId) {
     client: qb.client || '',
     builder: qb.builder || '',
     stage: qb.stage || '',
+    drawingCount: 0,
     createdAt: now,
     modifiedAt: now
   });
@@ -1615,6 +1690,7 @@ window.createProject = async function() {
     client: selectedQBProject ? (selectedQBProject.client || '') : '',
     builder: selectedQBProject ? (selectedQBProject.builder || '') : '',
     stage: selectedQBProject ? (selectedQBProject.stage || '') : '',
+    drawingCount: 0,
     createdAt: now,
     modifiedAt: now
   };
@@ -1856,10 +1932,11 @@ async function handleDrawingFiles(files) {
     await idbAdd('drawings', drawing);
   }
 
-  // Update project modifiedAt
+  // Update project modifiedAt + drawingCount
   const project = await idbGet('projects', currentManagerProjectId);
   if (project) {
     project.modifiedAt = Date.now();
+    project.drawingCount = (project.drawingCount || 0) + Array.from(files).filter(f => f.type === 'application/pdf').length;
     await idbPut('projects', project);
   }
 
@@ -1951,11 +2028,12 @@ window.deleteDrawing = function(drawingId, fileName) {
   showConfirm(`Delete drawing "${fileName}"?`, async () => {
     await idbDeleteByIndex('pageData', 'drawingId', drawingId);
     await idbDelete('drawings', drawingId);
-    // Update project modifiedAt
+    // Update project modifiedAt + drawingCount
     if (currentManagerProjectId) {
       const project = await idbGet('projects', currentManagerProjectId);
       if (project) {
         project.modifiedAt = Date.now();
+        project.drawingCount = Math.max(0, (project.drawingCount || 1) - 1);
         await idbPut('projects', project);
       }
     }
@@ -2105,10 +2183,10 @@ async function doDuplicate(originalDrawing, includeTakeoff) {
     showToast(`Duplicated "${originalDrawing.fileName}" (drawing only)`);
   }
 
-  // Update project modifiedAt
+  // Update project modifiedAt + drawingCount
   if (currentManagerProjectId) {
     const proj = await idbGet('projects', currentManagerProjectId);
-    if (proj) { proj.modifiedAt = now; await idbPut('projects', proj); }
+    if (proj) { proj.modifiedAt = now; proj.drawingCount = (proj.drawingCount || 0) + 1; await idbPut('projects', proj); }
   }
 
   renderDrawingManager(currentManagerProjectId);
