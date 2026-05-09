@@ -76,7 +76,7 @@ const GROUP_DIMENSIONS = [
   { key: 'costGroup', label: 'Cost Group',     icon: '💰', extract: r => r.costGroup || 'ungrouped' },
   { key: 'gauge',     label: 'Gauge',          icon: '🔩', extract: r => r.gauge || 'default' },
   { key: 'laborCat',  label: 'Labor Category', icon: '👷', extract: r => r._laborCatLabel || 'unassigned' },
-  { key: 'system',    label: 'System',          icon: '⚙️', extract: r => r.systemSymbol || 'unassigned' },
+  { key: 'system',    label: 'System Tag',       icon: '⚙️', extract: r => r.systemSymbol || 'unassigned' },
   { key: 'page',      label: 'Page',           icon: '📄', extract: r => 'Pg ' + r._page },
   { key: 'drawing',   label: 'Drawing',        icon: '📋', extract: r => r._drawingName },
 ];
