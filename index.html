@@ -27,6 +27,16 @@
   .toolbar button.active { background: #e94560; border-color: #e94560; }
   .toolbar button.active-select { background: rgba(255,212,59,0.15); border-color: #ffd43b; color: #ffd43b; }
 
+  /* Select tool: combined button + sub-mode switcher */
+  .select-tool-wrap { display: inline-flex; align-items: center; position: relative; }
+  .select-sub { display: none; margin-left: -1px; }
+  .select-tool-wrap.active .select-sub { display: inline-flex; }
+  .sel-sub-btn { background: #1a1a2e; border: 1px solid #0f3460; color: #555; padding: 4px 7px; font-size: 11px; cursor: pointer; transition: all 0.12s; }
+  .sel-sub-btn:first-child { border-radius: 0; border-left: none; }
+  .sel-sub-btn:last-child { border-radius: 0 4px 4px 0; }
+  .sel-sub-btn:hover { color: #a0a0c0; border-color: #1a4080; }
+  .sel-sub-btn.active { background: rgba(255,212,59,0.15); border-color: #ffd43b; color: #ffd43b; }
+
   /* Rich tool tooltips */
   .tool-has-tip { position: relative; }
   .tool-has-tip .tool-tip { display: none; position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 150; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; font-size: 11px; line-height: 1.5; color: #c9d1d9; white-space: nowrap; text-align: left; box-shadow: 0 8px 24px rgba(0,0,0,0.4); pointer-events: none; }
@@ -518,8 +528,13 @@
     </select>
     <button onclick="openSystemSymbolManager()" title="Manage System Symbols" style="background:none;border:1px solid #0f3460;color:#a0a0c0;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer">⚙</button>
     <div class="separator"></div>
-    <button id="multiSelectBtn" onclick="toggleMultiSelectMode()" title="Multi-Select" class="tool-has-tip">🔶 Select<span class="tool-tip">Rectangle Select<br><b>Q</b> = toggle mode<br>Click = pick items<br>Drag = box select<br><b>Esc</b> = clear<br><b>Alt</b> = hold to deselect</span></button>
-    <button id="lassoBtn" onclick="toggleLassoMode()" title="Lasso Select" class="tool-has-tip">➰ Lasso<span class="tool-tip">Freehand Lasso<br><b>L</b> = toggle mode<br>Draw around items to select<br>For overlapping ductwork<br><b>Alt</b> = hold to deselect</span></button>
+    <span id="selectToolWrap" class="select-tool-wrap">
+      <button id="multiSelectBtn" onclick="toggleMultiSelectMode()" title="Select Tool" class="tool-has-tip">🔶 Select<span class="tool-tip">Select Tool &mdash; <b>Q</b><br>Click = pick items<br>Drag = box or lasso<br><b>L</b> = switch to lasso<br><b>Alt</b> = hold to deselect<br><b>Esc</b> = clear selection</span></button>
+      <div class="select-sub" id="selectSubBar">
+        <button id="selModeRect" class="sel-sub-btn active" onclick="setSelectSubMode('rect')" title="Rectangle (Q)">▬</button>
+        <button id="selModeLasso" class="sel-sub-btn" onclick="setSelectSubMode('lasso')" title="Lasso (L)">✦</button>
+      </div>
+    </span>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)" class="tool-has-tip">📐 Measure<span class="tool-tip">Measure Tool<br><b>M</b> = toggle<br>Click points to measure<br><b>Enter</b> = finish line</span></button>
     <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)" class="tool-has-tip">◎ Duct<span class="tool-tip">Duct Draw<br><b>D</b> = toggle<br>Draws measured duct runs<br>Auto-tags size &amp; gauge</span></button>
     <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)" class="tool-has-tip">🔩 Fittings<span class="tool-tip">Fittings Palette<br><b>T</b> = toggle<br><b>R</b> = rotate · <b>X</b> = mirror<br>Click canvas to place</span></button>
@@ -5346,40 +5361,43 @@ function exitDrawModes() {
 }
 
 window.toggleMultiSelectMode = function() {
-  // If lasso is on, switch to rect
-  if (MultiSelect.lassoMode) {
-    MultiSelect.lassoMode = false;
-    document.getElementById('lassoBtn')?.classList.remove('active-select');
-  }
   multiSelectModeOn = !multiSelectModeOn;
+  const wrap = document.getElementById('selectToolWrap');
   const btn = document.getElementById('multiSelectBtn');
   if (btn) btn.classList.toggle('active-select', multiSelectModeOn);
+  if (wrap) wrap.classList.toggle('active', multiSelectModeOn);
   if (multiSelectModeOn) {
     exitDrawModes();
     viewer.style.cursor = 'crosshair';
   } else {
     viewer.style.cursor = '';
+    MultiSelect.lassoMode = false;
     MultiSelect.clearSelection();
+    updateSelectSubUI();
   }
 };
 
-window.toggleLassoMode = function() {
-  // If rect select is on, switch to lasso
-  const wasLasso = MultiSelect.lassoMode;
-  if (!multiSelectModeOn && !wasLasso) {
-    // Entering lasso from scratch
+window.setSelectSubMode = function(mode) {
+  if (!multiSelectModeOn) {
     multiSelectModeOn = true;
     exitDrawModes();
     viewer.style.cursor = 'crosshair';
     document.getElementById('multiSelectBtn')?.classList.add('active-select');
+    document.getElementById('selectToolWrap')?.classList.add('active');
   }
-  MultiSelect.lassoMode = !wasLasso;
-  document.getElementById('lassoBtn')?.classList.toggle('active-select', MultiSelect.lassoMode);
-  document.getElementById('multiSelectBtn')?.classList.toggle('active-select', multiSelectModeOn && !MultiSelect.lassoMode);
-  if (!MultiSelect.lassoMode && !multiSelectModeOn) {
-    viewer.style.cursor = '';
-  }
+  MultiSelect.lassoMode = mode === 'lasso';
+  updateSelectSubUI();
 };
+
+window.toggleLassoMode = function() {
+  if (MultiSelect.lassoMode) setSelectSubMode('rect');
+  else setSelectSubMode('lasso');
+};
+
+function updateSelectSubUI() {
+  document.getElementById('selModeRect')?.classList.toggle('active', !MultiSelect.lassoMode);
+  document.getElementById('selModeLasso')?.classList.toggle('active', MultiSelect.lassoMode);
+}
 
 // Alt key = deselect mode (hold)
 document.addEventListener('keydown', (e) => {
