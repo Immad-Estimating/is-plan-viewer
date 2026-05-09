@@ -2992,7 +2992,7 @@ function renderRadarChart(baseKey, itemType, subType) {
     html += '<input type="range" min="0" max="' + (RD_SIZES.length-1) + '" value="' + mainIdx + '" ';
     html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:' + (hasSec ? '90' : '140') + 'px;accent-color:#00c8ff" ';
     html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
-    html += 'oninput="radarSlideRd(0,this.value,\'' + baseKey + '\')">';
+    html += 'onchange="radarSlideRd(0,this.value,\'' + baseKey + '\')">';
     html += '<span style="color:#00c8ff;font-size:13px;font-weight:700">' + mainSz + '\u2033</span>';
     // Secondary slider (branch/outlet) for two-dim fittings
     if (hasSec) {
@@ -3001,7 +3001,7 @@ function renderRadarChart(baseKey, itemType, subType) {
       html += '<input type="range" min="0" max="' + mainIdx + '" value="' + secIdx + '" ';
       html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:90px;accent-color:#da77f2" ';
       html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
-      html += 'oninput="radarSlideRd(1,this.value,\'' + baseKey + '\')">';
+      html += 'onchange="radarSlideRd(1,this.value,\'' + baseKey + '\')">';
       html += '<span style="color:#da77f2;font-size:13px;font-weight:700">' + secSz + '\u2033</span>';
     }
   } else {
@@ -3010,7 +3010,7 @@ function renderRadarChart(baseKey, itemType, subType) {
     html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length-1) + '" value="' + currentPCIdx + '" ';
     html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:140px;accent-color:#e94560" ';
     html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
-    html += 'oninput="radarSliderPerim(this.value)">';
+    html += 'onchange="radarSliderPerim(this.value)">';
     var pcLabel = RECT_PERIM_CLASSES[currentPCIdx] ? RECT_PERIM_CLASSES[currentPCIdx].label : '';
     html += '<span style="color:#e94560;font-size:12px;font-weight:600;text-align:center;max-width:60px">' + pcLabel + '</span>';
   }
