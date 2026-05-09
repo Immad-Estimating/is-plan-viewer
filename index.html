@@ -2995,7 +2995,14 @@ function renderRadarChart(baseKey, itemType, subType) {
 
 window.radarSliderPerim = function(idx) {
   var i = parseInt(idx);
+  var oldIdx = pbPerimClass['rect-fit'] || 0;
   pbPerimClass['rect-fit'] = i;
+  // Update radarChartTarget key to match new perim class so chart stays open
+  if (radarChartTarget) {
+    var oldMax = RECT_PERIM_CLASSES[oldIdx] ? RECT_PERIM_CLASSES[oldIdx].maxPerim : 30;
+    var newMax = RECT_PERIM_CLASSES[i] ? RECT_PERIM_CLASSES[i].maxPerim : 30;
+    radarChartTarget = radarChartTarget.replace('-p' + oldMax, '-p' + newMax);
+  }
   renderPriceBook();
   pbSaveLayout();
 };
