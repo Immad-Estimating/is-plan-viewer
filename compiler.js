@@ -39,6 +39,15 @@ async function cGetByIndex(store, idx, val) {
     r.onerror = () => rej(r.error);
   });
 }
+async function cGet(store, key) {
+  const db = await cOpenDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readonly');
+    const r = tx.objectStore(store).get(key);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
 
 // ── Fitting names (mirrored from main app) ────────────────────────────
 const FITTING_NAMES = {
@@ -49,41 +58,61 @@ const FITTING_NAMES = {
   'rectTap': 'Rect Tap'
 };
 
-// ── Available grouping dimensions ─────────────────────────────────────
-// Each has a key (used in data), a label (shown to user), and extractor
-const GROUP_DIMENSIONS = [
-  { key: 'itemType',  label: 'Type',       icon: '🔧', extract: r => r._itemType },
-  { key: 'size',      label: 'Size',       icon: '📐', extract: r => r._size },
-  { key: 'shape',     label: 'Shape',      icon: '⬡',  extract: r => r._shape },
-  { key: 'phase',     label: 'Phase',      icon: '🏷️', extract: r => r.phase || 'unassigned' },
-  { key: 'costGroup', label: 'Cost Group', icon: '💰', extract: r => r.costGroup || 'ungrouped' },
-  { key: 'gauge',     label: 'Gauge',      icon: '🔩', extract: r => r.gauge || 'default' },
-  { key: 'page',      label: 'Page',       icon: '📄', extract: r => 'Pg ' + r._page },
-  { key: 'drawing',   label: 'Drawing',    icon: '📋', extract: r => r._drawingName },
+// ── Labor categories (mirrored from main app) ─────────────────────────
+const LABOR_CATEGORIES = [
+  { key: 'rough',       label: 'Rough',       short: 'R',  color: '#4dabf7' },
+  { key: 'air-handler', label: 'Air Handler', short: 'AH', color: '#69db7c' },
+  { key: 'condenser',   label: 'Condenser',   short: 'CU', color: '#69db7c' },
+  { key: 'lineset',     label: 'Line Set',    short: 'LS', color: '#ffd43b' },
+  { key: 'trim',        label: 'Trim',        short: 'T',  color: '#da77f2' },
+  { key: 'venting',     label: 'Venting',     short: 'V',  color: '#ff8787' },
+  { key: 'stocking',    label: 'Stocking',    short: 'SK', color: '#a9e34b' },
+  { key: 'startup',     label: 'Startup',     short: 'SU', color: '#ffa94d' },
+  { key: 'qc',          label: 'Quality Ctrl', short: 'QC', color: '#74c0fc' },
 ];
 
-// ── Column definitions (toggleable) ───────────────────────────────────
+// ── Available grouping dimensions ─────────────────────────────────────
+const GROUP_DIMENSIONS = [
+  { key: 'itemType',     label: 'Type',           icon: '🔧', extract: r => r._itemType },
+  { key: 'size',         label: 'Size',           icon: '📐', extract: r => r._size },
+  { key: 'shape',        label: 'Shape',          icon: '⬡',  extract: r => r._shape },
+  { key: 'phase',        label: 'Phase',          icon: '🏷️', extract: r => r.phase || 'unassigned' },
+  { key: 'costGroup',    label: 'Cost Group',     icon: '💰', extract: r => r.costGroup || 'ungrouped' },
+  { key: 'gauge',        label: 'Gauge',          icon: '🔩', extract: r => r.gauge || 'default' },
+  { key: 'laborCat',     label: 'Labor Category', icon: '👷', extract: r => r._laborCatLabel || 'unassigned' },
+  { key: 'page',         label: 'Page',           icon: '📄', extract: r => 'Pg ' + r._page },
+  { key: 'drawing',      label: 'Drawing',        icon: '📋', extract: r => r._drawingName },
+];
+
+// ── Column definitions ────────────────────────────────────────────────
+// laborHrs and laborCost are expandable — clicking header toggles sub-columns
 const DATA_COLUMNS = [
-  { key: 'qty',          label: 'Qty',          type: 'number', extract: rows => rows.length, alwaysOn: true },
-  { key: 'totalLF',      label: 'Total LF',     type: 'number', extract: rows => rows.reduce((s, r) => s + (r._lengthFt || 0), 0) },
-  { key: 'materialCost', label: 'Material $',    type: 'currency', extract: rows => rows.reduce((s, r) => s + (r._matCost || 0), 0) },
-  { key: 'laborHrs',     label: 'Labor Hrs',     type: 'number', extract: rows => rows.reduce((s, r) => s + (r._laborHrs || 0), 0) },
-  { key: 'laborCost',    label: 'Labor $',       type: 'currency', extract: rows => rows.reduce((s, r) => s + (r._laborCost || 0), 0) },
-  { key: 'totalCost',    label: 'Total $',       type: 'currency', extract: rows => rows.reduce((s, r) => s + (r._totalCost || 0), 0) },
+  { key: 'qty',          label: 'Qty',        type: 'number',   extract: rows => rows.length, alwaysOn: true },
+  { key: 'totalLF',      label: 'Total LF',   type: 'number',   extract: rows => rows.reduce((s, r) => s + (r._lengthFt || 0), 0) },
+  { key: 'materialCost', label: 'Material $',  type: 'currency', extract: rows => rows.reduce((s, r) => s + (r._matCost || 0), 0) },
+  { key: 'laborHrs',     label: 'Labor Hrs',   type: 'number',   extract: rows => rows.reduce((s, r) => s + (r._laborHrs || 0), 0), expandable: true, expandKey: 'laborHrsExpand' },
+  { key: 'laborCost',    label: 'Labor $',     type: 'currency', extract: rows => rows.reduce((s, r) => s + (r._laborCost || 0), 0), expandable: true, expandKey: 'laborCostExpand' },
+  { key: 'totalCost',    label: 'Total $',     type: 'currency', extract: rows => rows.reduce((s, r) => s + (r._totalCost || 0), 0) },
 ];
 
 // ── State ─────────────────────────────────────────────────────────────
 let _container = null;
-let _scope = 'project';           // 'project' | 'drawing'
+let _scope = 'project';
 let _projectId = null;
 let _drawingId = null;
-let _activeGroups = ['itemType'];  // ordered list of grouping keys
+let _activeGroups = ['itemType'];
 let _activeColumns = ['qty', 'totalLF', 'materialCost', 'laborHrs', 'totalCost'];
-let _collapsed = {};               // groupPath -> true
-let _rows = [];                    // flat normalized rows (rebuilt on data change)
-let _drawingNames = {};            // drawingId -> fileName
+let _collapsed = {};
+let _rows = [];
+let _drawingNames = {};
+let _priceBookCache = null;   // loaded from IDB priceBook store
+let _projectRateTable = null; // from project record
 
-// ── CSS (injected once) ───────────────────────────────────────────────
+// Expansion state for labor sub-columns
+let _laborHrsExpanded = false;
+let _laborCostExpanded = false;
+
+// ── CSS ───────────────────────────────────────────────────────────────
 const CSS = `
 .compiler { font-size: 12px; color: #e0e0e0; display: flex; flex-direction: column; height: 100%; }
 
@@ -121,8 +150,13 @@ const CSS = `
 .cmp-table { width: 100%; border-collapse: collapse; }
 .cmp-table th { position: sticky; top: 0; background: #16213e; text-align: left; padding: 5px 6px; font-size: 10px; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 1px solid #0f3460; white-space: nowrap; }
 .cmp-table th.num { text-align: right; }
+.cmp-table th.expandable { cursor: pointer; user-select: none; }
+.cmp-table th.expandable:hover { color: #e94560; }
+.cmp-table th.expanded { color: #e94560; }
+.cmp-table th.labor-sub { font-size: 9px; letter-spacing: 0; text-transform: none; border-bottom: 2px solid var(--lc-color, #555); }
 .cmp-table td { padding: 4px 6px; border-bottom: 1px solid rgba(15,52,96,0.4); white-space: nowrap; }
 .cmp-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.cmp-table td.labor-sub-cell { font-size: 10px; }
 .cmp-table tr.group-header td { font-weight: 600; cursor: pointer; user-select: none; }
 .cmp-table tr.group-header:hover td { background: rgba(233,69,96,0.06); }
 .cmp-table tr.depth-0 td { color: #e0e0e0; font-size: 12px; border-bottom: 1px solid #0f3460; }
@@ -134,6 +168,8 @@ const CSS = `
 .cmp-toggle { display: inline-block; width: 14px; font-size: 10px; color: #555; }
 .cmp-empty { text-align: center; color: #555; padding: 40px 20px; }
 .cmp-empty-icon { font-size: 32px; margin-bottom: 8px; }
+.cmp-expand-arrow { font-size: 8px; margin-left: 2px; transition: transform 0.15s; display: inline-block; }
+.cmp-expand-arrow.open { transform: rotate(90deg); }
 `;
 
 let _cssInjected = false;
@@ -145,11 +181,47 @@ function injectCSS() {
   _cssInjected = true;
 }
 
+// ── Price book loader ─────────────────────────────────────────────────
+async function loadPriceBook() {
+  try {
+    const all = await cGetAll('priceBook');
+    _priceBookCache = {};
+    for (const entry of all) _priceBookCache[entry.key] = entry;
+  } catch (e) {
+    _priceBookCache = {};
+  }
+}
+
+async function loadProjectRate(projectId) {
+  try {
+    const proj = await cGet('projects', projectId);
+    _projectRateTable = (proj && proj.rateTable) ? proj.rateTable : null;
+  } catch (e) {
+    _projectRateTable = null;
+  }
+}
+
+function getLaborRate() {
+  return (_projectRateTable && _projectRateTable.laborRatePerHr) || 45;
+}
+
+// Get labor hours breakdown per category from price book for a given item key
+function getPriceBookLaborBreakdown(baseKey) {
+  const result = {};
+  for (const cat of LABOR_CATEGORIES) {
+    const k = baseKey + '-lc-' + cat.key;
+    const entry = _priceBookCache ? _priceBookCache[k] : null;
+    if (entry && entry.laborHrs) result[cat.key] = entry.laborHrs;
+  }
+  return result;
+}
+
 // ── Data normalization ────────────────────────────────────────────────
-// Converts raw pageData into flat rows with consistent fields for grouping
 
 function normalizeRows(allPageData, drawingNames) {
   const rows = [];
+  const labRate = getLaborRate();
+
   for (const pd of allPageData) {
     const page = pd.pageNum || 0;
     const drawingId = pd.drawingId;
@@ -157,15 +229,41 @@ function normalizeRows(allPageData, drawingNames) {
 
     // -- Duct runs (measurements with duct tag) --
     for (const m of (pd.measurements || [])) {
-      if (!m.duct) continue; // skip plain measurements
+      if (!m.duct) continue;
       const lengthFt = m.distance ? m.distance.value || 0 : 0;
       const shape = m.duct.type || 'round';
       const matPerFt = m.materialCostPerFt || 0;
       const labHrsPerFt = m.laborHrsPerFt || 0;
-      const labRate = m.laborRate || 45;
-      const matCost = matPerFt * lengthFt;
+      const rate = m.laborRate || labRate;
+      const matCost = m.costOverride ? matPerFt * lengthFt : matPerFt * lengthFt;
       const laborHrs = labHrsPerFt * lengthFt;
-      const laborCost = laborHrs * labRate;
+      const laborCost = laborHrs * rate;
+
+      // Build price book key for labor category breakdown
+      const ductKey = shape === 'rect' ? 'duct-rect' : shape === 'oval' ? 'duct-oval' : 'duct-round';
+      const sizeKey = ductKey + '-' + (m.duct.dims || '');
+      const laborBreakdown = getPriceBookLaborBreakdown(sizeKey);
+
+      // Scale breakdown proportionally by lengthFt
+      const laborCatHrs = {};
+      const laborCatCost = {};
+      let assignedCat = 'unassigned';
+      for (const cat of LABOR_CATEGORIES) {
+        const catHrs = (laborBreakdown[cat.key] || 0) * lengthFt;
+        laborCatHrs[cat.key] = catHrs;
+        laborCatCost[cat.key] = catHrs * rate;
+        if (catHrs > 0 && assignedCat === 'unassigned') assignedCat = cat.label;
+      }
+      // If no breakdown found, put all hours under the item's phase or 'Rough'
+      const totalBreakdownHrs = Object.values(laborCatHrs).reduce((s, v) => s + v, 0);
+      if (totalBreakdownHrs === 0 && laborHrs > 0) {
+        const fallbackCat = m.phase || 'rough';
+        laborCatHrs[fallbackCat] = laborHrs;
+        laborCatCost[fallbackCat] = laborCost;
+        const catObj = LABOR_CATEGORIES.find(c => c.key === fallbackCat);
+        assignedCat = catObj ? catObj.label : capitalize(fallbackCat);
+      }
+
       rows.push({
         _itemType: 'Duct Run',
         _size: m.duct.dims || '?',
@@ -174,10 +272,13 @@ function normalizeRows(allPageData, drawingNames) {
         _drawingId: drawingId,
         _drawingName: drawingName,
         _lengthFt: lengthFt,
-        _matCost: m.costOverride ? (m.materialCostPerFt || 0) * lengthFt : matCost,
+        _matCost: matCost,
         _laborHrs: laborHrs,
         _laborCost: laborCost,
         _totalCost: matCost + laborCost,
+        _laborCatHrs: laborCatHrs,
+        _laborCatCost: laborCatCost,
+        _laborCatLabel: assignedCat,
         phase: m.phase || null,
         costGroup: m.costGroup || null,
         gauge: m.gauge || null,
@@ -189,9 +290,36 @@ function normalizeRows(allPageData, drawingNames) {
     for (const f of (pd.fittings || [])) {
       const matCost = f.materialCost || 0;
       const laborHrs = f.laborHrs || 0;
-      const labRate = f.laborRate || 45;
-      const laborCost = laborHrs * labRate;
+      const rate = f.laborRate || labRate;
+      const laborCost = laborHrs * rate;
       const shape = inferFittingShape(f);
+
+      // Price book key for fitting labor breakdown
+      const prefix = shape === 'rect' ? 'rect' : 'spiral';
+      const baseKey = prefix + '-' + f.type;
+      const sizeKey = baseKey + '-' + (f.sizeA || '');
+      const laborBreakdown = getPriceBookLaborBreakdown(sizeKey);
+      // Also try base key without size
+      const laborBreakdownBase = Object.keys(laborBreakdown).length > 0 ? laborBreakdown : getPriceBookLaborBreakdown(baseKey);
+
+      const laborCatHrs = {};
+      const laborCatCost = {};
+      let assignedCat = 'unassigned';
+      for (const cat of LABOR_CATEGORIES) {
+        const catHrs = laborBreakdownBase[cat.key] || 0;
+        laborCatHrs[cat.key] = catHrs;
+        laborCatCost[cat.key] = catHrs * rate;
+        if (catHrs > 0 && assignedCat === 'unassigned') assignedCat = cat.label;
+      }
+      const totalBreakdownHrs = Object.values(laborCatHrs).reduce((s, v) => s + v, 0);
+      if (totalBreakdownHrs === 0 && laborHrs > 0) {
+        const fallbackCat = f.phase || 'rough';
+        laborCatHrs[fallbackCat] = laborHrs;
+        laborCatCost[fallbackCat] = laborCost;
+        const catObj = LABOR_CATEGORIES.find(c => c.key === fallbackCat);
+        assignedCat = catObj ? catObj.label : capitalize(fallbackCat);
+      }
+
       rows.push({
         _itemType: FITTING_NAMES[f.type] || f.type,
         _size: f.sizeA + (f.sizeB ? '×' + f.sizeB : ''),
@@ -204,6 +332,9 @@ function normalizeRows(allPageData, drawingNames) {
         _laborHrs: laborHrs,
         _laborCost: laborCost,
         _totalCost: matCost + laborCost,
+        _laborCatHrs: laborCatHrs,
+        _laborCatCost: laborCatCost,
+        _laborCatLabel: assignedCat,
         phase: f.phase || null,
         costGroup: f.costGroup || null,
         gauge: f.gauge || null,
@@ -214,6 +345,8 @@ function normalizeRows(allPageData, drawingNames) {
     for (const s of (pd.stacks || [])) {
       for (const it of (s.items || [])) {
         const shape = it.shape || 'round';
+        const emptyCats = {};
+        for (const c of LABOR_CATEGORIES) emptyCats[c.key] = 0;
         rows.push({
           _itemType: it.type === 'ductrun' ? 'Vert. Duct' : (FITTING_NAMES[it.type] || it.type),
           _size: it.sizeA + (it.sizeB ? '×' + it.sizeB : ''),
@@ -226,6 +359,9 @@ function normalizeRows(allPageData, drawingNames) {
           _laborHrs: 0,
           _laborCost: 0,
           _totalCost: 0,
+          _laborCatHrs: { ...emptyCats },
+          _laborCatCost: { ...emptyCats },
+          _laborCatLabel: 'unassigned',
           phase: null,
           costGroup: null,
           gauge: null,
@@ -237,10 +373,9 @@ function normalizeRows(allPageData, drawingNames) {
 }
 
 function inferFittingShape(f) {
-  // If sizeA contains 'x' it's rect
   const s = String(f.sizeA || '');
   if (s.includes('x')) return 'rect';
-  return 'round'; // default
+  return 'round';
 }
 
 function capitalize(s) {
@@ -251,14 +386,12 @@ function capitalize(s) {
 
 function buildGroupTree(rows, groupKeys) {
   if (groupKeys.length === 0) return { _rows: rows, _children: null };
-
   const dims = groupKeys.map(k => GROUP_DIMENSIONS.find(d => d.key === k)).filter(Boolean);
   return _groupRecursive(rows, dims, 0, '');
 }
 
 function _groupRecursive(rows, dims, depth, pathPrefix) {
   if (depth >= dims.length) return { _rows: rows, _children: null };
-
   const dim = dims[depth];
   const buckets = {};
   for (const r of rows) {
@@ -266,34 +399,59 @@ function _groupRecursive(rows, dims, depth, pathPrefix) {
     if (!buckets[val]) buckets[val] = [];
     buckets[val].push(r);
   }
-
-  // Sort bucket keys
   const keys = Object.keys(buckets).sort((a, b) => {
-    // numeric-aware sort
     const na = parseFloat(a), nb = parseFloat(b);
     if (!isNaN(na) && !isNaN(nb)) return na - nb;
     return a.localeCompare(b);
   });
-
   const children = [];
   for (const k of keys) {
     const path = pathPrefix ? pathPrefix + '|' + k : k;
     children.push({
-      label: k,
-      path,
+      label: k, path,
       _rows: buckets[k],
       _children: _groupRecursive(buckets[k], dims, depth + 1, path),
     });
   }
-
   return { _rows: rows, _children: children };
+}
+
+// ── Build effective column list (with expansions) ─────────────────────
+
+function getEffectiveColumns() {
+  const result = [];
+  for (const c of DATA_COLUMNS) {
+    if (!_activeColumns.includes(c.key) && !c.alwaysOn) continue;
+    result.push(c);
+    // If this column is expandable and expanded, insert sub-columns after it
+    if (c.expandable && c.expandKey) {
+      const isExpanded = c.key === 'laborHrs' ? _laborHrsExpanded : _laborCostExpanded;
+      if (isExpanded) {
+        for (const cat of LABOR_CATEGORIES) {
+          result.push({
+            key: c.key + '_' + cat.key,
+            label: cat.short,
+            type: c.type,
+            color: cat.color,
+            isSub: true,
+            parentKey: c.key,
+            catKey: cat.key,
+            extract: c.key === 'laborHrs'
+              ? (rows => rows.reduce((s, r) => s + ((r._laborCatHrs && r._laborCatHrs[cat.key]) || 0), 0))
+              : (rows => rows.reduce((s, r) => s + ((r._laborCatCost && r._laborCatCost[cat.key]) || 0), 0)),
+          });
+        }
+      }
+    }
+  }
+  return result;
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────
 
 function renderCompiler() {
   if (!_container) return;
-  const cols = DATA_COLUMNS.filter(c => _activeColumns.includes(c.key) || c.alwaysOn);
+  const cols = getEffectiveColumns();
 
   let html = '';
 
@@ -347,7 +505,18 @@ function renderCompiler() {
     const tree = buildGroupTree(_rows, _activeGroups);
     html += `<table class="cmp-table"><thead><tr>`;
     html += `<th>Item</th>`;
-    for (const c of cols) html += `<th class="${c.type === 'number' || c.type === 'currency' ? 'num' : ''}">${c.label}</th>`;
+    for (const c of cols) {
+      if (c.isSub) {
+        // Labor category sub-column header
+        html += `<th class="num labor-sub" style="--lc-color:${c.color}">${c.label}</th>`;
+      } else if (c.expandable && _activeColumns.includes(c.key)) {
+        const isExp = c.key === 'laborHrs' ? _laborHrsExpanded : _laborCostExpanded;
+        html += `<th class="num expandable ${isExp ? 'expanded' : ''}" onclick="window._cmpToggleExpand('${c.key}')">`;
+        html += `${c.label} <span class="cmp-expand-arrow ${isExp ? 'open' : ''}">▶</span></th>`;
+      } else {
+        html += `<th class="${c.type === 'number' || c.type === 'currency' ? 'num' : ''}">${c.label}</th>`;
+      }
+    }
     html += `</tr></thead><tbody>`;
     html += renderTreeRows(tree, cols, 0);
 
@@ -355,7 +524,8 @@ function renderCompiler() {
     html += `<tr class="grand-total"><td>Grand Total</td>`;
     for (const c of cols) {
       const val = c.extract(_rows);
-      html += `<td class="num">${formatVal(val, c.type)}</td>`;
+      const cls = c.isSub ? 'num labor-sub-cell' : 'num';
+      html += `<td class="${cls}">${formatVal(val, c.type)}</td>`;
     }
     html += `</tr>`;
 
@@ -380,7 +550,8 @@ function renderTreeRows(node, cols, depth) {
     html += `<td>${toggle} ${escHtml(child.label)}</td>`;
     for (const c of cols) {
       const val = c.extract(child._rows);
-      html += `<td class="num">${formatVal(val, c.type)}</td>`;
+      const cls = c.isSub ? 'num labor-sub-cell' : 'num';
+      html += `<td class="${cls}">${formatVal(val, c.type)}</td>`;
     }
     html += `</tr>`;
 
@@ -411,6 +582,10 @@ function escapePath(s) { return s.replace(/'/g, "\\'").replace(/\\/g, "\\\\"); }
 async function loadCompilerData() {
   if (!_projectId) { _rows = []; return; }
 
+  // Load price book and project rate table
+  await loadPriceBook();
+  await loadProjectRate(_projectId);
+
   // Get drawing names
   const drawings = await cGetByIndex('drawings', 'projectId', _projectId);
   _drawingNames = {};
@@ -420,7 +595,6 @@ async function loadCompilerData() {
   if (_scope === 'drawing' && _drawingId) {
     allPageData = await cGetByIndex('pageData', 'drawingId', _drawingId);
   } else {
-    // All drawings in project
     allPageData = [];
     for (const d of drawings) {
       const pd = await cGetByIndex('pageData', 'drawingId', d.id);
@@ -431,7 +605,7 @@ async function loadCompilerData() {
   _rows = normalizeRows(allPageData, _drawingNames);
 }
 
-// ── Public API (called from index.html) ───────────────────────────────
+// ── Public API ────────────────────────────────────────────────────────
 
 const Compiler = {
   async init(container, projectId, drawingId) {
@@ -459,7 +633,7 @@ const Compiler = {
   },
 };
 
-// ── Global handlers (onclick from rendered HTML) ──────────────────────
+// ── Global handlers ───────────────────────────────────────────────────
 
 window._cmpSetScope = function(scope) {
   _scope = scope;
@@ -483,9 +657,18 @@ window._cmpRemoveGroup = function(key) {
 window._cmpToggleCol = function(key) {
   if (_activeColumns.includes(key)) {
     _activeColumns = _activeColumns.filter(k => k !== key);
+    // Also collapse any expansion when hiding
+    if (key === 'laborHrs') _laborHrsExpanded = false;
+    if (key === 'laborCost') _laborCostExpanded = false;
   } else {
     _activeColumns.push(key);
   }
+  renderCompiler();
+};
+
+window._cmpToggleExpand = function(key) {
+  if (key === 'laborHrs') _laborHrsExpanded = !_laborHrsExpanded;
+  if (key === 'laborCost') _laborCostExpanded = !_laborCostExpanded;
   renderCompiler();
 };
 
@@ -494,7 +677,6 @@ window._cmpToggleCollapse = function(path) {
   renderCompiler();
 };
 
-// Drag & drop reordering
 let _dragKey = null;
 window._cmpDragStart = function(e, key) {
   _dragKey = key;
@@ -508,11 +690,9 @@ window._cmpDropChip = function(e) {
   if (bar) bar.classList.remove('drag-over');
   if (!_dragKey) return;
 
-  // If not already in active groups, add it
   if (!_activeGroups.includes(_dragKey)) {
     _activeGroups.push(_dragKey);
   } else {
-    // Reorder: figure out drop position from mouse
     const chips = bar.querySelectorAll('.cmp-chip.in-bar');
     let insertIdx = _activeGroups.length;
     for (let i = 0; i < chips.length; i++) {
