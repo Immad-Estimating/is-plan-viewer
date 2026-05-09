@@ -2384,6 +2384,7 @@ const PRICE_BOOK_TABS = {
   rect: {
     label: 'Rectangular',
     sections: [
+      { id: 'rect-shop', hasGauge: false, title: 'Shop Settings', isShopSettings: true, items: [] },
       { id: 'rect-fit', hasGauge: true, title: 'Fittings', items: [
         { key: 'rect-90el', label: '90\u00b0 Elbow' },
         { key: 'rect-45el', label: '45\u00b0 Elbow' },
@@ -2398,8 +2399,18 @@ const PRICE_BOOK_TABS = {
         { key: 'rect-endcap', label: 'End Cap' },
         { key: 'rect-transition', label: 'Rect to Round Trans.' },
       ]},
-      { id: 'rect-duct', hasGauge: true, title: 'Ductwork', items: [
+      { id: 'rect-duct', hasGauge: true, title: 'Ductwork (Auto-Calc)', isRectDuctCalc: true, items: [
         { key: 'duct-rect', label: 'Rect Duct (per ft)' },
+      ]},
+      { id: 'rect-acc', hasGauge: false, title: 'Accessories & Add-Ons', items: [
+        { key: 'rect-liner', label: 'Duct Liner ($/SF)' },
+        { key: 'rect-wrap', label: 'Wrap Insulation ($/SF)' },
+        { key: 'rect-nosing', label: 'Nosing / Edging ($/LF)' },
+        { key: 'rect-turning-vanes', label: 'Turning Vanes ($/Ea)' },
+        { key: 'rect-access-door', label: 'Access Door ($/Ea)' },
+        { key: 'rect-volume-damper', label: 'Volume Damper ($/Ea)' },
+        { key: 'rect-fire-damper', label: 'Fire Damper ($/Ea)' },
+        { key: 'rect-flex-conn', label: 'Flex Connector ($/Ea)' },
       ]},
     ]
   },
@@ -2479,6 +2490,66 @@ var pbGauge = { 'round-fit': '26', 'round-duct': '26', 'rect-fit': '26', 'rect-d
 var activePBTab = 'rect';
 var pbRoundType = { 'round-fit': 'spiral', 'round-duct': 'spiral' }; // toggle: 'spiral' or 'snaplock'
 var pbExpandedItems = {}; // tracks which fitting rows are expanded to show per-size pricing
+
+// SMACNA galvanized sheet metal weights (lbs per SF) by gauge
+var SHEET_METAL_WEIGHT = {
+  '26': 1.031,
+  '24': 1.406,
+  '22': 1.781,
+  '20': 2.156,
+  '18': 2.781
+};
+
+// Shop settings defaults (stored in priceBookCache under 'shop-settings' key)
+var SHOP_DEFAULTS = {
+  sheetMetalPricePerLb: 0.00,   // $/lb — user sets to current commodity rate
+  shopOverheadFactor: 1.00,     // multiplier on raw material (1.35 = 35% overhead)
+  linerPricePerSF: 0.00,       // internal duct liner $/SF
+  wrapInsulationPerSF: 0.00,   // external wrap insulation $/SF
+  nosingPricePerLF: 0.00,      // nosing/edging $/LF of duct opening perimeter
+  turningVanesPerEa: 0.00      // turning vanes $/Ea (adder on elbows)
+};
+
+function getShopSettings() {
+  var saved = priceBookCache ? priceBookCache['shop-settings'] : null;
+  if (saved) {
+    var s = {};
+    for (var k in SHOP_DEFAULTS) s[k] = saved[k] != null ? saved[k] : SHOP_DEFAULTS[k];
+    return s;
+  }
+  return Object.assign({}, SHOP_DEFAULTS);
+}
+
+// Calculate rect duct material cost per LF from dimensions and shop settings
+function calcRectDuctCostPerLF(widthIn, heightIn, gauge) {
+  var shop = getShopSettings();
+  var perimeterIn = 2 * widthIn + 2 * heightIn;
+  var perimeterFt = perimeterIn / 12;
+  var surfaceAreaPerLF = perimeterFt * 1; // SF per linear foot
+  var weightPerSF = SHEET_METAL_WEIGHT[gauge] || SHEET_METAL_WEIGHT['26'];
+  var weightPerLF = surfaceAreaPerLF * weightPerSF;
+  var rawMaterialPerLF = weightPerLF * shop.sheetMetalPricePerLb;
+  var totalPerLF = rawMaterialPerLF * shop.shopOverheadFactor;
+  return {
+    perimeterIn: perimeterIn,
+    surfaceAreaPerLF: surfaceAreaPerLF,
+    weightPerLF: weightPerLF,
+    rawMaterialPerLF: rawMaterialPerLF,
+    totalPerLF: totalPerLF,
+    shop: shop
+  };
+}
+
+// Calculate rect duct liner/insulation adders per LF
+function calcRectDuctAddersPerLF(widthIn, heightIn) {
+  var shop = getShopSettings();
+  var perimeterFt = (2 * widthIn + 2 * heightIn) / 12;
+  return {
+    linerPerLF: perimeterFt * shop.linerPricePerSF,
+    wrapPerLF: perimeterFt * shop.wrapInsulationPerSF,
+    nosingPerLF: 0 // nosing is per opening, not per LF — applied at fitting level
+  };
+}
 
 
 // Default spiral pricing by gauge: key -> { '26': price, '22': price, ... }
@@ -2810,7 +2881,9 @@ function pbRowEditable(item) {
 
 function pbColumnHeader(hasMaterialInput, sectionId) {
   var matLabel;
-  if (sectionId && (sectionId.indexOf('-fit') !== -1 || sectionId.indexOf('-fit') !== -1)) {
+  if (sectionId && sectionId.indexOf('-acc') !== -1) {
+    matLabel = 'Rate';
+  } else if (sectionId && (sectionId.indexOf('-fit') !== -1)) {
     matLabel = '$/Ea';
   } else if (sectionId && (sectionId.indexOf('-duct') !== -1)) {
     matLabel = '$/Ft';
@@ -2819,6 +2892,100 @@ function pbColumnHeader(hasMaterialInput, sectionId) {
   }
   return '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Item</th><th style="padding:4px;text-align:center;width:70px">' + matLabel + '</th><th style="padding:4px;text-align:center;width:70px">Labor Hrs</th></tr>';
 }
+
+function shopSettingInput(settingKey, value, label, unit, color) {
+  color = color || '#e0e0e0';
+  return '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">'
+    + '<td style="padding:5px 4px;color:#e0e0e0;font-size:11px">' + label + '</td>'
+    + '<td colspan="2" style="padding:5px 2px;text-align:right">'
+    + '<input type="text" value="' + (value != null ? value : '') + '" placeholder="0.00" '
+    + 'style="width:70px;background:#1a1a2e;border:1px solid #0f3460;color:' + color + ';padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" '
+    + 'onchange="updateShopSetting(\'' + settingKey + '\',this.value)"> '
+    + '<span style="color:#666;font-size:10px">' + unit + '</span>'
+    + '</td></tr>';
+}
+
+function renderShopSettingsSection() {
+  var s = getShopSettings();
+  var html = '';
+  html += '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Setting</th><th colspan="2" style="padding:4px;text-align:right">Value</th></tr>';
+  html += shopSettingInput('sheetMetalPricePerLb', s.sheetMetalPricePerLb || '', 'Sheet Metal Price', '$/lb', '#00ff88');
+  html += shopSettingInput('shopOverheadFactor', s.shopOverheadFactor || '', 'Shop Overhead Factor', '\u00d7', '#ffaa00');
+  // Live preview: show calculated weight and cost for a sample duct
+  html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3);background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:6px 4px;font-size:10px;color:#a0a0c0">';
+  html += '<span style="color:#666">Preview:</span> 24\u2033\u00d712\u2033 @ 26ga \u2192 ';
+  var preview = calcRectDuctCostPerLF(24, 12, '26');
+  html += preview.weightPerLF.toFixed(2) + ' lbs/LF \u2192 ';
+  if (preview.totalPerLF > 0) {
+    html += '<span style="color:#00ff88">$' + preview.totalPerLF.toFixed(2) + '/LF</span>';
+    html += ' <span style="color:#666">(raw $' + preview.rawMaterialPerLF.toFixed(2) + ' \u00d7 ' + (s.shopOverheadFactor || 1) + ')</span>';
+  } else {
+    html += '<span style="color:#666">set $/lb to see cost</span>';
+  }
+  html += '</td></tr>';
+  // SMACNA gauge weight reference
+  html += '<tr style="background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:4px;font-size:9px;color:#666">';
+  html += 'SMACNA lbs/SF: 26ga=1.031 | 24ga=1.406 | 22ga=1.781 | 20ga=2.156 | 18ga=2.781';
+  html += '</td></tr>';
+  return html;
+}
+
+function renderRectDuctCalcSection(sec, gauge) {
+  var s = getShopSettings();
+  var html = '';
+  html += '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Duct Size</th><th style="padding:4px;text-align:center;width:70px">$/LF</th><th style="padding:4px;text-align:center;width:70px">Labor Hrs</th></tr>';
+  // Common rectangular duct sizes with auto-calculated pricing
+  var commonSizes = [
+    [8,8],[10,8],[10,10],[12,8],[12,10],[12,12],
+    [14,8],[14,10],[14,12],[14,14],
+    [16,8],[16,10],[16,12],[16,14],[16,16],
+    [18,8],[18,10],[18,12],[18,14],[18,16],[18,18],
+    [20,10],[20,12],[20,14],[20,16],[20,18],[20,20],
+    [24,10],[24,12],[24,14],[24,16],[24,18],[24,20],[24,24],
+    [28,12],[28,14],[28,16],[28,18],[28,20],
+    [30,12],[30,14],[30,16],[30,18],[30,20],[30,24],
+    [36,12],[36,16],[36,18],[36,20],[36,24],
+    [42,16],[42,18],[42,20],[42,24],
+    [48,18],[48,20],[48,24],[48,30]
+  ];
+  for (var i = 0; i < commonSizes.length; i++) {
+    var w = commonSizes[i][0], h = commonSizes[i][1];
+    var calc = calcRectDuctCostPerLF(w, h, gauge);
+    var sizeLabel = w + '\u2033\u00d7' + h + '\u2033';
+    var perim = calc.perimeterIn;
+    // Lookup user-override or show auto-calc
+    var overrideKey = 'duct-rect-' + w + 'x' + h;
+    var gKey = overrideKey + '-g' + gauge;
+    var saved = priceBookCache ? priceBookCache[gKey] : null;
+    var displayMc = (saved && saved.materialCost != null) ? saved.materialCost : (calc.totalPerLF > 0 ? calc.totalPerLF : null);
+    var lhKey = overrideKey;
+    var savedLh = priceBookCache ? priceBookCache[lhKey] : null;
+    var displayLh = savedLh ? savedLh.laborHrs : null;
+    var isAutoCalc = !(saved && saved.materialCost != null) && calc.totalPerLF > 0;
+    html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
+    html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + sizeLabel + ' <span style="color:#555;font-size:9px">' + perim + '\u2033p</span></td>';
+    // Material: show auto-calc in dimmer green, or user-entered in bright green
+    html += '<td style="padding:4px 2px">';
+    if (isAutoCalc) {
+      html += '<input type="text" value="' + displayMc.toFixed(2) + '" placeholder="\u2014" '
+        + 'style="width:60px;background:#1a1a2e;border:1px solid #0f3460;color:#009966;padding:3px 5px;border-radius:3px;font-size:11px;text-align:right;font-style:italic" '
+        + 'onchange="updatePBEntry(\'' + gKey + '\',\'materialCost\',this.value)" title="Auto-calculated \u2014 edit to override">';
+    } else {
+      html += pbInput(gKey, 'materialCost', displayMc);
+    }
+    html += '</td>';
+    html += '<td style="padding:4px 2px">' + pbInput(lhKey, 'laborHrs', displayLh) + '</td>';
+    html += '</tr>';
+  }
+  return html;
+}
+
+window.updateShopSetting = async function(key, value) {
+  var existing = (priceBookCache && priceBookCache['shop-settings']) || { key: 'shop-settings' };
+  existing[key] = value === '' ? null : parseFloat(value) || null;
+  await savePriceBookEntry('shop-settings', existing);
+  renderPriceBook(); // re-render to update auto-calc previews
+};
 
 function renderPriceBook() {
   var el = document.getElementById('priceBookContent');
@@ -2882,13 +3049,23 @@ function renderPriceBook() {
     html += '</td></tr>';
 
     if (!collapsed) {
-      var hasGauge = !!sec.hasGauge;
-      html += pbColumnHeader(!hasGauge, sec.id);
-      for (var j = 0; j < sec.items.length; j++) {
-        if (hasGauge) {
-          html += pbRow(sec.items[j], sec.id);
-        } else {
-          html += pbRowEditable(sec.items[j]);
+      // Special rendering for Shop Settings section
+      if (sec.isShopSettings) {
+        html += renderShopSettingsSection();
+      }
+      // Special rendering for Rect Duct Auto-Calc section
+      else if (sec.isRectDuctCalc) {
+        html += renderRectDuctCalcSection(sec, pbGauge[sec.id] || '26');
+      }
+      else {
+        var hasGauge = !!sec.hasGauge;
+        html += pbColumnHeader(!hasGauge, sec.id);
+        for (var j = 0; j < sec.items.length; j++) {
+          if (hasGauge) {
+            html += pbRow(sec.items[j], sec.id);
+          } else {
+            html += pbRowEditable(sec.items[j]);
+          }
         }
       }
     }
