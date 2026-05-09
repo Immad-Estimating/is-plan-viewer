@@ -810,10 +810,11 @@
     </div>
     <div style="border-top:1px solid #0f3460;padding-top:10px;margin-bottom:10px">
       <p style="font-size:11px;color:#666;margin-bottom:6px">Or extract from a mechanical schedule:</p>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
         <input type="file" id="sysSymImageInput" accept="image/*,.pdf" style="display:none">
-        <button onclick="document.getElementById('sysSymImageInput').click()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">📷 Upload Schedule Image</button>
+        <button onclick="document.getElementById('sysSymImageInput').click()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">📷 Upload Schedule</button>
         <button onclick="pasteScheduleFromClipboard()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">📋 Paste from Clipboard</button>
+        <button onclick="openAiConfig()" style="background:none;border:1px solid #0f3460;color:#555;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">⚙ Configure AI</button>
       </div>
       <div id="sysSymAiStatus" style="font-size:11px;color:#555;margin-top:6px"></div>
     </div>
@@ -827,6 +828,7 @@
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
 import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
+import ScheduleAI from './schedule-ai.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -2852,7 +2854,7 @@ window.removeSysSymbol = async function(tag) {
   renderSysSymbolList();
 };
 
-// AI Schedule Extraction (placeholder — image upload → future vision API)
+// AI Schedule Extraction — delegates to schedule-ai.js
 window.pasteScheduleFromClipboard = async function() {
   try {
     const items = await navigator.clipboard.read();
@@ -2860,37 +2862,81 @@ window.pasteScheduleFromClipboard = async function() {
       const imageType = item.types.find(t => t.startsWith('image/'));
       if (imageType) {
         const blob = await item.getType(imageType);
-        await extractSystemSymbolsFromImage(blob);
+        await runScheduleExtraction(blob);
         return;
       }
     }
-    document.getElementById('sysSymAiStatus').textContent = 'No image found in clipboard. Copy a screenshot of the mechanical schedule first.';
+    document.getElementById('sysSymAiStatus').textContent = 'No image found in clipboard. Copy a screenshot first.';
   } catch (e) {
-    document.getElementById('sysSymAiStatus').textContent = 'Clipboard access denied. Try the upload button instead.';
+    document.getElementById('sysSymAiStatus').textContent = 'Clipboard access denied. Try the upload button.';
   }
 };
 
 document.getElementById('sysSymImageInput')?.addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  await extractSystemSymbolsFromImage(file);
+  await runScheduleExtraction(file);
   e.target.value = '';
 });
 
-async function extractSystemSymbolsFromImage(blob) {
+window.openAiConfig = function() {
   const statusEl = document.getElementById('sysSymAiStatus');
-  statusEl.textContent = '⏳ Analyzing schedule image...';
-  statusEl.style.color = '#ffd43b';
+  statusEl.innerHTML = ScheduleAI.renderConfigUI();
+};
 
-  // Convert to base64 for display / future API call
-  const reader = new FileReader();
-  reader.onload = () => {
-    // For now, show a message that AI extraction is coming
-    // In future: send base64 image to vision API endpoint
-    statusEl.innerHTML = '🚧 AI schedule extraction is being connected. For now, add system symbols manually using the fields above.<br><span style="color:#555;font-size:10px">Image received (' + (blob.size / 1024).toFixed(0) + ' KB) — will process when vision API is wired.</span>';
-    statusEl.style.color = '#a0a0c0';
-  };
-  reader.readAsDataURL(blob);
+async function runScheduleExtraction(blob) {
+  const statusEl = document.getElementById('sysSymAiStatus');
+
+  if (!ScheduleAI.isConfigured()) {
+    statusEl.innerHTML = 'No API key configured. ' + '<button onclick="openAiConfig()" style="background:#0f3460;color:#ffd43b;border:1px solid #1a4080;padding:3px 8px;border-radius:3px;cursor:pointer;font-size:11px">⚙ Configure AI</button>';
+    return;
+  }
+
+  try {
+    const equipment = await ScheduleAI.extract(blob, (msg) => {
+      statusEl.textContent = msg;
+      statusEl.style.color = '#ffd43b';
+    });
+
+    if (!equipment || equipment.length === 0) {
+      statusEl.textContent = 'No equipment found in the image. Try a clearer screenshot.';
+      statusEl.style.color = '#e94560';
+      return;
+    }
+
+    // Convert to system symbols and merge
+    const newSymbols = ScheduleAI.equipmentToSymbols(equipment);
+    let added = 0;
+    for (const s of newSymbols) {
+      if (projectSystemSymbols.some(e => e.tag === s.tag)) continue;
+      projectSystemSymbols.push({ id: ++_sysSymIdCounter, ...s });
+      added++;
+    }
+    await saveProjectSystemSymbols(activeProjectId);
+    renderSysSymbolList();
+
+    // Show results
+    let html = `<span style="color:#00ff88">✓ Extracted ${equipment.length} entries, added ${added} new symbols</span>`;
+    if (equipment.length > added) html += `<br><span style="color:#555;font-size:10px">${equipment.length - added} duplicates skipped</span>`;
+    // Show equipment detail table
+    html += '<div style="margin-top:6px;max-height:120px;overflow-y:auto;font-size:10px">';
+    html += '<table style="width:100%;border-collapse:collapse">';
+    html += '<tr style="color:#555"><th style="text-align:left;padding:2px 4px">Tag</th><th style="text-align:left;padding:2px 4px">Type</th><th style="text-align:left;padding:2px 4px">Tons</th><th style="text-align:left;padding:2px 4px">CFM</th><th style="text-align:left;padding:2px 4px">Voltage</th></tr>';
+    for (const eq of equipment) {
+      html += `<tr style="color:#a0a0c0"><td style="padding:2px 4px">${escapeHtml(eq.tag || '?')}</td><td style="padding:2px 4px">${escapeHtml(eq.type || '')}</td><td style="padding:2px 4px">${eq.tonnage || '—'}</td><td style="padding:2px 4px">${eq.cfm || '—'}</td><td style="padding:2px 4px">${escapeHtml(eq.voltage || '—')}</td></tr>`;
+    }
+    html += '</table></div>';
+    statusEl.innerHTML = html;
+    statusEl.style.color = '';
+
+  } catch (err) {
+    if (err.message === 'NO_API_KEY') {
+      statusEl.innerHTML = 'No API key configured. ' + '<button onclick="openAiConfig()" style="background:#0f3460;color:#ffd43b;border:1px solid #1a4080;padding:3px 8px;border-radius:3px;cursor:pointer;font-size:11px">⚙ Configure AI</button>';
+    } else {
+      statusEl.textContent = '✗ ' + err.message;
+      statusEl.style.color = '#e94560';
+    }
+  }
 }
 
 // ---- Global Price Book ----
