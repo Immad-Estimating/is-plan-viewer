@@ -189,25 +189,37 @@
   .upload-zone p { color: #a0a0c0; font-size: 13px; }
   .upload-zone .uz-btn { display: inline-block; margin-top: 8px; background: #e94560; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
 
+  /* Drawing cards — unified collapsible */
   .drawing-list { display: flex; flex-direction: column; gap: 8px; }
-  a.drawing-item, .drawing-item { display: flex; text-decoration: none; color: inherit; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 18px 20px; align-items: center; justify-content: space-between; cursor: pointer; transition: border-color 0.15s; }
-  .drawing-item:hover { border-color: #e94560; }
-  .drawing-item .di-info { flex: 1; }
-  .drawing-item .di-name { font-size: 16px; font-weight: 500; }
-  .drawing-item .di-meta { font-size: 13px; color: #a0a0c0; margin-top: 6px; display: flex; gap: 14px; }
-  .drawing-item .di-actions { display: flex; gap: 6px; }
-  .drawing-item .di-actions button { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 18px; padding: 6px 8px; border-radius: 3px; }
-  .drawing-item .di-actions button:hover { color: #e94560; background: rgba(233,69,96,0.1); }
+  .dw-card { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; overflow: hidden; transition: border-color 0.15s; }
+  .dw-card:hover { border-color: #1a4080; }
+  .dw-card.expanded { border-color: #e94560; }
 
-  /* Sheet list inside drawing manager */
-  .drawing-item-wrap { margin-bottom: 0; }
-  .sheet-toggle { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 11px; padding: 4px 8px; border-radius: 4px; transition: all 0.15s; display: flex; align-items: center; gap: 4px; margin-top: 6px; }
-  .sheet-toggle:hover { color: #e94560; background: rgba(233,69,96,0.06); }
-  .sheet-toggle .st-arrow { display: inline-block; font-size: 9px; transition: transform 0.2s; }
-  .sheet-toggle .st-arrow.open { transform: rotate(90deg); }
-  .sheet-list { display: none; margin-top: 6px; padding-left: 8px; border-left: 2px solid #0f3460; }
-  .sheet-list.open { display: block; }
-  .sheet-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: #a0a0c0; transition: background 0.1s; cursor: pointer; }
+  /* Card header — always visible */
+  .dw-head { display: flex; align-items: center; padding: 12px 16px; gap: 10px; cursor: pointer; user-select: none; }
+  .dw-head:hover { background: rgba(233,69,96,0.03); }
+  .dw-arrow { font-size: 10px; color: #555; transition: transform 0.2s; flex-shrink: 0; width: 14px; text-align: center; }
+  .dw-card.expanded .dw-arrow { transform: rotate(90deg); color: #e94560; }
+  .dw-head-info { flex: 1; min-width: 0; }
+  .dw-head-name { font-size: 15px; font-weight: 600; color: #e0e0e0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dw-head-meta { font-size: 11px; color: #666; margin-top: 2px; display: flex; gap: 10px; }
+  .dw-head-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .dw-head-actions button { background: none; border: none; color: #555; cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 3px; transition: all 0.12s; }
+  .dw-head-actions button:hover { color: #e94560; background: rgba(233,69,96,0.08); }
+
+  /* Card body — sheets + actions, hidden until expanded */
+  .dw-body { display: none; border-top: 1px solid #0f3460; }
+  .dw-card.expanded .dw-body { display: block; }
+
+  /* Quick-open bar */
+  .dw-open-bar { display: flex; padding: 8px 16px; gap: 6px; border-bottom: 1px solid rgba(15,52,96,0.5); }
+  .dw-open-btn { flex: 1; background: #e94560; color: #fff; border: none; padding: 7px 12px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; transition: background 0.12s; text-align: center; text-decoration: none; display: block; }
+  .dw-open-btn:hover { background: #c73550; }
+
+  /* Sheet rows */
+  .dw-sheets { padding: 4px 8px 8px; }
+  .dw-sheets-label { font-size: 10px; color: #444; text-transform: uppercase; letter-spacing: 0.4px; padding: 4px 8px 2px; }
+  .sheet-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 4px; font-size: 12px; color: #a0a0c0; transition: background 0.1s; cursor: pointer; }
   .sheet-row:hover { background: rgba(15,52,96,0.5); color: #e0e0e0; }
   .sheet-row .sr-num { font-size: 10px; color: #555; min-width: 28px; }
   .sheet-row .sr-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1890,39 +1902,44 @@ async function renderDrawingManager(projectId) {
     html += `<div class="drawing-list">`;
     const sorted = [...drawings].sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0));
     for (const d of sorted) {
-      const createdStr = d.uploadedAt ? formatDateTime(d.uploadedAt) : '';
       const modifiedStr = d.modifiedAt ? formatDateTime(d.modifiedAt) : '';
       const size = d.fileSize ? formatFileSize(d.fileSize) : '';
       const pc = d.pageCount || 0;
-      const pages = pc ? `${pc} sheet${pc !== 1 ? 's' : ''}` : '';
+      const sheetLabel = pc ? `${pc} sheet${pc !== 1 ? 's' : ''}` : '';
       const safeName = escapeHtml(d.fileName).replace(/'/g, "\\'");
       const sheets = sheetIndex[d.id] || {};
+      const isExp = _dwExpanded[d.id] ? ' expanded' : '';
 
-      html += `<div class="drawing-item-wrap" id="dw-${d.id}">`;
-      html += `<a class="drawing-item" href="#/project/${projectId}/drawing/${d.id}">
-        <div class="di-info">
-          <div class="di-name" id="drawingName-${d.id}">📄 ${escapeHtml(d.fileName)}</div>
-          <div class="di-meta">
-            ${pages ? `<span>${pages}</span>` : ''}
-            ${size ? `<span>${size}</span>` : ''}
-            ${createdStr ? `<span>Created: ${createdStr}</span>` : ''}
-            ${modifiedStr ? `<span>Modified: ${modifiedStr}</span>` : ''}
-          </div>
-        </div>
-        <div class="di-actions">
-          <button onclick="event.stopPropagation(); event.preventDefault(); renameDrawing(${d.id})" title="Rename">✏️</button>
-          <button onclick="event.stopPropagation(); event.preventDefault(); reuploadDrawing(${d.id})" title="Re-upload PDF (keeps takeoff data)">🔄</button>
-          <button onclick="event.stopPropagation(); event.preventDefault(); duplicateDrawing(${d.id})" title="Duplicate">📋</button>
-          <button onclick="event.stopPropagation(); event.preventDefault(); deleteDrawing(${d.id}, '${safeName}')" title="Delete">🗑️</button>
-        </div>
-      </a>`;
+      html += `<div class="dw-card${isExp}" id="dwCard-${d.id}">`;
 
-      // Sheet list (expandable)
+      // Header row — click to expand/collapse
+      html += `<div class="dw-head" onclick="toggleDrawingCard(${d.id})">`;
+      html += `<span class="dw-arrow">▶</span>`;
+      html += `<div class="dw-head-info">`;
+      html += `<div class="dw-head-name" id="drawingName-${d.id}">${escapeHtml(d.fileName)}</div>`;
+      html += `<div class="dw-head-meta">`;
+      if (sheetLabel) html += `<span>📄 ${sheetLabel}</span>`;
+      if (size) html += `<span>${size}</span>`;
+      if (modifiedStr) html += `<span>${modifiedStr}</span>`;
+      html += `</div></div>`;
+
+      // Actions on header
+      html += `<div class="dw-head-actions">`;
+      html += `<button onclick="event.stopPropagation(); renameDrawing(${d.id})" title="Rename">✏️</button>`;
+      html += `<button onclick="event.stopPropagation(); reuploadDrawing(${d.id})" title="Re-upload PDF">🔄</button>`;
+      html += `<button onclick="event.stopPropagation(); duplicateDrawing(${d.id})" title="Duplicate">📋</button>`;
+      html += `<button onclick="event.stopPropagation(); deleteDrawing(${d.id}, '${safeName}')" title="Delete">🗑️</button>`;
+      html += `</div></div>`;
+
+      // Body — open button + sheet list
+      html += `<div class="dw-body">`;
+      html += `<div class="dw-open-bar">`;
+      html += `<a class="dw-open-btn" href="#/project/${projectId}/drawing/${d.id}">Open Drawing</a>`;
+      html += `</div>`;
+
       if (pc > 0) {
-        html += `<button class="sheet-toggle" onclick="toggleSheetList(${d.id})">`;
-        html += `<span class="st-arrow" id="stArrow-${d.id}">▶</span> Sheets (${pc})`;
-        html += `</button>`;
-        html += `<div class="sheet-list" id="sheetList-${d.id}">`;
+        html += `<div class="dw-sheets">`;
+        html += `<div class="dw-sheets-label">Sheets</div>`;
         for (let p = 1; p <= pc; p++) {
           const pd = sheets[p];
           const name = pd && pd.pageName ? pd.pageName : '';
@@ -1941,7 +1958,9 @@ async function renderDrawingManager(projectId) {
         }
         html += `</div>`;
       }
-      html += `</div>`;
+
+      html += `</div>`; // dw-body
+      html += `</div>`; // dw-card
     }
     html += `</div>`;
   }
@@ -2269,13 +2288,14 @@ window._measIdCounter = window._measIdCounter || 0;
 // Sheet Management (individual pages within drawings)
 // =====================================================
 
-// Toggle sheet list in drawing manager
-window.toggleSheetList = function(drawingId) {
-  const list = document.getElementById('sheetList-' + drawingId);
-  const arrow = document.getElementById('stArrow-' + drawingId);
-  if (!list) return;
-  list.classList.toggle('open');
-  if (arrow) arrow.classList.toggle('open', list.classList.contains('open'));
+// Track which drawing cards are expanded (survives re-renders within session)
+const _dwExpanded = {};
+
+// Toggle drawing card expand/collapse
+window.toggleDrawingCard = function(drawingId) {
+  _dwExpanded[drawingId] = !_dwExpanded[drawingId];
+  const card = document.getElementById('dwCard-' + drawingId);
+  if (card) card.classList.toggle('expanded', _dwExpanded[drawingId]);
 };
 
 // Navigate to a specific page after opening a drawing
