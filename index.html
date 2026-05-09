@@ -2978,7 +2978,33 @@ function renderRadarChart(baseKey, itemType, subType) {
   // --- RIGHT: Size slider ---
   html += '<div style="display:flex;flex-direction:column;gap:8px;min-width:50px;align-items:center">';
   var isRoundItem = baseKey.indexOf('spiral') !== -1 || baseKey.indexOf('snaplock') !== -1;
-  if (!isRoundItem) {
+  var RD_SIZES = [4,5,6,7,8,9,10,12,14,16,18,20,22,24];
+  if (isRoundItem) {
+    // Parse current size(s) from key: 'spiral-tee-12x8' or 'spiral-90el-12' or 'duct-spiral-12'
+    var pairMatch = baseKey.match(/-(\d+)x(\d+)$/);
+    var singleMatch = !pairMatch && baseKey.match(/-(\d+)$/);
+    var mainSz = pairMatch ? parseInt(pairMatch[1]) : (singleMatch ? parseInt(singleMatch[1]) : 12);
+    var hasSec = !!pairMatch;
+    var secSz = hasSec ? parseInt(pairMatch[2]) : mainSz;
+    var mainIdx = RD_SIZES.indexOf(mainSz); if (mainIdx < 0) mainIdx = 0;
+    // Primary slider
+    html += '<span style="color:#a0a0c0;font-size:11px;font-weight:700">\u2300</span>';
+    html += '<input type="range" min="0" max="' + (RD_SIZES.length-1) + '" value="' + mainIdx + '" ';
+    html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:' + (hasSec ? '90' : '140') + 'px;accent-color:#00c8ff" ';
+    html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+    html += 'oninput="radarSlideRd(0,this.value,\'' + baseKey + '\')">';
+    html += '<span style="color:#00c8ff;font-size:13px;font-weight:700">' + mainSz + '\u2033</span>';
+    // Secondary slider (branch/outlet) for two-dim fittings
+    if (hasSec) {
+      var secIdx = RD_SIZES.indexOf(secSz); if (secIdx < 0) secIdx = 0;
+      html += '<span style="color:#a0a0c0;font-size:9px;font-weight:600;margin-top:6px">BR</span>';
+      html += '<input type="range" min="0" max="' + mainIdx + '" value="' + secIdx + '" ';
+      html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:90px;accent-color:#da77f2" ';
+      html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+      html += 'oninput="radarSlideRd(1,this.value,\'' + baseKey + '\')">';
+      html += '<span style="color:#da77f2;font-size:13px;font-weight:700">' + secSz + '\u2033</span>';
+    }
+  } else {
     var currentPCIdx = pbPerimClass['rect-fit'] || 0;
     html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">SIZE</span>';
     html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length-1) + '" value="' + currentPCIdx + '" ';
@@ -2994,6 +3020,28 @@ function renderRadarChart(baseKey, itemType, subType) {
   return html;
 }
 
+window.radarSlideRd = function(dim, idx, key) {
+  var S = [4,5,6,7,8,9,10,12,14,16,18,20,22,24];
+  var v = S[parseInt(idx)];
+  var pairM = key.match(/-(\d+)x(\d+)$/);
+  var singleM = !pairM && key.match(/-(\d+)$/);
+  var newKey;
+  if (pairM) {
+    var m = parseInt(pairM[1]), b = parseInt(pairM[2]);
+    if (dim === 0) { m = v; if (b > m) b = m; }
+    else { b = v; if (b > m) b = m; }
+    newKey = key.replace(/-(\d+)x(\d+)$/, '-' + m + 'x' + b);
+  } else if (singleM) {
+    newKey = key.replace(/-(\d+)$/, '-' + v);
+  } else { return; }
+  // Keep parent fitting expanded
+  var parent = key.replace(/-(\d+)(x\d+)?$/, '');
+  pbExpandedItems[parent] = true;
+  // For pair items, keep the main size group expanded too
+  if (pairM) pbExpandedItems[parent + '-' + (dim === 0 ? v : parseInt(pairM[1]))] = true;
+  radarChartTarget = newKey;
+  renderPriceBook();
+};
 
 window.radarSliderPerim = function(idx) {
   var i = parseInt(idx);
