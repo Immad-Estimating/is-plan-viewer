@@ -2408,21 +2408,15 @@ const PRICE_BOOK_TABS = {
         { key: 'spiral-90el', snapKey: 'snaplock-90el', label: '90° Elbow', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
         { key: 'spiral-45el', snapKey: 'snaplock-45el', label: '45° Elbow', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
         { key: 'spiral-22el', snapKey: 'snaplock-22el', label: '22.5° Elbow', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-tee', snapKey: 'snaplock-tee', label: 'Tee', sizePairs: true, sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-saddle45y', snapKey: 'snaplock-saddle45y', label: 'Saddle 45° Wye', sizePairs: true, sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-lateral', snapKey: 'snaplock-lateral', label: '45° Lateral', sizePairs: true, sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-wye', snapKey: 'snaplock-wye', label: 'Wye', sizePairs: true, sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-reducer', snapKey: 'snaplock-reducer', label: 'Concentric Reducer', sizePairs: true, sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-eccReducer', snapKey: 'snaplock-eccReducer', label: 'Eccentric Reducer', sizePairs: true, sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-tee', snapKey: 'snaplock-tee', label: 'Tee', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-saddle45y', snapKey: 'snaplock-saddle45y', label: 'Saddle 45° Wye', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-lateral', snapKey: 'snaplock-lateral', label: '45° Lateral', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-wye', snapKey: 'snaplock-wye', label: 'Wye', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-reducer', snapKey: 'snaplock-reducer', label: 'Concentric Reducer', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
+        { key: 'spiral-eccReducer', snapKey: 'snaplock-eccReducer', label: 'Eccentric Reducer', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
         { key: 'spiral-endcap', snapKey: 'snaplock-endcap', label: 'End Cap', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
         { key: 'spiral-coupling', snapKey: 'snaplock-coupling', label: 'Coupling', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
         { key: 'spiral-transition', snapKey: 'snaplock-transition', label: 'Round to Rect Trans.', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-volume-damper', snapKey: 'snaplock-volume-damper', label: 'Volume Damper', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-spin-in', snapKey: 'snaplock-spin-in', label: 'Spin-In / Tap', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-starting-collar', snapKey: 'snaplock-starting-collar', label: 'Starting Collar', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-boot', snapKey: 'snaplock-boot', label: 'Register Boot', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-flex-conn', snapKey: 'snaplock-flex-conn', label: 'Flex Connector', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-test-hole', snapKey: 'snaplock-test-hole', label: 'Test Hole Fitting', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
       ]},
       { id: 'round-duct', hasGauge: true, title: 'Ductwork', toggleType: true, items: [
         { key: 'duct-spiral-3', snapKey: 'duct-snaplock-3', label: '3\u2033' },
@@ -2688,11 +2682,6 @@ window.togglePBItemExpand = function(itemKey) {
   renderPriceBook();
 };
 
-window.togglePBSizePairExpand = function(pairKey) {
-  pbExpandedItems[pairKey] = !pbExpandedItems[pairKey];
-  renderPriceBook();
-};
-
 function pbInput(key, prop, value) {
   var clr = prop === 'materialCost' ? '#00ff88' : prop === 'laborHrs' ? '#ffaa00' : '#e0e0e0';
   return '<input type="text" value="' + (value != null ? value : '') + '" placeholder="\u2014" style="width:60px;background:#1a1a2e;border:1px solid #0f3460;color:' + clr + ';padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + key + '\',\'' + prop + '\',this.value)">';
@@ -2722,7 +2711,6 @@ function pbRow(item, sectionId) {
   }
   var gaugeKey = gauge ? activeKey + '-g' + gauge : activeKey;
   var hasSizes = item.sizes && item.sizes.length > 0;
-  var hasPairs = item.sizePairs && hasSizes;
   var isExpanded = hasSizes && !!pbExpandedItems[activeKey];
   var arrow = hasSizes ? (isExpanded ? '\u25BC ' : '\u25B6 ') : '';
   var clickAttr = hasSizes ? ' onclick="togglePBItemExpand(\'' + activeKey + '\')" style="padding:4px;color:#e0e0e0;font-size:11px;cursor:pointer"' : ' style="padding:4px;color:#e0e0e0;font-size:11px"';
@@ -2732,50 +2720,7 @@ function pbRow(item, sectionId) {
   html += '<td style="padding:4px 2px">' + pbInput(activeKey, 'laborHrs', lh) + '</td>';
   html += '</tr>';
   // Expanded per-size rows
-  if (isExpanded && hasPairs) {
-    // Two-dimension pricing: show main size headers, each with branch/outlet sub-rows
-    var isReducer = activeKey.indexOf('reducer') !== -1 || activeKey.indexOf('eccReducer') !== -1;
-    var mainLabel = isReducer ? 'Inlet' : 'Main';
-    var subLabel = isReducer ? 'Outlet' : 'Branch';
-    for (var si = 0; si < item.sizes.length; si++) {
-      var mainSz = item.sizes[si];
-      // Main size header row
-      html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.2);background:rgba(15,52,96,0.15)">';
-      html += '<td onclick="togglePBSizePairExpand(\'' + activeKey + '-' + mainSz + '\')" style="padding:3px 4px 3px 16px;color:#00c8ff;font-size:12px;cursor:pointer;font-weight:600" onmouseover="this.style.color=\'#4dd9ff\'" onmouseout="this.style.color=\'#00c8ff\'">';
-      var pairExpanded = !!pbExpandedItems[activeKey + '-' + mainSz];
-      html += (pairExpanded ? '\u25BC ' : '\u25B6 ') + mainSz + '\u2033 ' + mainLabel;
-      html += '</td>';
-      // Single-size fallback inputs for this main size
-      var szKey = activeKey + '-' + mainSz;
-      var szMc = getMaterialForGauge(szKey, gauge || '26');
-      var szGaugeKey = gauge ? szKey + '-g' + gauge : szKey;
-      var szEntry = priceBookCache ? priceBookCache[szKey] : null;
-      var szLh = szEntry ? szEntry.laborHrs : null;
-      html += '<td style="padding:3px 2px">' + pbInput(szGaugeKey, 'materialCost', szMc) + '</td>';
-      html += '<td style="padding:3px 2px">' + pbInput(szKey, 'laborHrs', szLh) + '</td>';
-      html += '</tr>';
-      // Sub-rows for branch/outlet sizes (only sizes <= main size)
-      if (pairExpanded) {
-        for (var bi = 0; bi < item.sizes.length; bi++) {
-          var subSz = item.sizes[bi];
-          if (subSz > mainSz) continue; // branch/outlet can't exceed main/inlet
-          var pairKey = activeKey + '-' + mainSz + 'x' + subSz;
-          var pairMc = getMaterialForGauge(pairKey, gauge || '26');
-          var pairGaugeKey = gauge ? pairKey + '-g' + gauge : pairKey;
-          var pairEntry = priceBookCache ? priceBookCache[pairKey] : null;
-          var pairLh = pairEntry ? pairEntry.laborHrs : null;
-          html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.1);background:rgba(15,52,96,0.25)">';
-          html += '<td style="padding:2px 4px 2px 36px;color:#a0c8ff;font-size:11px">';
-          html += mainSz + '\u2033\u00d7' + subSz + '\u2033';
-          html += '</td>';
-          html += '<td style="padding:2px 2px">' + pbInput(pairGaugeKey, 'materialCost', pairMc) + '</td>';
-          html += '<td style="padding:2px 2px">' + pbInput(pairKey, 'laborHrs', pairLh) + '</td>';
-          html += '</tr>';
-        }
-      }
-    }
-  } else if (isExpanded) {
-    // Single-dimension per-size rows (elbows, endcaps, couplings, etc.)
+  if (isExpanded) {
     for (var si = 0; si < item.sizes.length; si++) {
       var sz = item.sizes[si];
       var sizeKey = activeKey + '-' + sz;
