@@ -2973,27 +2973,43 @@ function renderRadarChart(baseKey, itemType, subType) {
   html += '</div>';
   html += '</div>'; // end left
 
-  // --- RIGHT: Size slider (rect only — round items are already per-size) ---
+  // --- RIGHT: Size slider ---
+  html += '<div style="display:flex;flex-direction:column;gap:8px;min-width:50px;align-items:center">';
   var isRoundItem = baseKey.indexOf('spiral') !== -1 || baseKey.indexOf('snaplock') !== -1;
-  if (!isRoundItem) {
-    html += '<div style="display:flex;flex-direction:column;gap:8px;min-width:50px;align-items:center">';
+  if (isRoundItem) {
+    var roundSizes = [4,5,6,7,8,9,10,12,14,16,18,20,22,24];
+    var curSzM = baseKey.match(/-(\d+)$/);
+    var curSz = curSzM ? parseInt(curSzM[1]) : 12;
+    var curIdx = roundSizes.indexOf(curSz); if (curIdx < 0) curIdx = 0;
+    html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">DIA</span>';
+    html += '<input type="range" min="0" max="' + (roundSizes.length-1) + '" value="' + curIdx + '" ';
+    html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:140px;accent-color:#00c8ff" ';
+    html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+    html += 'oninput="radarSlideRound(this.value,\'' + baseKey + '\')">';
+    html += '<span style="color:#00c8ff;font-size:14px;font-weight:700">' + curSz + '\u2033</span>';
+  } else {
     var currentPCIdx = pbPerimClass['rect-fit'] || 0;
-    html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
     html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">SIZE</span>';
-    html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length - 1) + '" value="' + currentPCIdx + '" ';
+    html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length-1) + '" value="' + currentPCIdx + '" ';
     html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:140px;accent-color:#e94560" ';
     html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
     html += 'oninput="radarSliderPerim(this.value)">';
     var pcLabel = RECT_PERIM_CLASSES[currentPCIdx] ? RECT_PERIM_CLASSES[currentPCIdx].label : '';
     html += '<span style="color:#e94560;font-size:12px;font-weight:600;text-align:center;max-width:60px">' + pcLabel + '</span>';
-    html += '</div>';
-    html += '</div>';
   }
+  html += '</div>';
 
   html += '</div>'; // end flex row
   return html;
 }
 
+window.radarSlideRound = function(idx, key) {
+  var sizes = [4,5,6,7,8,9,10,12,14,16,18,20,22,24];
+  var newKey = key.replace(/-(\d+)$/, '-' + sizes[parseInt(idx)]);
+  pbExpandedItems[key.replace(/-(\d+)$/, '')] = true;
+  radarChartTarget = newKey;
+  renderPriceBook();
+};
 
 window.radarSliderPerim = function(idx) {
   var i = parseInt(idx);
