@@ -25,6 +25,14 @@
   .toolbar button:hover { background: #1a4080; }
   .toolbar button:active { background: #e94560; }
   .toolbar button.active { background: #e94560; border-color: #e94560; }
+  .toolbar button.active-select { background: rgba(255,212,59,0.15); border-color: #ffd43b; color: #ffd43b; }
+
+  /* Rich tool tooltips */
+  .tool-has-tip { position: relative; }
+  .tool-has-tip .tool-tip { display: none; position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 150; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; font-size: 11px; line-height: 1.5; color: #c9d1d9; white-space: nowrap; text-align: left; box-shadow: 0 8px 24px rgba(0,0,0,0.4); pointer-events: none; }
+  .tool-has-tip .tool-tip::before { content: ''; position: absolute; top: -5px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 8px; height: 8px; background: #0d1117; border-left: 1px solid #30363d; border-top: 1px solid #30363d; }
+  .tool-has-tip .tool-tip b { color: #ffd43b; font-weight: 700; }
+  .tool-has-tip:hover .tool-tip { display: block; }
   .toolbar .zoom-display { font-size: 13px; min-width: 50px; text-align: center; color: #a0a0c0; }
   .toolbar .separator { width: 1px; height: 24px; background: #0f3460; }
   .toolbar .page-info { font-size: 13px; color: #a0a0c0; }
@@ -510,13 +518,14 @@
     </select>
     <button onclick="openSystemSymbolManager()" title="Manage System Symbols" style="background:none;border:1px solid #0f3460;color:#a0a0c0;padding:4px 8px;border-radius:4px;font-size:11px;cursor:pointer">⚙</button>
     <div class="separator"></div>
-    <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)">📐 Measure</button>
-    <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)">◎ Duct</button>
-    <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)">🔩 Fittings</button>
-    <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)">📌 Stack</button>
-    <button id="panelBtn" onclick="togglePanel()" title="Analysis Panel">📊 Analysis</button>
-    <button id="compilerBtn" onclick="toggleCompiler()" title="Compiler">⚙️ Compiler</button>
-    <button onclick="openPriceBook()" title="Global Price Book">💲 Prices</button>
+    <button id="multiSelectBtn" onclick="toggleMultiSelectMode()" title="Multi-Select" class="tool-has-tip">🔶 Select<span class="tool-tip">Multi-Select<br><b>Q</b> = toggle mode on/off<br><b>Shift+Click</b> = pick items<br><b>Shift+Drag</b> = box select<br><b>Esc</b> = clear selection<br><b>Ctrl+Shift+Drag</b> = add to selection</span></button>
+    <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)" class="tool-has-tip">📐 Measure<span class="tool-tip">Measure Tool<br><b>M</b> = toggle<br>Click points to measure<br><b>Enter</b> = finish line</span></button>
+    <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)" class="tool-has-tip">◎ Duct<span class="tool-tip">Duct Draw<br><b>D</b> = toggle<br>Draws measured duct runs<br>Auto-tags size &amp; gauge</span></button>
+    <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)" class="tool-has-tip">🔩 Fittings<span class="tool-tip">Fittings Palette<br><b>T</b> = toggle<br><b>R</b> = rotate · <b>X</b> = mirror<br>Click canvas to place</span></button>
+    <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)" class="tool-has-tip">📌 Stack<span class="tool-tip">Vertical Stack<br><b>S</b> = toggle<br>Click to place stack point<br>Add items from palette</span></button>
+    <button id="panelBtn" onclick="togglePanel()" title="Analysis Panel" class="tool-has-tip">📊 Analysis<span class="tool-tip">Measurements Panel<br>View all duct runs, fittings,<br>stacks &amp; costs per page</span></button>
+    <button id="compilerBtn" onclick="toggleCompiler()" title="Compiler" class="tool-has-tip">⚙️ Compiler<span class="tool-tip">Takeoff Compiler<br>Group, filter &amp; aggregate<br>all items across drawings</span></button>
+    <button onclick="openPriceBook()" title="Global Price Book" class="tool-has-tip">💲 Prices<span class="tool-tip">Global Price Book<br>Set material costs &amp; labor<br>rates for all item types</span></button>
 
   </div>
 
@@ -4321,8 +4330,8 @@ viewer.addEventListener('mousedown', (e) => {
   if (calibrationMode) return;
   if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette') || e.target.closest('.ms-panel')) return;
 
-  // Multi-select: Shift+Click or Shift+Drag
-  if (e.shiftKey && !measureMode && !fittingMode && !stackMode) {
+  // Multi-select: Shift+Click/Drag OR persistent select mode (Q)
+  if ((e.shiftKey || multiSelectModeOn) && !measureMode && !fittingMode && !stackMode) {
     if (MultiSelect.onShiftMouseDown(e, screenToPdf)) {
       e.preventDefault();
       return;
@@ -4412,7 +4421,7 @@ viewer.addEventListener('mousedown', (e) => {
 
 window.addEventListener('mousemove', (e) => {
   // Multi-select drag
-  if (e.shiftKey) MultiSelect.onShiftMouseMove(e, screenToPdf);
+  if (e.shiftKey || multiSelectModeOn) MultiSelect.onShiftMouseMove(e, screenToPdf);
 
   // Stack dragging
   if (isDraggingStack && dragStackId != null) {
@@ -4942,6 +4951,7 @@ window.addEventListener('keydown', (e) => {
     drawMeasureOverlay();
     return;
   }
+  else if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); window.toggleMultiSelectMode(); }
   else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
   else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); window.toggleDuctDraw(); }
   else if ((e.key === 'e' || e.key === 'E') && selectedEndpointMeasId != null && selectedEndpointIdx != null && !elevationInputActive) {
@@ -5323,7 +5333,27 @@ function renderSavedCustomScales() {
 }
 
 // ---- Measure mode ----
+// Multi-select mode: persistent select mode (no need to hold Shift)
+let multiSelectModeOn = false;
+window.toggleMultiSelectMode = function() {
+  multiSelectModeOn = !multiSelectModeOn;
+  const btn = document.getElementById('multiSelectBtn');
+  if (btn) btn.classList.toggle('active-select', multiSelectModeOn);
+  // Exit other modes when entering select mode
+  if (multiSelectModeOn) {
+    if (measureMode) toggleMeasureMode();
+    if (ductDrawMode) toggleDuctDraw();
+    if (fittingMode) toggleFittingMode();
+    if (stackMode) toggleStackMode();
+    viewer.style.cursor = 'crosshair';
+  } else {
+    viewer.style.cursor = '';
+    MultiSelect.clearSelection();
+  }
+};
+
 window.toggleMeasureMode = function() {
+  if (multiSelectModeOn) toggleMultiSelectMode();
   if (ductDrawMode) toggleDuctDraw();
   if (stackMode) toggleStackMode();
   selectedMeasId = null; selectedFittingId = null;
@@ -5338,6 +5368,7 @@ window.toggleMeasureMode = function() {
 };
 
 window.toggleDuctDraw = function() {
+  if (multiSelectModeOn) toggleMultiSelectMode();
   if (stackMode) toggleStackMode();
   ductDrawMode = !ductDrawMode;
   if (ductDrawMode && !measureMode) {
@@ -7186,6 +7217,7 @@ function parseDimension(dimStr) {
 }
 
 window.toggleFittingMode = function() {
+  if (multiSelectModeOn) toggleMultiSelectMode();
   fittingMode = !fittingMode;
   const btn = document.getElementById('fittingBtn');
   const palette = document.getElementById('fittingPalette');
@@ -7375,6 +7407,7 @@ window.clearAllFittings = function() {
 // =====================================================
 
 window.toggleStackMode = function() {
+  if (multiSelectModeOn) toggleMultiSelectMode();
   stackMode = !stackMode;
   const btn = document.getElementById('stackBtn');
   btn.classList.toggle('active', stackMode);
