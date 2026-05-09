@@ -103,10 +103,12 @@ let _drawingNames = {};
 let _priceBookCache = null;
 let _projectRateTable = null;
 
-// Pinned labor category columns: { 'laborHrs': Set(['rough','trim']), 'laborCost': Set() }
+// Pinned labor category columns
 let _pinnedCats = { laborHrs: new Set(), laborCost: new Set() };
-// Collapsed state: pinned cats remembered but sub-columns hidden
 let _lbrCollapsed = { laborHrs: false, laborCost: false };
+
+// Filters: { dimensionKey: Set of allowed values } — null means no filter (all pass)
+let _filters = {};
 
 // ── CSS ───────────────────────────────────────────────────────────────
 const CSS = `
@@ -132,6 +134,21 @@ const CSS = `
 .cmp-col-tog { font-size: 10px; padding: 2px 6px; border-radius: 3px; border: 1px solid #0f3460; background: #1a1a2e; color: #555; cursor: pointer; transition: all 0.15s; }
 .cmp-col-tog.on { border-color: #00ff88; color: #00ff88; background: rgba(0,255,136,0.08); }
 .cmp-col-tog:hover { border-color: #1a4080; }
+
+/* Filters */
+.cmp-filters { padding: 2px 10px 6px; display: flex; flex-wrap: wrap; gap: 3px; }
+.cmp-filter-chip { position: relative; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; cursor: pointer; border: 1px solid #0f3460; background: #1a1a2e; color: #a0a0c0; transition: all 0.12s; user-select: none; }
+.cmp-filter-chip:hover { border-color: #1a4080; color: #e0e0e0; }
+.cmp-filter-chip.active { border-color: #ffd43b; color: #ffd43b; background: rgba(255,212,59,0.08); }
+.cmp-filter-chip .cmp-fc-count { font-size: 9px; opacity: 0.7; }
+.cmp-filter-pop { display: none; position: absolute; top: 100%; left: 0; z-index: 25; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 6px; padding: 6px 0; min-width: 160px; max-height: 220px; overflow-y: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+.cmp-filter-chip.open .cmp-filter-pop { display: block; }
+.cmp-fp-row { display: flex; align-items: center; gap: 6px; padding: 4px 10px; cursor: pointer; font-size: 11px; color: #a0a0c0; transition: background 0.1s; }
+.cmp-fp-row:hover { background: rgba(255,212,59,0.06); }
+.cmp-fp-cb { width: 14px; height: 14px; accent-color: #ffd43b; cursor: pointer; flex-shrink: 0; }
+.cmp-fp-actions { display: flex; gap: 6px; padding: 4px 10px; border-top: 1px solid #0f3460; margin-top: 4px; }
+.cmp-fp-actions button { background: none; border: none; color: #555; cursor: pointer; font-size: 10px; padding: 2px 4px; }
+.cmp-fp-actions button:hover { color: #ffd43b; }
 
 /* Results table */
 .cmp-results { flex: 1; overflow: auto; padding: 0 6px 8px; }
@@ -365,6 +382,45 @@ function _groupRecursive(rows, dims, depth, pathPrefix) {
   return { _rows: rows, _children: children };
 }
 
+// ── Filtering ──────────────────────────────────────────────────────
+
+function getUniqueValues(rows, dimKey) {
+  const dim = GROUP_DIMENSIONS.find(d => d.key === dimKey);
+  if (!dim) return [];
+  const vals = new Set();
+  for (const r of rows) vals.add(dim.extract(r));
+  return [...vals].sort((a, b) => {
+    const na = parseFloat(a), nb = parseFloat(b);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return String(a).localeCompare(String(b));
+  });
+}
+
+function applyFilters(rows) {
+  const activeFilterKeys = Object.keys(_filters);
+  if (activeFilterKeys.length === 0) return rows;
+  return rows.filter(r => {
+    for (const key of activeFilterKeys) {
+      const allowed = _filters[key];
+      if (!allowed || allowed.size === 0) continue;
+      const dim = GROUP_DIMENSIONS.find(d => d.key === key);
+      if (!dim) continue;
+      const val = dim.extract(r);
+      if (!allowed.has(val)) return false;
+    }
+    return true;
+  });
+}
+
+function isFilterActive(dimKey) {
+  return _filters[dimKey] && _filters[dimKey].size > 0;
+}
+
+function getFilteredRowCount(dimKey) {
+  if (!_filters[dimKey]) return 0;
+  return _filters[dimKey].size;
+}
+
 // ── Build column list with pinned category sub-columns ────────────────
 
 function getEffectiveColumns() {
@@ -442,12 +498,44 @@ function renderCompiler() {
   }
   html += `</div>`;
 
+  // Filter chips
+  html += `<div class="cmp-filters">`;
+  for (const d of GROUP_DIMENSIONS) {
+    const vals = getUniqueValues(_rows, d.key);
+    if (vals.length <= 1) continue; // no point filtering single-value dims
+    const active = isFilterActive(d.key);
+    const count = active ? getFilteredRowCount(d.key) : 0;
+    const openCls = _openFilterPop === d.key ? ' open' : '';
+    html += `<span class="cmp-filter-chip${active ? ' active' : ''}${openCls}" onclick="window._cmpToggleFilterPop('${d.key}')"`;
+    html += ` id="cmpFc_${d.key}">`;
+    html += `🔍 ${d.label}`;
+    if (active) html += ` <span class="cmp-fc-count">(${count}/${vals.length})</span>`;
+    // Popover
+    html += `<div class="cmp-filter-pop" onclick="event.stopPropagation()">`;
+    const allowed = _filters[d.key];
+    for (const v of vals) {
+      const checked = !allowed || allowed.has(v) ? 'checked' : '';
+      html += `<label class="cmp-fp-row"><input type="checkbox" class="cmp-fp-cb" ${checked} onchange="window._cmpSetFilter('${d.key}',${JSON.stringify(v).replace(/'/g,"\\'")},this.checked)"> ${escHtml(String(v))}</label>`;
+    }
+    html += `<div class="cmp-fp-actions">`;
+    html += `<button onclick="window._cmpFilterAll('${d.key}', true)">All</button>`;
+    html += `<button onclick="window._cmpFilterAll('${d.key}', false)">None</button>`;
+    html += `<button onclick="window._cmpClearFilter('${d.key}')">Clear</button>`;
+    html += `</div></div></span>`;
+  }
+  html += `</div>`;
+
+  // Apply filters to get visible rows
+  const filteredRows = applyFilters(_rows);
+
   // Results table
   html += `<div class="cmp-results">`;
   if (_rows.length === 0) {
     html += `<div class="cmp-empty"><div class="cmp-empty-icon">📊</div>No takeoff data yet.<br>Draw duct runs & place fittings to compile.</div>`;
+  } else if (filteredRows.length === 0) {
+    html += `<div class="cmp-empty"><div class="cmp-empty-icon">🔍</div>No items match current filters.<br>Adjust filters above to see data.</div>`;
   } else {
-    const tree = buildGroupTree(_rows, _activeGroups);
+    const tree = buildGroupTree(filteredRows, _activeGroups);
     html += `<table class="cmp-table"><thead><tr><th>Item</th>`;
 
     for (const c of cols) {
@@ -496,7 +584,7 @@ function renderCompiler() {
     // Grand total
     html += `<tr class="grand-total"><td>Grand Total</td>`;
     for (const c of cols) {
-      const val = c.extract(_rows);
+      const val = c.extract(filteredRows);
       const cls = c.isSub ? 'num pinned-cat' : 'num';
       const style = c.isSub ? ` style="--cat-color:${c.color}"` : '';
       html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
@@ -607,6 +695,69 @@ window._cmpToggleCol = function(key) {
 };
 
 window._cmpToggleCollapse = function(path) { _collapsed[path] = !_collapsed[path]; renderCompiler(); };
+
+// Filter popover state
+let _openFilterPop = null;
+
+window._cmpToggleFilterPop = function(dimKey) {
+  _openFilterPop = _openFilterPop === dimKey ? null : dimKey;
+  renderCompiler();
+  // Close on outside click
+  if (_openFilterPop) {
+    setTimeout(() => {
+      const handler = (e) => {
+        const chip = document.getElementById('cmpFc_' + dimKey);
+        if (chip && !chip.contains(e.target)) {
+          _openFilterPop = null;
+          renderCompiler();
+          document.removeEventListener('click', handler);
+        }
+      };
+      document.addEventListener('click', handler);
+    }, 10);
+  }
+};
+
+window._cmpSetFilter = function(dimKey, value, included) {
+  const vals = getUniqueValues(_rows, dimKey);
+  if (!_filters[dimKey]) {
+    // First exclusion: start with all values, then remove the unchecked one
+    _filters[dimKey] = new Set(vals);
+  }
+  if (included) {
+    _filters[dimKey].add(value);
+    // If all values are now selected, clear the filter
+    if (_filters[dimKey].size >= vals.length) delete _filters[dimKey];
+  } else {
+    _filters[dimKey].delete(value);
+  }
+  // Keep popover open
+  const pop = _openFilterPop;
+  renderCompiler();
+  _openFilterPop = pop;
+  // Re-render to keep popover state
+  const chip = document.getElementById('cmpFc_' + dimKey);
+  if (chip) chip.classList.add('open');
+};
+
+window._cmpFilterAll = function(dimKey, selectAll) {
+  if (selectAll) {
+    delete _filters[dimKey];
+  } else {
+    _filters[dimKey] = new Set();
+  }
+  const pop = _openFilterPop;
+  renderCompiler();
+  _openFilterPop = pop;
+  const chip = document.getElementById('cmpFc_' + dimKey);
+  if (chip) chip.classList.add('open');
+};
+
+window._cmpClearFilter = function(dimKey) {
+  delete _filters[dimKey];
+  _openFilterPop = null;
+  renderCompiler();
+};
 
 // Collapse/expand pinned labor sub-columns (pins remembered)
 window._cmpToggleLbrCollapse = function(key) {
