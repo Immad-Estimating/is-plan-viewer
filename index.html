@@ -2973,25 +2973,52 @@ function renderRadarChart(baseKey, itemType, subType) {
   html += '</div>';
   html += '</div>'; // end left
 
-  // --- RIGHT: Size slider(s) ---
-  html += '<div style="display:flex;flex-direction:column;gap:8px;min-width:40px;align-items:center">';
-  // Determine current perimeter class index
-  var currentPCIdx = pbPerimClass['rect-fit'] || 0;
-  // Main size slider
-  html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
-  html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">SIZE</span>';
-  html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length - 1) + '" value="' + currentPCIdx + '" ';
-  html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:140px;accent-color:#e94560" ';
-  html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
-  html += 'oninput="radarSliderPerim(this.value)">';
-  var pcLabel = RECT_PERIM_CLASSES[currentPCIdx] ? RECT_PERIM_CLASSES[currentPCIdx].label : '';
-  html += '<span style="color:#e94560;font-size:12px;font-weight:600;text-align:center;max-width:60px">' + pcLabel + '</span>';
-  html += '</div>';
+  // --- RIGHT: Size slider ---
+  html += '<div style="display:flex;flex-direction:column;gap:8px;min-width:50px;align-items:center">';
+  var isRoundItem = baseKey.indexOf('spiral') !== -1 || baseKey.indexOf('snaplock') !== -1 || baseKey.indexOf('duct-spiral') !== -1 || baseKey.indexOf('duct-snaplock') !== -1;
+  if (isRoundItem) {
+    // Round: exact diameter selector
+    var roundSizes = [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24];
+    // Extract current size from baseKey (e.g., 'spiral-90el-12' -> 12)
+    var curSizeMatch = baseKey.match(/-(\d+)$/);
+    var curSize = curSizeMatch ? parseInt(curSizeMatch[1]) : 12;
+    var curSizeIdx = roundSizes.indexOf(curSize);
+    if (curSizeIdx < 0) curSizeIdx = 0;
+    html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+    html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">DIA</span>';
+    html += '<input type="range" min="0" max="' + (roundSizes.length - 1) + '" value="' + curSizeIdx + '" ';
+    html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:140px;accent-color:#00c8ff" ';
+    html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+    html += 'oninput="radarSliderRoundSize(this.value,\'' + baseKey + '\')">';
+    html += '<span style="color:#00c8ff;font-size:14px;font-weight:700">' + curSize + '\u2033</span>';
+    html += '</div>';
+  } else {
+    // Rect: perimeter class selector
+    var currentPCIdx = pbPerimClass['rect-fit'] || 0;
+    html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+    html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">SIZE</span>';
+    html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length - 1) + '" value="' + currentPCIdx + '" ';
+    html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:140px;accent-color:#e94560" ';
+    html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+    html += 'oninput="radarSliderPerim(this.value)">';
+    var pcLabel = RECT_PERIM_CLASSES[currentPCIdx] ? RECT_PERIM_CLASSES[currentPCIdx].label : '';
+    html += '<span style="color:#e94560;font-size:12px;font-weight:600;text-align:center;max-width:60px">' + pcLabel + '</span>';
+    html += '</div>';
+  }
   html += '</div>'; // end right
 
   html += '</div>'; // end flex row
   return html;
 }
+
+window.radarSliderRoundSize = function(idx, currentKey) {
+  var roundSizes = [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24];
+  var newSize = roundSizes[parseInt(idx)] || 12;
+  // Replace the size suffix in the key (e.g., 'spiral-90el-12' -> 'spiral-90el-14')
+  var newKey = currentKey.replace(/-(\d+)$/, '-' + newSize);
+  radarChartTarget = newKey;
+  renderPriceBook();
+};
 
 window.radarSliderPerim = function(idx) {
   var i = parseInt(idx);
