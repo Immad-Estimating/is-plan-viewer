@@ -2501,10 +2501,66 @@ var SHEET_METAL_WEIGHT = {
   '18': 2.781
 };
 
+// Duct weight per linear foot by perimeter (inches) and gauge — from vendor table
+// Key: perimeterInches, Value: { '26': lbs/LF, '24': lbs/LF, '22': lbs/LF }
+var DUCT_WEIGHT_PER_LF = {
+  36:  { '26': 0.191, '24': 0.243, '22': 0.305 },
+  48:  { '26': 0.254, '24': 0.325, '22': 0.406 },
+  60:  { '26': 0.318, '24': 0.406, '22': 0.508 },
+  72:  { '26': 0.381, '24': 0.487, '22': 0.609 },
+  96:  { '26': 0.508, '24': 0.649, '22': 0.812 },
+  120: { '26': 0.635, '24': 0.812, '22': 1.015 },
+  144: { '26': 0.762, '24': 0.974, '22': 1.218 },
+  168: { '26': 0.889, '24': 1.136, '22': 1.422 },
+  192: { '26': 1.016, '24': 1.299, '22': 1.625 },
+  216: { '26': 1.143, '24': 1.461, '22': 1.828 },
+  240: { '26': 1.270, '24': 1.623, '22': 2.031 },
+  300: { '26': 1.588, '24': 2.029, '22': 2.539 },
+  360: { '26': 1.905, '24': 2.435, '22': 3.046 },
+  420: { '26': 2.223, '24': 2.841, '22': 3.554 }
+};
+
+// Lookup duct weight/LF for a perimeter class using closest data point
+function getDuctWeightPerLF(perimIn, gauge) {
+  var keys = Object.keys(DUCT_WEIGHT_PER_LF).map(Number).sort(function(a,b){return a-b;});
+  // Find closest key <= perimIn, or first key if smaller
+  var best = keys[0];
+  for (var i = 0; i < keys.length; i++) {
+    if (keys[i] <= perimIn) best = keys[i];
+    else break;
+  }
+  var entry = DUCT_WEIGHT_PER_LF[best];
+  return entry ? (entry[gauge] || entry['26'] || 0) : 0;
+}
+
 // Shop settings defaults (stored in priceBookCache under 'shop-settings' key)
 var SHOP_DEFAULTS = {
   sheetMetalPricePerLb: 0.00   // $/lb — user sets to current commodity rate
 };
+
+// Labor categories — only certain categories apply to certain item types
+var LABOR_CATEGORIES = [
+  { key: 'rough',      label: 'Rough',      short: 'R',  color: '#4dabf7', applies: ['duct','fitting'] },
+  { key: 'air-handler',label: 'Air Handler', short: 'AH', color: '#69db7c', applies: ['equipment'] },
+  { key: 'condenser',  label: 'Condenser',   short: 'CU', color: '#69db7c', applies: ['equipment'] },
+  { key: 'lineset',    label: 'Line Set',    short: 'LS', color: '#ffd43b', applies: ['equipment'] },
+  { key: 'trim',       label: 'Trim',        short: 'T',  color: '#da77f2', applies: ['duct','fitting','accessory'] },
+  { key: 'venting',    label: 'Venting',     short: 'V',  color: '#ff8787', applies: ['duct','fitting'] },
+  { key: 'stocking',   label: 'Stocking',    short: 'SK', color: '#a9e34b', applies: ['duct','fitting','equipment','accessory'] },
+  { key: 'startup',    label: 'Startup',     short: 'SU', color: '#ffa94d', applies: ['equipment'] },
+  { key: 'qc',         label: 'Quality Ctrl', short: 'QC', color: '#74c0fc', applies: ['duct','fitting','equipment','accessory'] },
+];
+
+var activeLaborCat = 'rough'; // default active labor category
+
+function getLaborCatForSection(sectionId) {
+  // Map section types to applicable categories
+  var type = 'duct';
+  if (sectionId && sectionId.indexOf('-fit') !== -1) type = 'fitting';
+  else if (sectionId && sectionId.indexOf('-acc') !== -1) type = 'accessory';
+  else if (sectionId && sectionId.indexOf('-equip') !== -1) type = 'equipment';
+  return LABOR_CATEGORIES.filter(function(c) { return c.applies.indexOf(type) !== -1; });
+}
 
 // Reference data per rectangular fitting type (read-only)
 // cuts: fabrication complexity reference
@@ -2529,10 +2585,8 @@ function calcRectFittingRawCost(fittingKey, perimeterIn, gauge) {
   var ref = RECT_FITTING_REF[fittingKey];
   if (!ref) return null;
   var shop = getShopSettings();
-  var perimeterFt = perimeterIn / 12;
-  var sfPerLF = perimeterFt; // SF per linear foot of duct at this perimeter
-  var weightPerSF = SHEET_METAL_WEIGHT[gauge] || SHEET_METAL_WEIGHT['26'];
-  var rawCost = ref.equivLF * sfPerLF * weightPerSF * (shop.sheetMetalPricePerLb || 0);
+  var weightPerLF = getDuctWeightPerLF(perimeterIn, gauge);
+  var rawCost = ref.equivLF * weightPerLF * (shop.sheetMetalPricePerLb || 0);
   return rawCost;
 }
 
@@ -2546,17 +2600,13 @@ function getShopSettings() {
   return Object.assign({}, SHOP_DEFAULTS);
 }
 
-// Calculate rect duct raw material cost per LF from perimeter and gauge
+// Calculate rect duct raw material cost per LF from perimeter and gauge using vendor weight table
 function calcRectDuctRawPerLF(perimeterIn, gauge) {
   var shop = getShopSettings();
-  var perimeterFt = perimeterIn / 12;
-  var surfaceAreaPerLF = perimeterFt * 1; // SF per linear foot
-  var weightPerSF = SHEET_METAL_WEIGHT[gauge] || SHEET_METAL_WEIGHT['26'];
-  var weightPerLF = surfaceAreaPerLF * weightPerSF;
-  var rawMaterialPerLF = weightPerLF * shop.sheetMetalPricePerLb;
+  var weightPerLF = getDuctWeightPerLF(perimeterIn, gauge);
+  var rawMaterialPerLF = weightPerLF * (shop.sheetMetalPricePerLb || 0);
   return {
     perimeterIn: perimeterIn,
-    surfaceAreaPerLF: surfaceAreaPerLF,
     weightPerLF: weightPerLF,
     rawMaterialPerLF: rawMaterialPerLF
   };
@@ -2676,6 +2726,7 @@ function pbSaveLayout() {
     gauge: pbGauge,
     roundType: pbRoundType,
     perimClass: pbPerimClass,
+    laborCat: activeLaborCat,
     tab: activePBTab
   };
   localStorage.setItem('pbLayout', JSON.stringify(layout));
@@ -2703,6 +2754,7 @@ function pbApplyLayout(panel) {
     if (layout.perimClass) {
       for (var pk in layout.perimClass) pbPerimClass[pk] = layout.perimClass[pk];
     }
+    if (layout.laborCat) activeLaborCat = layout.laborCat;
     if (layout.tab) activePBTab = layout.tab;
   } else {
     panel.style.width = '480px';
@@ -2801,6 +2853,11 @@ window.togglePBSizePairExpand = function(pairKey) {
 
 
 
+// Build labor-category-aware key: appends '-lc-{category}' to base key for laborHrs
+function lhCatKey(baseKey) {
+  return baseKey + '-lc-' + activeLaborCat;
+}
+
 function pbInput(key, prop, value) {
   var clr = prop === 'materialCost' ? '#00ff88' : prop === 'laborHrs' ? '#ffaa00' : '#e0e0e0';
   return '<input type="text" value="' + (value != null ? value : '') + '" placeholder="\u2014" style="width:60px;background:#1a1a2e;border:1px solid #0f3460;color:' + clr + ';padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + key + '\',\'' + prop + '\',this.value)">';
@@ -2821,7 +2878,8 @@ function pbRow(item, sectionId) {
     return html;
   }
   var entry = priceBookCache ? priceBookCache[activeKey] : null;
-  var lh = entry ? entry.laborHrs : null;
+  var lhEntry = priceBookCache ? priceBookCache[lhCatKey(activeKey)] : null;
+  var lh = lhEntry ? lhEntry.laborHrs : (entry ? entry.laborHrs : null);
   var mc;
   if (gauge && (SPIRAL_DEFAULTS[activeKey] || SNAPLOCK_DEFAULTS[activeKey])) {
     mc = getMaterialForGauge(activeKey, gauge);
@@ -2844,15 +2902,15 @@ function pbRow(item, sectionId) {
     var pcIdx = pbPerimClass[sectionId] || 0;
     var pc = RECT_PERIM_CLASSES[pcIdx];
     var pcMax = pc ? pc.maxPerim : 30;
-    var pcMid = pc ? pc.midPerim : 24;
+    var pcRef = pc ? pc.refPerim : 36;
     mcKey = activeKey + '-p' + pcMax + (gauge ? '-g' + gauge : '');
     lhKey = activeKey + '-p' + pcMax;
     // Auto-calc raw material from sheet metal weight
-    autoCalcMc = calcRectFittingRawCost(activeKey, pcMid, gauge || '26');
+    autoCalcMc = calcRectFittingRawCost(activeKey, pcRef, gauge || '26');
     // Check for user override
     var pcEntry = priceBookCache ? priceBookCache[mcKey] : null;
     mc = (pcEntry && pcEntry.materialCost != null) ? pcEntry.materialCost : null;
-    var pcLhEntry = priceBookCache ? priceBookCache[lhKey] : null;
+    var pcLhEntry = priceBookCache ? priceBookCache[lhCatKey(lhKey)] : null;
     lh = pcLhEntry ? pcLhEntry.laborHrs : null;
   }
   var ref = RECT_FITTING_REF[activeKey];
@@ -2880,7 +2938,7 @@ function pbRow(item, sectionId) {
     var shopAdder = shopSaved ? shopSaved.materialCost : null;
     html += '<td style="padding:4px 2px"><input type="text" value="' + (shopAdder != null ? shopAdder : '') + '" placeholder="\u2014" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)"></td>';
   }
-  html += '<td style="padding:4px 2px">' + pbInput(lhKey, 'laborHrs', lh) + '</td>';
+  html += '<td style="padding:4px 2px">' + pbInput(lhCatKey(lhKey), 'laborHrs', lh) + '</td>';
   html += '</tr>';
 
   // ---- Two-dimension pricing: expandable tree with sub-rows ----
@@ -2899,9 +2957,10 @@ function pbRow(item, sectionId) {
       var szMc = getMaterialForGauge(szKey, gauge || '26');
       var szGaugeKey = gauge ? szKey + '-g' + gauge : szKey;
       var szEntry = priceBookCache ? priceBookCache[szKey] : null;
-      var szLh = szEntry ? szEntry.laborHrs : null;
+      var szLhEntry = priceBookCache ? priceBookCache[lhCatKey(szKey)] : null;
+      var szLh = szLhEntry ? szLhEntry.laborHrs : (szEntry ? szEntry.laborHrs : null);
       html += '<td style="padding:3px 2px">' + pbInput(szGaugeKey, 'materialCost', szMc) + '</td>';
-      html += '<td style="padding:3px 2px">' + pbInput(szKey, 'laborHrs', szLh) + '</td>';
+      html += '<td style="padding:3px 2px">' + pbInput(lhCatKey(szKey), 'laborHrs', szLh) + '</td>';
       html += '</tr>';
       if (pairExpanded) {
         for (var bi = 0; bi < item.sizes.length; bi++) {
@@ -2911,13 +2970,14 @@ function pbRow(item, sectionId) {
           var pairMc = getMaterialForGauge(pairKey, gauge || '26');
           var pairGaugeKey = gauge ? pairKey + '-g' + gauge : pairKey;
           var pairEntry = priceBookCache ? priceBookCache[pairKey] : null;
-          var pairLh = pairEntry ? pairEntry.laborHrs : null;
+          var pairLhEntry = priceBookCache ? priceBookCache[lhCatKey(pairKey)] : null;
+          var pairLh = pairLhEntry ? pairLhEntry.laborHrs : (pairEntry ? pairEntry.laborHrs : null);
           html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.1);background:rgba(15,52,96,0.25)">';
           html += '<td style="padding:2px 4px 2px 36px;color:#a0c8ff;font-size:11px">';
           html += mainSz + '\u2033\u00d7' + subSz + '\u2033';
           html += '</td>';
           html += '<td style="padding:2px 2px">' + pbInput(pairGaugeKey, 'materialCost', pairMc) + '</td>';
-          html += '<td style="padding:2px 2px">' + pbInput(pairKey, 'laborHrs', pairLh) + '</td>';
+          html += '<td style="padding:2px 2px">' + pbInput(lhCatKey(pairKey), 'laborHrs', pairLh) + '</td>';
           html += '</tr>';
         }
       }
@@ -2931,11 +2991,12 @@ function pbRow(item, sectionId) {
       var szMc = getMaterialForGauge(sizeKey, gauge || '26');
       var szGaugeKey = gauge ? sizeKey + '-g' + gauge : sizeKey;
       var szEntry = priceBookCache ? priceBookCache[sizeKey] : null;
-      var szLh = szEntry ? szEntry.laborHrs : null;
+      var szLhEntry2 = priceBookCache ? priceBookCache[lhCatKey(sizeKey)] : null;
+      var szLh = szLhEntry2 ? szLhEntry2.laborHrs : (szEntry ? szEntry.laborHrs : null);
       html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.15);background:rgba(15,52,96,0.15)">';
       html += '<td onclick="togglePBItemExpand(\'' + activeKey + '\')" style="padding:3px 4px 3px 20px;color:#00c8ff;font-size:12px;cursor:pointer" onmouseover="this.style.color=\'#4dd9ff\'" onmouseout="this.style.color=\'#00c8ff\'">' + sz + '\u2033</td>';
       html += '<td style="padding:3px 2px">' + pbInput(szGaugeKey, 'materialCost', szMc) + '</td>';
-      html += '<td style="padding:3px 2px">' + pbInput(sizeKey, 'laborHrs', szLh) + '</td>';
+      html += '<td style="padding:3px 2px">' + pbInput(lhCatKey(sizeKey), 'laborHrs', szLh) + '</td>';
       html += '</tr>';
     }
   }
@@ -2945,7 +3006,8 @@ function pbRow(item, sectionId) {
 function pbRowEditable(item, sectionId) {
   var entry = priceBookCache ? priceBookCache[item.key] : null;
   var mc = entry ? entry.materialCost : null;
-  var lh = entry ? entry.laborHrs : null;
+  var lhEntry = priceBookCache ? priceBookCache[lhCatKey(item.key)] : null;
+  var lh = lhEntry ? lhEntry.laborHrs : (entry ? entry.laborHrs : null);
   var hasShopAdder = sectionId === 'rect-acc';
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
@@ -2956,7 +3018,7 @@ function pbRowEditable(item, sectionId) {
     var shopAdder = shopSaved ? shopSaved.materialCost : null;
     html += '<td style="padding:4px 2px"><input type="text" value="' + (shopAdder != null ? shopAdder : '') + '" placeholder="\u2014" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)"></td>';
   }
-  html += '<td style="padding:4px 2px">' + pbInput(item.key, 'laborHrs', lh) + '</td>';
+  html += '<td style="padding:4px 2px">' + pbInput(lhCatKey(item.key), 'laborHrs', lh) + '</td>';
   html += '</tr>';
   return html;
 }
@@ -2999,8 +3061,8 @@ function renderShopSettingsSection() {
   // Live preview
   html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3);background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:6px 4px;font-size:10px;color:#a0a0c0">';
   var preview = calcRectDuctRawPerLF(72, '26');
-  html += '<span style="color:#666">72\u2033 perimeter @ 26ga =</span> ';
-  html += preview.weightPerLF.toFixed(2) + ' lbs/LF';
+  html += '<span style="color:#666">72\u2033 perim @ 26ga =</span> ';
+  html += preview.weightPerLF.toFixed(3) + ' lbs/LF';
   if (preview.rawMaterialPerLF > 0) {
     html += ' \u2192 <span style="color:#00ff88">$' + preview.rawMaterialPerLF.toFixed(2) + ' raw/LF</span>';
   }
@@ -3012,16 +3074,16 @@ function renderShopSettingsSection() {
   return html;
 }
 
-// SMACNA perimeter classes for rectangular ductwork
+// Perimeter classes aligned to vendor weight table data points
 var RECT_PERIM_CLASSES = [
-  { label: 'Up to 30\u2033',    maxPerim: 30,  midPerim: 24 },
-  { label: '31\u2033 \u2013 54\u2033',   maxPerim: 54,  midPerim: 42 },
-  { label: '55\u2033 \u2013 60\u2033',   maxPerim: 60,  midPerim: 58 },
-  { label: '61\u2033 \u2013 84\u2033',   maxPerim: 84,  midPerim: 72 },
-  { label: '85\u2033 \u2013 96\u2033',   maxPerim: 96,  midPerim: 90 },
-  { label: '97\u2033 \u2013 120\u2033',  maxPerim: 120, midPerim: 108 },
-  { label: '121\u2033 \u2013 144\u2033', maxPerim: 144, midPerim: 132 },
-  { label: '145\u2033 \u2013 168\u2033', maxPerim: 168, midPerim: 156 },
+  { label: '\u226436\u2033',     maxPerim: 36,  refPerim: 36 },
+  { label: '37\u201348\u2033',   maxPerim: 48,  refPerim: 48 },
+  { label: '49\u201360\u2033',   maxPerim: 60,  refPerim: 60 },
+  { label: '61\u201372\u2033',   maxPerim: 72,  refPerim: 72 },
+  { label: '73\u201396\u2033',   maxPerim: 96,  refPerim: 96 },
+  { label: '97\u2013120\u2033',  maxPerim: 120, refPerim: 120 },
+  { label: '121\u2013144\u2033', maxPerim: 144, refPerim: 144 },
+  { label: '145\u2013168\u2033', maxPerim: 168, refPerim: 168 },
 ];
 
 function renderRectDuctCalcSection(sec, gauge) {
@@ -3029,7 +3091,7 @@ function renderRectDuctCalcSection(sec, gauge) {
   html += '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Perimeter Class</th><th style="padding:4px;text-align:center;width:55px">Raw $/LF</th><th style="padding:4px;text-align:center;width:55px">Shop +$/LF</th><th style="padding:4px;text-align:center;width:55px">Labor Hrs/LF</th></tr>';
   for (var i = 0; i < RECT_PERIM_CLASSES.length; i++) {
     var pc = RECT_PERIM_CLASSES[i];
-    var calc = calcRectDuctRawPerLF(pc.midPerim, gauge);
+    var calc = calcRectDuctRawPerLF(pc.refPerim, gauge);
     var classKey = 'duct-rect-p' + pc.maxPerim;
     var gKey = classKey + '-g' + gauge;
     // Raw material: auto-calc (read-only display) or user-override
@@ -3040,8 +3102,9 @@ function renderRectDuctCalcSection(sec, gauge) {
     var shopKey = classKey + '-shop';
     var shopSaved = priceBookCache ? priceBookCache[shopKey] : null;
     var shopAdder = shopSaved ? shopSaved.materialCost : null;
-    // Labor hrs
-    var lhSaved = priceBookCache ? priceBookCache[classKey] : null;
+    // Labor hrs (keyed by category)
+    var lhCK = lhCatKey(classKey);
+    var lhSaved = priceBookCache ? priceBookCache[lhCK] : null;
     var displayLh = lhSaved ? lhSaved.laborHrs : null;
     html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
     html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + pc.label + ' <span style="color:#555;font-size:9px">' + calc.weightPerLF.toFixed(1) + ' lbs/LF</span></td>';
@@ -3064,11 +3127,17 @@ function renderRectDuctCalcSection(sec, gauge) {
       + 'onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)">';
     html += '</td>';
     // Labor hrs
-    html += '<td style="padding:4px 2px">' + pbInput(classKey, 'laborHrs', displayLh) + '</td>';
+    html += '<td style="padding:4px 2px">' + pbInput(lhCK, 'laborHrs', displayLh) + '</td>';
     html += '</tr>';
   }
   return html;
 }
+
+window.setLaborCat = function(catKey) {
+  activeLaborCat = catKey;
+  renderPriceBook();
+  pbSaveLayout();
+};
 
 window.updateShopSetting = async function(key, value) {
   var existing = (priceBookCache && priceBookCache['shop-settings']) || { key: 'shop-settings' };
@@ -3090,6 +3159,19 @@ function renderPriceBook() {
       ? 'background:rgba(233,69,96,0.15);border-color:#e94560;color:#e94560'
       : 'background:#1a1a2e;border-color:#0f3460;color:#a0a0c0';
     html += '<button onclick="setPBTab(\'' + t + '\')" style="flex:1;padding:6px 4px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;border:1px solid;' + style + '">' + PRICE_BOOK_TABS[t].label + '</button>';
+  }
+  html += '</div>';
+
+  // Labor category selector
+  html += '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;padding:4px 0;border-bottom:1px solid #0f3460">';
+  html += '<span style="color:#666;font-size:10px;padding:2px 4px;align-self:center">Labor:</span>';
+  for (var lci = 0; lci < LABOR_CATEGORIES.length; lci++) {
+    var lc = LABOR_CATEGORIES[lci];
+    var lcActive = lc.key === activeLaborCat;
+    var lcStyle = lcActive
+      ? 'background:' + lc.color + '22;color:' + lc.color + ';border-color:' + lc.color
+      : 'background:#1a1a2e;color:#555;border-color:#0f3460';
+    html += '<button onclick="setLaborCat(\'' + lc.key + '\')" style="padding:2px 6px;border-radius:3px;cursor:pointer;font-size:9px;font-weight:600;border:1px solid;white-space:nowrap;' + lcStyle + '" title="' + lc.label + '">' + lc.short + '</button>';
   }
   html += '</div>';
 
