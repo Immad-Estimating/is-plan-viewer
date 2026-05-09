@@ -2503,12 +2503,36 @@ var SHEET_METAL_WEIGHT = {
 // Shop settings defaults (stored in priceBookCache under 'shop-settings' key)
 var SHOP_DEFAULTS = {
   sheetMetalPricePerLb: 0.00,   // $/lb — user sets to current commodity rate
-  shopOverheadFactor: 1.00,     // multiplier on raw material (1.35 = 35% overhead)
+  shopRatePerCut: 0.00,         // $/cut — cost per joint/cut in the shop
   linerPricePerSF: 0.00,       // internal duct liner $/SF
   wrapInsulationPerSF: 0.00,   // external wrap insulation $/SF
   nosingPricePerLF: 0.00,      // nosing/edging $/LF of duct opening perimeter
   turningVanesPerEa: 0.00      // turning vanes $/Ea (adder on elbows)
 };
+
+// Default joint/cut counts per rectangular fitting type (editable per fitting in price book)
+var RECT_DEFAULT_CUTS = {
+  'rect-90el': 4,           // 4-5 miters + seam
+  'rect-45el': 3,           // 3 miters
+  'rect-22el': 2,           // 2 miters
+  'rect-tee': 5,            // main split + branch collar + tie-ins
+  'rectTap': 2,             // hole cut + collar
+  'rect-wye': 6,            // angled branch + both tie-ins
+  'rect-lateral': 6,        // 45° branch + complex intersect
+  'rect-reducer': 3,        // 4 tapered panels, 3 seams
+  'rect-eccReducer': 4,     // asymmetric taper
+  'rect-sqwing': 5,         // square corner + vane frame
+  'rect-endcap': 1,         // single closure
+  'rect-transition': 4,     // 4 panels + round collar
+  'duct-rect-per-lf': 0.5   // longitudinal seam + transverse joint ~every 2ft
+};
+
+// Get the cut count for a fitting (user-saved override or default)
+function getRectCutCount(fittingKey) {
+  var saved = priceBookCache ? priceBookCache[fittingKey + '-cuts'] : null;
+  if (saved && saved.cuts != null) return saved.cuts;
+  return RECT_DEFAULT_CUTS[fittingKey] != null ? RECT_DEFAULT_CUTS[fittingKey] : 0;
+}
 
 function getShopSettings() {
   var saved = priceBookCache ? priceBookCache['shop-settings'] : null;
@@ -2529,15 +2553,26 @@ function calcRectDuctCostPerLF(widthIn, heightIn, gauge) {
   var weightPerSF = SHEET_METAL_WEIGHT[gauge] || SHEET_METAL_WEIGHT['26'];
   var weightPerLF = surfaceAreaPerLF * weightPerSF;
   var rawMaterialPerLF = weightPerLF * shop.sheetMetalPricePerLb;
-  var totalPerLF = rawMaterialPerLF * shop.shopOverheadFactor;
+  var cutsPerLF = getRectCutCount('duct-rect-per-lf');
+  var shopCostPerLF = cutsPerLF * (shop.shopRatePerCut || 0);
+  var totalPerLF = rawMaterialPerLF + shopCostPerLF;
   return {
     perimeterIn: perimeterIn,
     surfaceAreaPerLF: surfaceAreaPerLF,
     weightPerLF: weightPerLF,
     rawMaterialPerLF: rawMaterialPerLF,
+    shopCostPerLF: shopCostPerLF,
     totalPerLF: totalPerLF,
     shop: shop
   };
+}
+
+// Calculate rect fitting total cost: raw material + (cuts × $/cut)
+function calcRectFittingShopCost(fittingKey) {
+  var shop = getShopSettings();
+  var cuts = getRectCutCount(fittingKey);
+  var shopCost = cuts * (shop.shopRatePerCut || 0);
+  return { cuts: cuts, shopCost: shopCost };
 }
 
 // Calculate rect duct liner/insulation adders per LF
@@ -2802,8 +2837,22 @@ function pbRow(item, sectionId) {
   var isExpanded = hasSizes && !!pbExpandedItems[activeKey];
   var arrow = hasSizes ? (isExpanded ? '\u25BC ' : '\u25B6 ') : '';
   var clickAttr = hasSizes ? ' onclick="togglePBItemExpand(\'' + activeKey + '\')" style="padding:4px;color:#e0e0e0;font-size:11px;cursor:pointer"' : ' style="padding:4px;color:#e0e0e0;font-size:11px"';
+  var isRectFit = sectionId === 'rect-fit';
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
-  html += '<td' + clickAttr + '>' + arrow + item.label + '</td>';
+  html += '<td' + clickAttr + '>' + arrow + item.label;
+  // Show shop surcharge inline for rect fittings
+  if (isRectFit) {
+    var shopCalc = calcRectFittingShopCost(activeKey);
+    if (shopCalc.shopCost > 0) {
+      html += ' <span style="color:#ffaa00;font-size:9px">+$' + shopCalc.shopCost.toFixed(2) + '</span>';
+    }
+  }
+  html += '</td>';
+  // Cuts column for rect fittings
+  if (isRectFit) {
+    var cuts = getRectCutCount(activeKey);
+    html += '<td style="padding:4px 2px"><input type="text" value="' + cuts + '" style="width:36px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:center" onchange="updateRectCuts(\'' + activeKey + '\',this.value)"></td>';
+  }
   html += '<td style="padding:4px 2px">' + pbInput(gaugeKey, 'materialCost', mc) + '</td>';
   html += '<td style="padding:4px 2px">' + pbInput(activeKey, 'laborHrs', lh) + '</td>';
   html += '</tr>';
@@ -2890,6 +2939,10 @@ function pbColumnHeader(hasMaterialInput, sectionId) {
   } else {
     matLabel = hasMaterialInput ? 'Material $' : '$/Ft';
   }
+  // Rect fittings get an extra Cuts column
+  if (sectionId === 'rect-fit') {
+    return '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Item</th><th style="padding:4px;text-align:center;width:50px">Cuts</th><th style="padding:4px;text-align:center;width:60px">' + matLabel + '</th><th style="padding:4px;text-align:center;width:60px">Labor Hrs</th></tr>';
+  }
   return '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Item</th><th style="padding:4px;text-align:center;width:70px">' + matLabel + '</th><th style="padding:4px;text-align:center;width:70px">Labor Hrs</th></tr>';
 }
 
@@ -2910,17 +2963,31 @@ function renderShopSettingsSection() {
   var html = '';
   html += '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Setting</th><th colspan="2" style="padding:4px;text-align:right">Value</th></tr>';
   html += shopSettingInput('sheetMetalPricePerLb', s.sheetMetalPricePerLb || '', 'Sheet Metal Price', '$/lb', '#00ff88');
-  html += shopSettingInput('shopOverheadFactor', s.shopOverheadFactor || '', 'Shop Overhead Factor', '\u00d7', '#ffaa00');
-  // Live preview: show calculated weight and cost for a sample duct
+  html += shopSettingInput('shopRatePerCut', s.shopRatePerCut || '', 'Shop Rate Per Cut/Joint', '$/cut', '#ffaa00');
+  // Duct cuts per LF (editable)
+  var ductCutsLF = getRectCutCount('duct-rect-per-lf');
+  html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)"><td style="padding:5px 4px;color:#e0e0e0;font-size:11px">Duct Cuts per LF</td>';
+  html += '<td colspan="2" style="padding:5px 2px;text-align:right">';
+  html += '<input type="text" value="' + ductCutsLF + '" placeholder="0.5" style="width:70px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" onchange="updateRectCuts(\'duct-rect-per-lf\',this.value)"> ';
+  html += '<span style="color:#666;font-size:10px">cuts/LF</span></td></tr>';
+  // Live preview: show calculated cost for a sample duct
   html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3);background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:6px 4px;font-size:10px;color:#a0a0c0">';
-  html += '<span style="color:#666">Preview:</span> 24\u2033\u00d712\u2033 @ 26ga \u2192 ';
+  html += '<span style="color:#666">Duct Preview:</span> 24\u2033\u00d712\u2033 @ 26ga \u2192 ';
   var preview = calcRectDuctCostPerLF(24, 12, '26');
-  html += preview.weightPerLF.toFixed(2) + ' lbs/LF \u2192 ';
+  html += preview.weightPerLF.toFixed(2) + ' lbs/LF';
   if (preview.totalPerLF > 0) {
-    html += '<span style="color:#00ff88">$' + preview.totalPerLF.toFixed(2) + '/LF</span>';
-    html += ' <span style="color:#666">(raw $' + preview.rawMaterialPerLF.toFixed(2) + ' \u00d7 ' + (s.shopOverheadFactor || 1) + ')</span>';
+    html += ' \u2192 <span style="color:#00ff88">$' + preview.totalPerLF.toFixed(2) + '/LF</span>';
+    html += ' <span style="color:#666">(material $' + preview.rawMaterialPerLF.toFixed(2) + ' + shop $' + preview.shopCostPerLF.toFixed(2) + ')</span>';
   } else {
-    html += '<span style="color:#666">set $/lb to see cost</span>';
+    html += ' <span style="color:#666">\u2014 set $/lb and $/cut to see cost</span>';
+  }
+  html += '</td></tr>';
+  // Fitting preview
+  var fitPreview = calcRectFittingShopCost('rect-tee');
+  html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3);background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:4px;font-size:10px;color:#a0a0c0">';
+  html += '<span style="color:#666">Fitting Preview:</span> Tee (' + fitPreview.cuts + ' cuts)';
+  if (fitPreview.shopCost > 0) {
+    html += ' \u2192 <span style="color:#ffaa00">+$' + fitPreview.shopCost.toFixed(2) + ' shop</span>';
   }
   html += '</td></tr>';
   // SMACNA gauge weight reference
@@ -2985,6 +3052,13 @@ window.updateShopSetting = async function(key, value) {
   existing[key] = value === '' ? null : parseFloat(value) || null;
   await savePriceBookEntry('shop-settings', existing);
   renderPriceBook(); // re-render to update auto-calc previews
+};
+
+window.updateRectCuts = async function(fittingKey, value) {
+  var cuts = parseFloat(value);
+  if (isNaN(cuts) || cuts < 0) cuts = 0;
+  await savePriceBookEntry(fittingKey + '-cuts', { key: fittingKey + '-cuts', cuts: cuts });
+  renderPriceBook();
 };
 
 function renderPriceBook() {
