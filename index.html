@@ -801,6 +801,7 @@
 <script type="module">
 import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs';
 import Compiler from './compiler.js';
+import MultiSelect from './multiselect.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -4318,7 +4319,15 @@ function pdfToScreen(px, py) {
 viewer.addEventListener('mousedown', (e) => {
   if (!pdfDoc) return;
   if (calibrationMode) return;
-  if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette')) return;
+  if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette') || e.target.closest('.ms-panel')) return;
+
+  // Multi-select: Shift+Click or Shift+Drag
+  if (e.shiftKey && !measureMode && !fittingMode && !stackMode) {
+    if (MultiSelect.onShiftMouseDown(e, screenToPdf)) {
+      e.preventDefault();
+      return;
+    }
+  }
 
   // Stack/callout drag: when not in measure/fitting mode
   if (!measureMode && !fittingMode) {
@@ -4402,6 +4411,9 @@ viewer.addEventListener('mousedown', (e) => {
 });
 
 window.addEventListener('mousemove', (e) => {
+  // Multi-select drag
+  if (e.shiftKey) MultiSelect.onShiftMouseMove(e, screenToPdf);
+
   // Stack dragging
   if (isDraggingStack && dragStackId != null) {
     const pt = screenToPdf(e.clientX, e.clientY);
@@ -4566,7 +4578,10 @@ window.addEventListener('mousemove', (e) => {
   }
 });
 
-window.addEventListener('mouseup', () => {
+window.addEventListener('mouseup', (e) => {
+  // Multi-select release
+  MultiSelect.onShiftMouseUp(e, screenToPdf);
+
   if (isDraggingLabel) {
     isDraggingLabel = false;
     dragLabelMeasId = null;
@@ -4936,6 +4951,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 't' || e.key === 'T') { e.preventDefault(); window.toggleFittingMode(); return; }
   else if (e.key === 's' || e.key === 'S') { e.preventDefault(); window.toggleStackMode(); return; }
   else if (e.key === 'Escape') {
+    if (MultiSelect.getSelectionCount() > 0) { MultiSelect.clearSelection(); return; }
     if (calibrationMode) { cancelCalibration(); return; }
     if (selectedStackId || selectedStackItemId) { selectedStackId = null; selectedStackItemId = null; hideStackPalette(); drawMeasureOverlay(); updatePanel(); return; }
     if (stackMode) { toggleStackMode(); return; }
@@ -5921,7 +5937,8 @@ function drawMeasureOverlay() {
   for (const m of saved) {
     _currentRenderMeas = m;
     const isSelected = m.id === selectedMeasId || m.id === dragMeasId;
-    const mColor = isSelected ? '#e94560' : '#00ff88';
+    const isMultiSel = MultiSelect.isMeasSelected(m.id);
+    const mColor = isSelected ? '#e94560' : isMultiSel ? '#ffd43b' : '#00ff88';
     drawMeasurementLine(m.points, m.distance.formatted, m.duct, mColor, false);
   }
 
@@ -6007,7 +6024,9 @@ function drawMeasureOverlay() {
 
   const fittingsOnPage = pageFittings[currentPage] || [];
   for (const f of fittingsOnPage) {
-    drawFitting(f, f.id === selectedFittingId);
+    const fitSel = f.id === selectedFittingId;
+    const fitMultiSel = MultiSelect.isFitSelected(f.id);
+    drawFitting(f, fitSel, fitMultiSel);
   }
 
   // Draw vertical stacks
@@ -7816,7 +7835,7 @@ function hitTestStack(pdfX, pdfY) {
 
 // ---- Fitting rendering functions ----
 
-function drawFitting(f, isSelected) {
+function drawFitting(f, isSelected, isMultiSelected) {
   const D = inchesToPx(parseDimension(f.sizeA));
   const D2 = f.sizeB ? inchesToPx(parseDimension(f.sizeB)) : D * 0.7;
   const rot = (f.rotation || 0) * Math.PI / 180;
@@ -7825,7 +7844,7 @@ function drawFitting(f, isSelected) {
   mCtx.translate(f.x, f.y);
   mCtx.rotate(rot);
   if (f.mirrored) mCtx.scale(1, -1);
-  mCtx.strokeStyle = isSelected ? '#e94560' : '#00ff88';
+  mCtx.strokeStyle = isSelected ? '#e94560' : isMultiSelected ? '#ffd43b' : '#00ff88';
   mCtx.lineWidth = 2.5;
   mCtx.setLineDash([]);
   mCtx.lineJoin = 'round';
@@ -8412,6 +8431,19 @@ async function init() {
   }
 
   pbInitDrag();
+
+  // Init multi-select system
+  MultiSelect.init({
+    getPageMeasurements: (p) => pageMeasurements[p] || [],
+    getPageFittings: (p) => pageFittings[p] || [],
+    getCurrentPage: () => currentPage,
+    screenToPdf: screenToPdf,
+    scheduleSave: scheduleSave,
+    drawOverlay: drawMeasureOverlay,
+    updatePanel: updatePanel,
+    getProjectSystemSymbols: () => projectSystemSymbols,
+  });
+
   handleRoute();
 }
 
