@@ -2984,25 +2984,30 @@ function renderRadarChart(baseKey, itemType, subType) {
     var pairMatch = baseKey.match(/-(\d+)x(\d+)$/);
     var singleMatch = !pairMatch && baseKey.match(/-(\d+)$/);
     var mainSz = pairMatch ? parseInt(pairMatch[1]) : (singleMatch ? parseInt(singleMatch[1]) : 12);
-    var hasSec = !!pairMatch;
-    var secSz = hasSec ? parseInt(pairMatch[2]) : mainSz;
+    // Detect if this fitting TYPE is a two-dim type (even if current key has no x)
+    var fittingType = baseKey.replace(/-(\d+)(x\d+)?$/, '');
+    var isTwoDim = pairMatch || (RECT_FITTING_REF[fittingType] && false) || /-(tee|saddle45y|lateral|wye|reducer|eccReducer|transition)/.test(baseKey);
+    var secSz = pairMatch ? parseInt(pairMatch[2]) : mainSz;
     var mainIdx = RD_SIZES.indexOf(mainSz); if (mainIdx < 0) mainIdx = 0;
+    var uid = 'rd-' + Date.now();
     // Primary slider
-    html += '<span style="color:#a0a0c0;font-size:11px;font-weight:700">\u2300</span>';
-    html += '<input type="range" min="0" max="' + (RD_SIZES.length-1) + '" value="' + mainIdx + '" ';
-    html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:' + (hasSec ? '90' : '140') + 'px;accent-color:#00c8ff" ';
+    html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">\u2300</span>';
+    html += '<input type="range" id="' + uid + 'a" min="0" max="' + (RD_SIZES.length-1) + '" value="' + mainIdx + '" ';
+    html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:' + (isTwoDim ? '90' : '140') + 'px;accent-color:#00c8ff" ';
     html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+    html += 'oninput="document.getElementById(\'' + uid + 'al\').textContent=[4,5,6,7,8,9,10,12,14,16,18,20,22,24][this.value]+\'\u2033\'" ';
     html += 'onchange="radarSlideRd(0,this.value,\'' + baseKey + '\')">';
-    html += '<span style="color:#00c8ff;font-size:13px;font-weight:700">' + mainSz + '\u2033</span>';
-    // Secondary slider (branch/outlet) for two-dim fittings
-    if (hasSec) {
+    html += '<span id="' + uid + 'al" style="color:#00c8ff;font-size:14px;font-weight:700">' + mainSz + '\u2033</span>';
+    // Secondary slider (branch/outlet) for two-dim fitting types
+    if (isTwoDim) {
       var secIdx = RD_SIZES.indexOf(secSz); if (secIdx < 0) secIdx = 0;
-      html += '<span style="color:#a0a0c0;font-size:9px;font-weight:600;margin-top:6px">BR</span>';
-      html += '<input type="range" min="0" max="' + mainIdx + '" value="' + secIdx + '" ';
+      html += '<span style="color:#da77f2;font-size:11px;font-weight:700;margin-top:8px">BRANCH</span>';
+      html += '<input type="range" id="' + uid + 'b" min="0" max="' + mainIdx + '" value="' + secIdx + '" ';
       html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:90px;accent-color:#da77f2" ';
       html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+      html += 'oninput="document.getElementById(\'' + uid + 'bl\').textContent=[4,5,6,7,8,9,10,12,14,16,18,20,22,24][this.value]+\'\u2033\'" ';
       html += 'onchange="radarSlideRd(1,this.value,\'' + baseKey + '\')">';
-      html += '<span style="color:#da77f2;font-size:13px;font-weight:700">' + secSz + '\u2033</span>';
+      html += '<span id="' + uid + 'bl" style="color:#da77f2;font-size:14px;font-weight:700">' + secSz + '\u2033</span>';
     }
   } else {
     var currentPCIdx = pbPerimClass['rect-fit'] || 0;
@@ -3032,13 +3037,23 @@ window.radarSlideRd = function(dim, idx, key) {
     else { b = v; if (b > m) b = m; }
     newKey = key.replace(/-(\d+)x(\d+)$/, '-' + m + 'x' + b);
   } else if (singleM) {
-    newKey = key.replace(/-(\d+)$/, '-' + v);
+    if (dim === 1) {
+      // Branch slider on a single-dim key: create pair key
+      var curMain = parseInt(singleM[1]);
+      if (v > curMain) v = curMain;
+      if (v === curMain) { newKey = key; } // same size = stay single
+      else { newKey = key.replace(/-(\d+)$/, '-' + curMain + 'x' + v); }
+    } else {
+      newKey = key.replace(/-(\d+)$/, '-' + v);
+    }
   } else { return; }
-  // Keep parent fitting expanded
   var parent = key.replace(/-(\d+)(x\d+)?$/, '');
   pbExpandedItems[parent] = true;
-  // For pair items, keep the main size group expanded too
-  if (pairM) pbExpandedItems[parent + '-' + (dim === 0 ? v : parseInt(pairM[1]))] = true;
+  // Keep main size group expanded for pair-type fittings
+  var newPairM = newKey.match(/-(\d+)x(\d+)$/);
+  var newSingleM = !newPairM && newKey.match(/-(\d+)$/);
+  var mainForExpand = newPairM ? parseInt(newPairM[1]) : (newSingleM ? parseInt(newSingleM[1]) : v);
+  pbExpandedItems[parent + '-' + mainForExpand] = true;
   radarChartTarget = newKey;
   renderPriceBook();
 };
