@@ -2385,7 +2385,7 @@ const PRICE_BOOK_TABS = {
     label: 'Rectangular',
     sections: [
       { id: 'rect-shop', hasGauge: false, title: 'Shop Settings', isShopSettings: true, items: [] },
-      { id: 'rect-fit', hasGauge: true, title: 'Fittings', items: [
+      { id: 'rect-fit', hasGauge: true, title: 'Fittings', hasPerimClass: true, hasShopAdder: true, items: [
         { key: 'rect-90el', label: '90\u00b0 Elbow' },
         { key: 'rect-45el', label: '45\u00b0 Elbow' },
         { key: 'rect-22el', label: '22.5\u00b0 Elbow' },
@@ -2402,7 +2402,7 @@ const PRICE_BOOK_TABS = {
       { id: 'rect-duct', hasGauge: true, title: 'Ductwork (Auto-Calc)', isRectDuctCalc: true, items: [
         { key: 'duct-rect', label: 'Rect Duct (per ft)' },
       ]},
-      { id: 'rect-acc', hasGauge: false, title: 'Accessories & Add-Ons', items: [
+      { id: 'rect-acc', hasGauge: false, title: 'Accessories & Add-Ons', hasShopAdder: true, items: [
         { key: 'rect-liner', label: 'Duct Liner ($/SF)' },
         { key: 'rect-wrap', label: 'Wrap Insulation ($/SF)' },
         { key: 'rect-nosing', label: 'Nosing / Edging ($/LF)' },
@@ -2490,6 +2490,7 @@ var pbGauge = { 'round-fit': '26', 'round-duct': '26', 'rect-fit': '26', 'rect-d
 var activePBTab = 'rect';
 var pbRoundType = { 'round-fit': 'spiral', 'round-duct': 'spiral' }; // toggle: 'spiral' or 'snaplock'
 var pbExpandedItems = {}; // tracks which fitting rows are expanded to show per-size pricing
+var pbPerimClass = { 'rect-fit': 0 }; // active perimeter class index per section
 
 // SMACNA galvanized sheet metal weights (lbs per SF) by gauge
 var SHEET_METAL_WEIGHT = {
@@ -2660,6 +2661,7 @@ function pbSaveLayout() {
     collapsed: pbCollapsed,
     gauge: pbGauge,
     roundType: pbRoundType,
+    perimClass: pbPerimClass,
     tab: activePBTab
   };
   localStorage.setItem('pbLayout', JSON.stringify(layout));
@@ -2683,6 +2685,9 @@ function pbApplyLayout(panel) {
       for (var rk in layout.roundType) {
         pbRoundType[rk] = layout.roundType[rk];
       }
+    }
+    if (layout.perimClass) {
+      for (var pk in layout.perimClass) pbPerimClass[pk] = layout.perimClass[pk];
     }
     if (layout.tab) activePBTab = layout.tab;
   } else {
@@ -2769,6 +2774,12 @@ window.togglePBItemExpand = function(itemKey) {
   renderPriceBook();
 };
 
+window.setPBPerimClass = function(sectionId, idx) {
+  pbPerimClass[sectionId] = idx;
+  renderPriceBook();
+  pbSaveLayout();
+};
+
 window.togglePBSizePairExpand = function(pairKey) {
   pbExpandedItems[pairKey] = !pbExpandedItems[pairKey];
   renderPriceBook();
@@ -2810,6 +2821,21 @@ function pbRow(item, sectionId) {
   var arrow = hasSizes ? (isExpanded ? '\u25BC ' : '\u25B6 ') : '';
   var clickAttr = hasSizes ? ' onclick="togglePBItemExpand(\'' + activeKey + '\')" style="padding:4px;color:#e0e0e0;font-size:11px;cursor:pointer"' : ' style="padding:4px;color:#e0e0e0;font-size:11px"';
   var isRectFit = sectionId === 'rect-fit';
+  var hasShopAdder = isRectFit || (sectionId === 'rect-acc');
+  // For rect fittings, key prices by perimeter class
+  var mcKey = gaugeKey;
+  var lhKey = activeKey;
+  if (isRectFit) {
+    var pcIdx = pbPerimClass[sectionId] || 0;
+    var pcMax = RECT_PERIM_CLASSES[pcIdx] ? RECT_PERIM_CLASSES[pcIdx].maxPerim : 30;
+    mcKey = activeKey + '-p' + pcMax + (gauge ? '-g' + gauge : '');
+    lhKey = activeKey + '-p' + pcMax;
+    // Re-lookup material/labor for this perim class
+    var pcEntry = priceBookCache ? priceBookCache[mcKey] : null;
+    mc = pcEntry ? pcEntry.materialCost : null;
+    var pcLhEntry = priceBookCache ? priceBookCache[lhKey] : null;
+    lh = pcLhEntry ? pcLhEntry.laborHrs : null;
+  }
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   html += '<td' + clickAttr + '>' + arrow + item.label;
   // Show cuts reference inline for rect fittings (read-only)
@@ -2817,15 +2843,15 @@ function pbRow(item, sectionId) {
     html += ' <span style="color:#666;font-size:9px">(' + RECT_REF_CUTS[activeKey] + ' cuts)</span>';
   }
   html += '</td>';
-  html += '<td style="padding:4px 2px">' + pbInput(gaugeKey, 'materialCost', mc) + '</td>';
-  // Per-item shop adder for rect fittings
-  if (isRectFit) {
-    var shopKey = activeKey + '-shop';
+  html += '<td style="padding:4px 2px">' + pbInput(mcKey, 'materialCost', mc) + '</td>';
+  // Per-item shop adder
+  if (hasShopAdder) {
+    var shopKey = (isRectFit ? lhKey : activeKey) + '-shop';
     var shopSaved = priceBookCache ? priceBookCache[shopKey] : null;
     var shopAdder = shopSaved ? shopSaved.materialCost : null;
     html += '<td style="padding:4px 2px"><input type="text" value="' + (shopAdder != null ? shopAdder : '') + '" placeholder="\u2014" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)"></td>';
   }
-  html += '<td style="padding:4px 2px">' + pbInput(activeKey, 'laborHrs', lh) + '</td>';
+  html += '<td style="padding:4px 2px">' + pbInput(lhKey, 'laborHrs', lh) + '</td>';
   html += '</tr>';
 
   // ---- Two-dimension pricing: expandable tree with sub-rows ----
@@ -2887,13 +2913,20 @@ function pbRow(item, sectionId) {
   return html;
 }
 
-function pbRowEditable(item) {
+function pbRowEditable(item, sectionId) {
   var entry = priceBookCache ? priceBookCache[item.key] : null;
   var mc = entry ? entry.materialCost : null;
   var lh = entry ? entry.laborHrs : null;
+  var hasShopAdder = sectionId === 'rect-acc';
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
   html += '<td style="padding:4px 2px">' + pbInput(item.key, 'materialCost', mc) + '</td>';
+  if (hasShopAdder) {
+    var shopKey = item.key + '-shop';
+    var shopSaved = priceBookCache ? priceBookCache[shopKey] : null;
+    var shopAdder = shopSaved ? shopSaved.materialCost : null;
+    html += '<td style="padding:4px 2px"><input type="text" value="' + (shopAdder != null ? shopAdder : '') + '" placeholder="\u2014" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)"></td>';
+  }
   html += '<td style="padding:4px 2px">' + pbInput(item.key, 'laborHrs', lh) + '</td>';
   html += '</tr>';
   return html;
@@ -2910,7 +2943,8 @@ function pbColumnHeader(hasMaterialInput, sectionId) {
   } else {
     matLabel = hasMaterialInput ? 'Material $' : '$/Ft';
   }
-  if (sectionId === 'rect-fit') {
+  // Sections with shop adder get 4 columns
+  if (sectionId === 'rect-fit' || sectionId === 'rect-acc') {
     return '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Item</th><th style="padding:4px;text-align:center;width:55px">' + matLabel + '</th><th style="padding:4px;text-align:center;width:55px">Shop +$</th><th style="padding:4px;text-align:center;width:55px">Labor Hrs</th></tr>';
   }
   return '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Item</th><th style="padding:4px;text-align:center;width:70px">' + matLabel + '</th><th style="padding:4px;text-align:center;width:70px">Labor Hrs</th></tr>';
@@ -3076,6 +3110,19 @@ function renderPriceBook() {
     }
     html += '</span>';
     html += '</td></tr>';
+    // Perimeter class selector row (below section header, above items)
+    if (sec.hasPerimClass && !collapsed) {
+      var activePC = pbPerimClass[sec.id] || 0;
+      html += '<tr><td colspan="4" style="padding:4px;background:rgba(15,52,96,0.15)">';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:3px">';
+      for (var pci = 0; pci < RECT_PERIM_CLASSES.length; pci++) {
+        var pcStyle = pci === activePC
+          ? 'background:rgba(233,69,96,0.2);color:#e94560;border-color:#e94560'
+          : 'background:#1a1a2e;color:#a0a0c0;border-color:#0f3460';
+        html += '<button onclick="setPBPerimClass(\'' + sec.id + '\',' + pci + ')" style="padding:2px 5px;border-radius:3px;cursor:pointer;font-size:9px;font-weight:600;border:1px solid;white-space:nowrap;' + pcStyle + '">' + RECT_PERIM_CLASSES[pci].label + '</button>';
+      }
+      html += '</div></td></tr>';
+    }
 
     if (!collapsed) {
       // Special rendering for Shop Settings section
@@ -3093,7 +3140,7 @@ function renderPriceBook() {
           if (hasGauge) {
             html += pbRow(sec.items[j], sec.id);
           } else {
-            html += pbRowEditable(sec.items[j]);
+            html += pbRowEditable(sec.items[j], sec.id);
           }
         }
       }
