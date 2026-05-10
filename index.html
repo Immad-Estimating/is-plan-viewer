@@ -3173,6 +3173,70 @@ document.getElementById('sysSymImageInput')?.addEventListener('change', async (e
   e.target.value = '';
 });
 
+window.aiReviewImportAll = async function() {
+  const equipment = window._aiReviewEquipment;
+  if (!equipment || equipment.length === 0) return;
+
+  let imported = 0;
+  for (let idx = 0; idx < equipment.length; idx++) {
+    const chk = document.getElementById('aiChk' + idx);
+    if (!chk || !chk.checked) continue;
+
+    // Read edited values from the review row
+    const tag = (document.getElementById('aiTag' + idx)?.value || '').trim().toUpperCase();
+    const category = document.getElementById('aiCat' + idx)?.value || 'equipment';
+    const type = document.getElementById('aiType' + idx)?.value || equipment[idx].type || '';
+    if (!tag) continue;
+
+    // Skip if already exists
+    if (projectSystemSymbols.some(s => s.tag === tag)) continue;
+
+    // Build the symbol using edited values + original specs
+    const eq = equipment[idx];
+    const SYS_COLORS_LOCAL = ['#4dabf7','#69db7c','#ffd43b','#da77f2','#ff8787','#a9e34b','#ffa94d','#74c0fc','#f783ac','#63e6be'];
+    const color = SYS_COLORS_LOCAL[projectSystemSymbols.length % SYS_COLORS_LOCAL.length];
+
+    const descParts = [type];
+    if (eq.manufacturer) descParts.push(eq.manufacturer);
+    if (eq.tonnage) descParts.push(eq.tonnage + ' ton');
+    if (eq.cfm) descParts.push(eq.cfm + ' CFM');
+    if (eq.size) descParts.push(eq.size);
+
+    projectSystemSymbols.push({
+      id: ++_sysSymIdCounter,
+      tag,
+      description: descParts.filter(Boolean).join(' \u00b7 '),
+      color,
+      category,
+      equipment: {
+        type,
+        category,
+        tonnage: eq.tonnage || null,
+        cfm: eq.cfm || null,
+        model: eq.model || null,
+        manufacturer: eq.manufacturer || null,
+        heating: eq.heating || null,
+        voltage: eq.voltage || null,
+        refrigerant: eq.refrigerant || null,
+        mca: eq.mca || null,
+        mocp: eq.mocp || null,
+        size: eq.size || null,
+        quantity: eq.quantity || null,
+        location: eq.location || null,
+      }
+    });
+    imported++;
+  }
+
+  await saveProjectSystemSymbols(activeProjectId);
+  renderSysSymbolList();
+
+  const statusEl = document.getElementById('sysSymAiStatus');
+  statusEl.innerHTML = `<span style="color:#00ff88">\u2713 Imported ${imported} items</span>` +
+    (equipment.length > imported ? `<span style="color:#555;font-size:10px"> (${equipment.length - imported} skipped/dupes)</span>` : '');
+  window._aiReviewEquipment = null;
+};
+
 window.openAiConfig = function() {
   const statusEl = document.getElementById('sysSymAiStatus');
   statusEl.innerHTML = ScheduleAI.renderConfigUI();
@@ -3198,56 +3262,75 @@ async function runScheduleExtraction(blob) {
       return;
     }
 
-    // Convert to system symbols and merge
-    const newSymbols = ScheduleAI.equipmentToSymbols(equipment);
-    let added = 0;
-    for (const s of newSymbols) {
-      if (projectSystemSymbols.some(e => e.tag === s.tag)) continue;
-      projectSystemSymbols.push({ id: ++_sysSymIdCounter, ...s });
-      added++;
-    }
-    await saveProjectSystemSymbols(activeProjectId);
-    renderSysSymbolList();
-
-    // Show results summary
-    let html = `<span style="color:#00ff88">✓ Extracted ${equipment.length} entries, added ${added} new symbols</span>`;
-    if (equipment.length > added) html += `<br><span style="color:#555;font-size:10px">${equipment.length - added} duplicates skipped</span>`;
-    statusEl.innerHTML = html;
+    // Show editable review table — user can edit before importing
+    statusEl.innerHTML = `<span style="color:#00ff88">✓ Found ${equipment.length} items — review & edit before importing</span>`;
     statusEl.style.color = '';
 
-    // Step 2: HVAC Library matching
-    const matchResults = await HVACLibrary.matchExtractedBatch(equipment);
-    const matchContainer = document.createElement('div');
-    matchContainer.style.cssText = 'margin-top:10px;max-height:300px;overflow-y:auto;border-top:1px solid #0f3460;padding-top:8px';
-    statusEl.appendChild(matchContainer);
+    const reviewContainer = document.createElement('div');
+    reviewContainer.style.cssText = 'margin-top:8px;max-height:380px;overflow-y:auto';
+    statusEl.appendChild(reviewContainer);
 
-    // Header for match step
-    const matchHeader = document.createElement('div');
-    matchHeader.style.cssText = 'font-size:11px;color:#a0a0c0;margin-bottom:6px;display:flex;align-items:center;gap:6px';
-    matchHeader.innerHTML = '📚 <span style="font-weight:600;color:#4dabf7">HVAC Library</span> — Link to existing or save new entries';
-    matchContainer.appendChild(matchHeader);
+    // Category options for the dropdown
+    const catOptions = [
+      { key: 'equipment', label: '⚙️ Equipment' },
+      { key: 'fan', label: '🌀 Fan' },
+      { key: 'air-distribution', label: '💨 Air Dist' },
+      { key: 'terminal', label: '📦 Terminal' },
+      { key: 'energy-recovery', label: '♻️ Energy Rec' },
+      { key: 'heating', label: '🔥 Heating' },
+      { key: 'makeup-air', label: '🌬️ Makeup Air' },
+      { key: 'specialty', label: '⚡ Specialty' },
+    ];
 
-    const matchContent = document.createElement('div');
-    matchContainer.appendChild(matchContent);
+    // Build review rows
+    let reviewHtml = '';
+    equipment.forEach((eq, idx) => {
+      const isDupe = projectSystemSymbols.some(s => s.tag === (eq.tag || '').toUpperCase());
+      const specParts = [];
+      if (eq.tonnage) specParts.push(eq.tonnage + 'T');
+      if (eq.cfm) specParts.push(eq.cfm + ' CFM');
+      if (eq.size) specParts.push(eq.size);
+      if (eq.manufacturer) specParts.push(eq.manufacturer);
+      if (eq.voltage) specParts.push(eq.voltage);
+      const specStr = specParts.join(' · ');
 
-    HVACLibrary.renderMatchStep(matchContent, matchResults, {
-      onLink: async (extracted, libraryEntry) => {
-        await HVACLibrary.incrementUsage(libraryEntry.id);
-        // Find the system symbol for this tag and enrich it with library data
-        const sym = projectSystemSymbols.find(s => s.tag === (extracted.tag || '').toUpperCase());
-        if (sym) {
-          sym.libraryId = libraryEntry.id;
-          sym.equipment = { ...sym.equipment, ...libraryEntry.specs, manufacturer: libraryEntry.manufacturer, model: libraryEntry.model };
-          await saveProjectSystemSymbols(activeProjectId);
-          renderSysSymbolList();
-        }
-      },
-      onCreateNew: async (extracted) => {
-        const entry = HVACLibrary.createEntryFromExtracted(extracted);
-        await HVACLibrary.save(entry);
-      },
-      onSkip: () => { /* no-op */ },
+      reviewHtml += `<div class="ai-review-row" id="aiRow${idx}" style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:4px;margin-bottom:3px;background:${isDupe ? 'rgba(85,85,85,0.15)' : '#1a1a2e'};border:1px solid ${isDupe ? '#333' : '#0f3460'};${isDupe ? 'opacity:0.5;' : ''}">`;
+
+      // Checkbox
+      reviewHtml += `<input type="checkbox" id="aiChk${idx}" ${isDupe ? '' : 'checked'} style="accent-color:#e94560;flex-shrink:0;cursor:pointer" onclick="document.getElementById('aiRow${idx}').style.opacity=this.checked?'1':'0.5'">`;
+
+      // Tag (editable)
+      reviewHtml += `<input type="text" id="aiTag${idx}" value="${escapeHtml((eq.tag || '').toUpperCase())}" style="width:56px;background:transparent;border:1px solid #0f3460;color:#e0e0e0;padding:2px 4px;border-radius:3px;font-size:11px;font-weight:700;text-align:center" title="Tag">`;
+
+      // Category dropdown
+      reviewHtml += `<select id="aiCat${idx}" style="background:#16213e;border:1px solid #0f3460;color:#a0a0c0;padding:2px 4px;border-radius:3px;font-size:10px;max-width:90px;cursor:pointer">`;
+      catOptions.forEach(c => {
+        reviewHtml += `<option value="${c.key}"${(eq.category || 'equipment') === c.key ? ' selected' : ''}>${c.label}</option>`;
+      });
+      reviewHtml += `</select>`;
+
+      // Type (editable)
+      reviewHtml += `<input type="text" id="aiType${idx}" value="${escapeHtml(eq.type || '')}" style="flex:1;min-width:0;background:transparent;border:1px solid #0f3460;color:#a0a0c0;padding:2px 4px;border-radius:3px;font-size:10px" title="Type" placeholder="Type">`;
+
+      // Specs (read-only summary, compact)
+      if (specStr) reviewHtml += `<span style="font-size:9px;color:#555;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(specStr)}">${escapeHtml(specStr)}</span>`;
+
+      // Dupe indicator
+      if (isDupe) reviewHtml += `<span style="font-size:9px;color:#555" title="Already imported">✓</span>`;
+
+      reviewHtml += `</div>`;
     });
+
+    // Import button
+    reviewHtml += `<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">`;
+    reviewHtml += `<button onclick="aiReviewImportAll()" style="background:#00ff88;color:#1a1a2e;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">Import Selected</button>`;
+    reviewHtml += `<button onclick="document.getElementById('sysSymAiStatus').innerHTML=''" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:11px">Cancel</button>`;
+    reviewHtml += `</div>`;
+
+    reviewContainer.innerHTML = reviewHtml;
+
+    // Store raw equipment for import
+    window._aiReviewEquipment = equipment;
 
   } catch (err) {
     if (err.message === 'NO_API_KEY') {
