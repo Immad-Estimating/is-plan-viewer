@@ -8065,7 +8065,7 @@ window.updateInsertSection = function(section) {
       if (item.voltage) specParts.push(item.voltage);
       if (item.quantity && item.quantity > 1) specParts.push('qty ' + item.quantity);
       const specStr = specParts.length > 0 ? specParts.slice(0, 3).join(' · ') : '';
-      html += `<div class="hvac-comp-row${sel}" onclick="selectHvacComponent('${escapeHtml(item.tag)}')" style="border-left:3px solid ${item.color || '#4dabf7'}">`;
+      html += `<div class="hvac-comp-row${sel}" onclick="event.stopPropagation(); selectHvacComponent('${escapeHtml(item.tag)}')" style="border-left:3px solid ${item.color || '#4dabf7'}">`;
       html += `<span class="comp-tag">${escapeHtml(item.tag)}</span>`;
       html += `<span class="comp-type">${escapeHtml(item.type || '')}</span>`;
       if (specStr) html += `<span style="font-size:9px;color:#666;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px" title="${escapeHtml(specParts.join(' · '))}">${escapeHtml(specStr)}</span>`;
@@ -8090,7 +8090,7 @@ window.updateInsertSection = function(section) {
   const fittings = FITTINGS_BY_SHAPE[shape] || [];
   const visible = fittings.slice(0, count);
   container.innerHTML = '<div class="fitting-grid">' + visible.map(f =>
-    `<button data-type="${f.type}" data-shape="${shape}" onclick="selectInsertFitting('${f.type}','${shape}')" title="${f.title}" ${(selectedFittingType === f.type && currentFittingShape === shape && !selectedHvacComponent) ? 'class="selected"' : ''}>${f.label}</button>`
+    `<button data-type="${f.type}" data-shape="${shape}" onclick="event.stopPropagation(); selectInsertFitting('${f.type}','${shape}')" title="${f.title}" ${(selectedFittingType === f.type && currentFittingShape === shape && !selectedHvacComponent) ? 'class="selected"' : ''}>${f.label}</button>`
   ).join('') + '</div>';
 };
 
