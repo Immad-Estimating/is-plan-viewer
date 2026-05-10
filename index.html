@@ -8264,8 +8264,8 @@ function handleFittingClick(e) {
       x: pt.x, y: pt.y,
       rotation: 0,
       mirrored: false,
-      sizeA: '24',
-      sizeB: '',
+      sizeA: String(hvac.tonnage ? Math.max(24, hvac.tonnage * 4) : (hvac.size ? parseInt(hvac.size) || 24 : 24)),
+      sizeB: String(hvac.tonnage ? Math.max(16, hvac.tonnage * 2.5) : (hvac.size && hvac.size.includes('x') ? parseInt(hvac.size.split('x')[1]) || 16 : 16)),
       label: hvac.tag || 'HVAC',
       phase: 'rough',
       materialCost: (hvac.pricing && hvac.pricing.materialCost) || null,
@@ -8848,27 +8848,299 @@ function drawFitting(f, isSelected, isMultiSelected) {
 }
 
 function drawHvacMarker(f) {
-  // Draw HVAC component as a labeled marker (diamond with tag)
-  const size = 18;
-  const icon = HVAC_CATEGORY_ICONS[f.hvacCategory] || '📦';
-  // Diamond shape
-  mCtx.beginPath();
-  mCtx.moveTo(0, -size);
-  mCtx.lineTo(size, 0);
-  mCtx.lineTo(0, size);
-  mCtx.lineTo(-size, 0);
-  mCtx.closePath();
-  mCtx.fillStyle = 'rgba(15, 52, 96, 0.8)';
-  mCtx.fill();
-  mCtx.stroke();
-  // Tag label below
+  const W = inchesToPx(parseFloat(f.sizeA) || 24);
+  const H = inchesToPx(parseFloat(f.sizeB) || 16);
+  const hw = W / 2, hh = H / 2;
+  const cat = f.hvacCategory || 'equipment';
+  const typ = (f.hvacType || '').toLowerCase();
+
+  // Category-specific rendering
+  if (cat === 'equipment' || cat === 'makeup-air' || cat === 'energy-recovery') {
+    _drawRTUSymbol(hw, hh, typ);
+  } else if (cat === 'fan') {
+    _drawFanSymbol(hw, hh, typ);
+  } else if (cat === 'air-distribution') {
+    _drawDiffuserSymbol(hw, hh, typ);
+  } else if (cat === 'terminal') {
+    _drawTerminalSymbol(hw, hh);
+  } else if (cat === 'heating') {
+    _drawHeaterSymbol(hw, hh);
+  } else if (cat === 'specialty') {
+    _drawSpecialtySymbol(hw, hh, typ);
+  } else {
+    _drawGenericBox(hw, hh);
+  }
+
+  // Tag label below unit
   mCtx.save();
-  mCtx.rotate(-(f.rotation || 0) * Math.PI / 180); // un-rotate for readable text
-  mCtx.font = 'bold 10px sans-serif';
+  mCtx.rotate(-(f.rotation || 0) * Math.PI / 180);
+  const fontSize = Math.max(8, Math.min(14, W * 0.22));
+  mCtx.font = `bold ${fontSize}px sans-serif`;
   mCtx.fillStyle = '#00ff88';
   mCtx.textAlign = 'center';
   mCtx.textBaseline = 'top';
-  mCtx.fillText(f.hvacTag || 'HVAC', 0, size + 4);
+  mCtx.fillText(f.hvacTag || 'HVAC', 0, hh + 4);
+  mCtx.restore();
+}
+
+// ── Rooftop Unit / Package Unit / AHU (plan view: rectangle with supply+return circles) ──
+function _drawRTUSymbol(hw, hh, typ) {
+  // Outer cabinet
+  mCtx.fillStyle = 'rgba(40, 60, 100, 0.6)';
+  mCtx.strokeStyle = '#4dabf7';
+  mCtx.lineWidth = 1.5;
+  _roundRect(-hw, -hh, hw * 2, hh * 2, 3);
+  mCtx.fill();
+  mCtx.stroke();
+
+  // Internal divider (evaporator/condenser split)
+  mCtx.beginPath();
+  mCtx.moveTo(0, -hh);
+  mCtx.lineTo(0, hh);
+  mCtx.strokeStyle = 'rgba(77,171,247,0.4)';
+  mCtx.lineWidth = 1;
+  mCtx.stroke();
+
+  // Supply opening (circle, left side)
+  const portR = Math.min(hw, hh) * 0.28;
+  mCtx.beginPath();
+  mCtx.arc(-hw * 0.45, 0, portR, 0, Math.PI * 2);
+  mCtx.fillStyle = 'rgba(0,255,136,0.3)';
+  mCtx.fill();
+  mCtx.strokeStyle = '#00ff88';
+  mCtx.lineWidth = 1;
+  mCtx.stroke();
+
+  // Return opening (circle, right side)
+  mCtx.beginPath();
+  mCtx.arc(hw * 0.45, 0, portR, 0, Math.PI * 2);
+  mCtx.fillStyle = 'rgba(77,171,247,0.2)';
+  mCtx.fill();
+  mCtx.strokeStyle = '#4dabf7';
+  mCtx.stroke();
+
+  // Fan symbol (small circle with blades in center-left)
+  _drawMiniBlades(-hw * 0.45, 0, portR * 0.5);
+}
+
+// ── Fan (circle with blades) ──
+function _drawFanSymbol(hw, hh, typ) {
+  const r = Math.min(hw, hh);
+  const isExhaust = typ.includes('exhaust');
+
+  // Housing (circle or square depending on mount type)
+  if (typ.includes('curb') || typ.includes('roof') || typ.includes('centrifugal')) {
+    // Square housing
+    mCtx.fillStyle = 'rgba(40, 70, 50, 0.5)';
+    mCtx.strokeStyle = '#69db7c';
+    mCtx.lineWidth = 1.5;
+    _roundRect(-hw, -hh, hw * 2, hh * 2, 3);
+    mCtx.fill();
+    mCtx.stroke();
+  } else {
+    // Circular housing
+    mCtx.beginPath();
+    mCtx.arc(0, 0, r, 0, Math.PI * 2);
+    mCtx.fillStyle = 'rgba(40, 70, 50, 0.5)';
+    mCtx.fill();
+    mCtx.strokeStyle = '#69db7c';
+    mCtx.lineWidth = 1.5;
+    mCtx.stroke();
+  }
+
+  // Fan blades
+  _drawMiniBlades(0, 0, r * 0.55);
+
+  // Arrow showing airflow direction
+  const arrowY = isExhaust ? -hh - 6 : hh + 6;
+  const arrowDir = isExhaust ? -1 : 1;
+  mCtx.beginPath();
+  mCtx.moveTo(0, arrowDir > 0 ? hh : -hh);
+  mCtx.lineTo(0, arrowY);
+  mCtx.moveTo(-4, arrowY - arrowDir * 5);
+  mCtx.lineTo(0, arrowY);
+  mCtx.lineTo(4, arrowY - arrowDir * 5);
+  mCtx.strokeStyle = '#69db7c';
+  mCtx.lineWidth = 1.2;
+  mCtx.stroke();
+}
+
+// ── Diffuser / Grille / Register (plan view: square or rectangular with vanes) ──
+function _drawDiffuserSymbol(hw, hh, typ) {
+  const isLinear = typ.includes('linear') || typ.includes('slot');
+  const isRound = typ.includes('round');
+
+  if (isRound) {
+    const r = Math.min(hw, hh);
+    mCtx.beginPath();
+    mCtx.arc(0, 0, r, 0, Math.PI * 2);
+    mCtx.fillStyle = 'rgba(80, 70, 20, 0.4)';
+    mCtx.fill();
+    mCtx.strokeStyle = '#ffd43b';
+    mCtx.lineWidth = 1.5;
+    mCtx.stroke();
+    // Concentric rings
+    for (let i = 1; i <= 3; i++) {
+      mCtx.beginPath();
+      mCtx.arc(0, 0, r * i / 4, 0, Math.PI * 2);
+      mCtx.strokeStyle = 'rgba(255,212,59,0.3)';
+      mCtx.lineWidth = 0.7;
+      mCtx.stroke();
+    }
+  } else {
+    // Square/rectangular grille
+    mCtx.fillStyle = 'rgba(80, 70, 20, 0.4)';
+    mCtx.strokeStyle = '#ffd43b';
+    mCtx.lineWidth = 1.5;
+    _roundRect(-hw, -hh, hw * 2, hh * 2, 2);
+    mCtx.fill();
+    mCtx.stroke();
+
+    // Vane lines
+    const vaneCount = isLinear ? 2 : Math.max(2, Math.floor(hh * 2 / 8));
+    mCtx.strokeStyle = 'rgba(255,212,59,0.35)';
+    mCtx.lineWidth = 0.7;
+    for (let i = 1; i < vaneCount; i++) {
+      const y = -hh + (hh * 2 * i / vaneCount);
+      mCtx.beginPath();
+      mCtx.moveTo(-hw + 2, y);
+      mCtx.lineTo(hw - 2, y);
+      mCtx.stroke();
+    }
+  }
+}
+
+// ── Terminal Unit / VAV Box (rectangle with damper symbol) ──
+function _drawTerminalSymbol(hw, hh) {
+  mCtx.fillStyle = 'rgba(70, 40, 80, 0.4)';
+  mCtx.strokeStyle = '#da77f2';
+  mCtx.lineWidth = 1.5;
+  _roundRect(-hw, -hh, hw * 2, hh * 2, 3);
+  mCtx.fill();
+  mCtx.stroke();
+
+  // Damper butterfly
+  mCtx.beginPath();
+  mCtx.moveTo(-hw * 0.6, -hh * 0.3);
+  mCtx.lineTo(0, 0);
+  mCtx.lineTo(-hw * 0.6, hh * 0.3);
+  mCtx.moveTo(hw * 0.6, -hh * 0.3);
+  mCtx.lineTo(0, 0);
+  mCtx.lineTo(hw * 0.6, hh * 0.3);
+  mCtx.strokeStyle = 'rgba(218,119,242,0.5)';
+  mCtx.lineWidth = 1;
+  mCtx.stroke();
+
+  // Inlet circle
+  mCtx.beginPath();
+  mCtx.arc(-hw * 0.7, 0, Math.min(hw, hh) * 0.2, 0, Math.PI * 2);
+  mCtx.strokeStyle = '#da77f2';
+  mCtx.lineWidth = 1;
+  mCtx.stroke();
+}
+
+// ── Heater (rectangle with heating element zigzag) ──
+function _drawHeaterSymbol(hw, hh) {
+  mCtx.fillStyle = 'rgba(80, 30, 30, 0.4)';
+  mCtx.strokeStyle = '#ff8787';
+  mCtx.lineWidth = 1.5;
+  _roundRect(-hw, -hh, hw * 2, hh * 2, 3);
+  mCtx.fill();
+  mCtx.stroke();
+
+  // Heating element zigzag
+  const segs = 5;
+  const step = (hw * 1.6) / segs;
+  mCtx.beginPath();
+  mCtx.moveTo(-hw * 0.8, -hh * 0.3);
+  for (let i = 0; i < segs; i++) {
+    const x = -hw * 0.8 + step * (i + 0.5);
+    const y = (i % 2 === 0) ? hh * 0.3 : -hh * 0.3;
+    mCtx.lineTo(x, y);
+  }
+  mCtx.lineTo(hw * 0.8, -hh * 0.3);
+  mCtx.strokeStyle = 'rgba(255,135,135,0.6)';
+  mCtx.lineWidth = 1.2;
+  mCtx.stroke();
+}
+
+// ── Specialty (damper, louver, etc) ──
+function _drawSpecialtySymbol(hw, hh, typ) {
+  if (typ.includes('damper')) {
+    // Damper: rectangle with butterfly
+    mCtx.fillStyle = 'rgba(50, 60, 30, 0.4)';
+    mCtx.strokeStyle = '#a9e34b';
+    mCtx.lineWidth = 1.5;
+    _roundRect(-hw, -hh, hw * 2, hh * 2, 2);
+    mCtx.fill();
+    mCtx.stroke();
+    // Butterfly blades
+    mCtx.beginPath();
+    mCtx.moveTo(-hw * 0.7, -hh * 0.7);
+    mCtx.lineTo(hw * 0.7, hh * 0.7);
+    mCtx.moveTo(-hw * 0.7, hh * 0.7);
+    mCtx.lineTo(hw * 0.7, -hh * 0.7);
+    mCtx.strokeStyle = 'rgba(169,227,75,0.5)';
+    mCtx.lineWidth = 1.5;
+    mCtx.stroke();
+  } else {
+    _drawGenericBox(hw, hh);
+  }
+}
+
+// ── Generic fallback ──
+function _drawGenericBox(hw, hh) {
+  mCtx.fillStyle = 'rgba(40, 40, 60, 0.5)';
+  mCtx.strokeStyle = '#a0a0c0';
+  mCtx.lineWidth = 1.5;
+  _roundRect(-hw, -hh, hw * 2, hh * 2, 3);
+  mCtx.fill();
+  mCtx.stroke();
+  // X mark
+  mCtx.beginPath();
+  mCtx.moveTo(-hw * 0.6, -hh * 0.6);
+  mCtx.lineTo(hw * 0.6, hh * 0.6);
+  mCtx.moveTo(hw * 0.6, -hh * 0.6);
+  mCtx.lineTo(-hw * 0.6, hh * 0.6);
+  mCtx.strokeStyle = 'rgba(160,160,192,0.3)';
+  mCtx.lineWidth = 1;
+  mCtx.stroke();
+}
+
+// ── Shared helpers ──
+function _roundRect(x, y, w, h, r) {
+  mCtx.beginPath();
+  mCtx.moveTo(x + r, y);
+  mCtx.lineTo(x + w - r, y);
+  mCtx.arcTo(x + w, y, x + w, y + r, r);
+  mCtx.lineTo(x + w, y + h - r);
+  mCtx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  mCtx.lineTo(x + r, y + h);
+  mCtx.arcTo(x, y + h, x, y + h - r, r);
+  mCtx.lineTo(x, y + r);
+  mCtx.arcTo(x, y, x + r, y, r);
+  mCtx.closePath();
+}
+
+function _drawMiniBlades(cx, cy, r) {
+  const bladeCount = 4;
+  mCtx.save();
+  mCtx.translate(cx, cy);
+  for (let i = 0; i < bladeCount; i++) {
+    const angle = (Math.PI * 2 * i / bladeCount);
+    mCtx.beginPath();
+    mCtx.ellipse(0, 0, r, r * 0.25, angle, 0, Math.PI);
+    mCtx.fillStyle = 'rgba(200,220,255,0.25)';
+    mCtx.fill();
+    mCtx.strokeStyle = 'rgba(200,220,255,0.5)';
+    mCtx.lineWidth = 0.7;
+    mCtx.stroke();
+  }
+  // Hub
+  mCtx.beginPath();
+  mCtx.arc(0, 0, r * 0.15, 0, Math.PI * 2);
+  mCtx.fillStyle = 'rgba(200,220,255,0.4)';
+  mCtx.fill();
   mCtx.restore();
 }
 
