@@ -1,0 +1,178 @@
+// =====================================================
+// IS Plan Viewer — Price & Labor Defaults
+// =====================================================
+// Centralized default data for material costs, labor hours,
+// sheet metal reference, and shop settings.
+// User overrides (stored in IndexedDB priceBook) always win.
+// =====================================================
+
+// ── Spiral duct & fitting material defaults ($/LF by gauge) ──────────
+export const SPIRAL_DEFAULTS = {
+  'duct-spiral-3':  { '26': 1.38, '22': 2.23 },
+  'duct-spiral-4':  { '26': 1.81, '22': 2.81 },
+  'duct-spiral-5':  { '26': 2.65, '22': 3.46 },
+  'duct-spiral-6':  { '26': 3.24, '22': 4.13 },
+  'duct-spiral-7':  { '26': 3.63, '22': 4.79 },
+  'duct-spiral-8':  { '26': 3.12, '22': 5.45 },
+  'duct-spiral-9':  { '26': 3.42, '22': 6.27 },
+  'duct-spiral-10': { '26': 3.73, '22': 6.93 },
+  'duct-spiral-11': { '26': 4.09, '22': 7.59 },
+  'duct-spiral-12': { '26': 4.45, '22': 8.25 },
+  'duct-spiral-13': { '26': 4.81, '22': 8.91 },
+  'duct-spiral-14': { '26': 5.17, '22': 9.57 },
+  'duct-spiral-15': { '26': 5.53, '22': 10.23 },
+  'duct-spiral-16': { '26': 5.89, '22': 10.89 },
+  'duct-spiral-17': { '26': 6.19, '22': 11.71 },
+  'duct-spiral-18': { '26': 6.49, '22': 12.38 },
+  'duct-spiral-20': { '26': 7.45, '24': 12.76, '22': 12.76 },
+  'duct-spiral-22': { '26': 8.06, '24': 13.96, '22': 13.96 },
+  'duct-spiral-24': { '26': 9.73, '24': 12.97, '22': 12.97 },
+  'duct-spiral-26': { '26': 11.39, '24': 13.82, '22': 13.83 },
+  'duct-spiral-28': { '26': 13.06, '24': 14.68, '22': 14.68 },
+  'duct-spiral-30': { '26': 14.72, '24': 15.54, '22': 15.54 },
+  'duct-spiral-32': { '26': 16.39, '24': 16.39, '22': 16.39 },
+  'duct-spiral-34': { '26': 17.50, '24': 17.50, '22': 17.50 },
+  'duct-spiral-36': { '26': 18.60, '24': 18.60, '22': 18.60 },
+  // Spiral Wye fitting pricing
+  'spiral-wye-4':  { '26': 14.03 },
+  'spiral-wye-5':  { '26': 14.03 },
+  'spiral-wye-6':  { '26': 14.03 },
+  'spiral-wye-7':  { '26': 15.68 },
+  'spiral-wye-8':  { '26': 16.50 },
+  'spiral-wye-9':  { '26': 18.14 },
+  'spiral-wye-10': { '26': 19.15 },
+  'spiral-wye-12': { '26': 25.91 },
+  'spiral-wye-14': { '26': 32.72 },
+  'spiral-wye-16': { '26': 43.34 },
+  'spiral-wye-18': { '26': 57.22 },
+  'spiral-wye-20': { '26': 68.28 },
+  'spiral-wye-22': { '26': 92.11 },
+  'spiral-wye-24': { '26': 96.95 },
+};
+
+// ── Snaplock duct material defaults ($/LF by gauge) ──────────────────
+export const SNAPLOCK_DEFAULTS = {
+  'duct-snaplock-4':  { '26': 1.66 },
+  'duct-snaplock-5':  { '26': 2.02 },
+  'duct-snaplock-6':  { '26': 2.46 },
+  'duct-snaplock-7':  { '26': 2.79 },
+  'duct-snaplock-8':  { '26': 3.23 },
+  'duct-snaplock-9':  { '26': 3.59 },
+  'duct-snaplock-10': { '26': 4.06 },
+  'duct-snaplock-12': { '26': 4.80 },
+  'duct-snaplock-14': { '26': 5.42 },
+  'duct-snaplock-16': { '26': 9.17 },
+  'duct-snaplock-18': { '26': 9.28 },
+  'duct-snaplock-20': { '26': 9.18 },
+  'duct-snaplock-22': { '26': 15.07 },
+  'duct-snaplock-24': { '26': 16.47 },
+};
+
+// ── Rectangular fitting reference data ───────────────────────────────
+// cuts: fabrication complexity reference
+// equivLF: equivalent linear feet of straight duct material consumed
+export const RECT_FITTING_REF = {
+  'rect-90el':       { cuts: 4, equivLF: 2.0 },
+  'rect-45el':       { cuts: 3, equivLF: 1.5 },
+  'rect-22el':       { cuts: 2, equivLF: 1.0 },
+  'rect-tee':        { cuts: 5, equivLF: 2.5 },
+  'rectTap':         { cuts: 2, equivLF: 0.5 },
+  'rect-wye':        { cuts: 6, equivLF: 3.0 },
+  'rect-lateral':    { cuts: 6, equivLF: 3.0 },
+  'rect-reducer':    { cuts: 3, equivLF: 1.5 },
+  'rect-eccReducer': { cuts: 4, equivLF: 2.0 },
+  'rect-sqwing':     { cuts: 5, equivLF: 2.5 },
+  'rect-endcap':     { cuts: 1, equivLF: 0.25 },
+  'rect-transition': { cuts: 4, equivLF: 2.0 },
+};
+
+// ── Rectangular perimeter classes ────────────────────────────────────
+export const RECT_PERIM_CLASSES = [
+  { label: '\u226436\u2033',     maxPerim: 36,  refPerim: 36 },
+  { label: '37\u201348\u2033',   maxPerim: 48,  refPerim: 48 },
+  { label: '49\u201360\u2033',   maxPerim: 60,  refPerim: 60 },
+  { label: '61\u201372\u2033',   maxPerim: 72,  refPerim: 72 },
+  { label: '73\u201396\u2033',   maxPerim: 96,  refPerim: 96 },
+  { label: '97\u2013120\u2033',  maxPerim: 120, refPerim: 120 },
+  { label: '121\u2013144\u2033', maxPerim: 144, refPerim: 144 },
+  { label: '145\u2013168\u2033', maxPerim: 168, refPerim: 168 },
+];
+
+// ── Duct weight per linear foot (lbs) by perimeter class & gauge ─────
+export const DUCT_WEIGHT_PER_LF = {
+  36:  { '26': 0.191, '24': 0.243, '22': 0.305 },
+  48:  { '26': 0.254, '24': 0.325, '22': 0.406 },
+  60:  { '26': 0.318, '24': 0.406, '22': 0.508 },
+  72:  { '26': 0.381, '24': 0.487, '22': 0.609 },
+  96:  { '26': 0.508, '24': 0.649, '22': 0.812 },
+  120: { '26': 0.635, '24': 0.812, '22': 1.015 },
+  144: { '26': 0.762, '24': 0.974, '22': 1.218 },
+  168: { '26': 0.889, '24': 1.136, '22': 1.422 },
+  192: { '26': 1.016, '24': 1.299, '22': 1.625 },
+  216: { '26': 1.143, '24': 1.461, '22': 1.828 },
+  240: { '26': 1.270, '24': 1.623, '22': 2.031 },
+  300: { '26': 1.588, '24': 2.029, '22': 2.539 },
+  360: { '26': 1.905, '24': 2.435, '22': 3.046 },
+  420: { '26': 2.223, '24': 2.841, '22': 3.554 },
+};
+
+// ── Shop settings defaults ───────────────────────────────────────────
+export const SHOP_DEFAULTS = {
+  sheetMetalPricePerLb: 0.00,
+};
+
+// ── Labor categories ─────────────────────────────────────────────────
+export const LABOR_CATEGORIES = [
+  { key: 'rough',       label: 'Rough',        short: 'R',  color: '#4dabf7', applies: ['duct','fitting'] },
+  { key: 'air-handler', label: 'Air Handler',   short: 'AH', color: '#69db7c', applies: ['equipment'] },
+  { key: 'condenser',   label: 'Condenser',     short: 'CU', color: '#69db7c', applies: ['equipment'] },
+  { key: 'lineset',     label: 'Line Set',      short: 'LS', color: '#ffd43b', applies: ['equipment'] },
+  { key: 'trim',        label: 'Trim',          short: 'T',  color: '#da77f2', applies: ['duct','fitting','accessory'] },
+  { key: 'venting',     label: 'Venting',       short: 'V',  color: '#ff8787', applies: ['duct','fitting'] },
+  { key: 'stocking',    label: 'Stocking',      short: 'SK', color: '#a9e34b', applies: ['duct','fitting','equipment','accessory'] },
+  { key: 'startup',     label: 'Startup',       short: 'SU', color: '#ffa94d', applies: ['equipment'] },
+  { key: 'qc',          label: 'Quality Ctrl',  short: 'QC', color: '#74c0fc', applies: ['duct','fitting','equipment','accessory'] },
+];
+
+// ── Default labor hours ──────────────────────────────────────────────
+// Keyed by item type. Size-specific overrides use "type-size" keys.
+// Values are hours per labor category. User overrides in IndexedDB win.
+//
+// Structure:
+//   'spiral-90el':      { rough: 0.35, stocking: 0.05, qc: 0.02 }     ← base default for all sizes
+//   'spiral-90el-12':   { rough: 0.40, stocking: 0.05, qc: 0.03 }     ← size-specific override
+//   'duct-spiral':      { rough: 0.10, stocking: 0.02 }               ← per-LF base for spiral duct
+//   'duct-spiral-14':   { rough: 0.12, stocking: 0.02 }               ← per-LF for 14" spiral
+//
+// Add entries as you estimate — this grows over time.
+// Empty = no defaults yet (user enters via Price Book radar chart, saved to IndexedDB).
+export const LABOR_DEFAULTS = {
+  // ── Spiral fittings (hours per fitting) ──
+  // 'spiral-90el':     { rough: 0, stocking: 0, qc: 0 },
+  // 'spiral-45el':     { rough: 0, stocking: 0, qc: 0 },
+  // 'spiral-tee':      { rough: 0, stocking: 0, qc: 0 },
+  // 'spiral-wye':      { rough: 0, stocking: 0, qc: 0 },
+  // 'spiral-reducer':  { rough: 0, stocking: 0, qc: 0 },
+  // 'spiral-endcap':   { rough: 0, stocking: 0, qc: 0 },
+
+  // ── Snaplock fittings ──
+  // 'snaplock-90el':   { rough: 0, trim: 0, stocking: 0, qc: 0 },
+
+  // ── Spiral duct (hours per linear foot) ──
+  // 'duct-spiral':     { rough: 0, stocking: 0, qc: 0 },
+
+  // ── Rectangular fittings (hours per fitting, per perimeter class) ──
+  // 'rect-90el':       { rough: 0, trim: 0, stocking: 0, qc: 0 },
+  // 'rect-90el-p36':   { rough: 0, trim: 0, stocking: 0, qc: 0 },
+  // 'rect-90el-p48':   { rough: 0, trim: 0, stocking: 0, qc: 0 },
+
+  // ── Rectangular duct (hours per LF, per perimeter class) ──
+  // 'duct-rect-p36':   { rough: 0, stocking: 0, qc: 0 },
+  // 'duct-rect-p48':   { rough: 0, stocking: 0, qc: 0 },
+
+  // ── Accessories ──
+  // 'rect-liner':      { rough: 0, trim: 0 },
+  // 'rect-wrap':       { rough: 0, trim: 0 },
+  // 'rect-volume-damper': { rough: 0 },
+  // 'rect-fire-damper':   { rough: 0 },
+};

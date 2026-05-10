@@ -955,6 +955,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, RECT_FITTING_REF, RECT_PERIM_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -3604,22 +3605,7 @@ var SHEET_METAL_WEIGHT = {
 
 // Duct weight per linear foot by perimeter (inches) and gauge — from vendor table
 // Key: perimeterInches, Value: { '26': lbs/LF, '24': lbs/LF, '22': lbs/LF }
-var DUCT_WEIGHT_PER_LF = {
-  36:  { '26': 0.191, '24': 0.243, '22': 0.305 },
-  48:  { '26': 0.254, '24': 0.325, '22': 0.406 },
-  60:  { '26': 0.318, '24': 0.406, '22': 0.508 },
-  72:  { '26': 0.381, '24': 0.487, '22': 0.609 },
-  96:  { '26': 0.508, '24': 0.649, '22': 0.812 },
-  120: { '26': 0.635, '24': 0.812, '22': 1.015 },
-  144: { '26': 0.762, '24': 0.974, '22': 1.218 },
-  168: { '26': 0.889, '24': 1.136, '22': 1.422 },
-  192: { '26': 1.016, '24': 1.299, '22': 1.625 },
-  216: { '26': 1.143, '24': 1.461, '22': 1.828 },
-  240: { '26': 1.270, '24': 1.623, '22': 2.031 },
-  300: { '26': 1.588, '24': 2.029, '22': 2.539 },
-  360: { '26': 1.905, '24': 2.435, '22': 3.046 },
-  420: { '26': 2.223, '24': 2.841, '22': 3.554 }
-};
+// DUCT_WEIGHT_PER_LF — imported from price-defaults.js
 
 // Lookup duct weight/LF for a perimeter class using closest data point
 function getDuctWeightPerLF(perimIn, gauge) {
@@ -3635,22 +3621,10 @@ function getDuctWeightPerLF(perimIn, gauge) {
 }
 
 // Shop settings defaults (stored in priceBookCache under 'shop-settings' key)
-var SHOP_DEFAULTS = {
-  sheetMetalPricePerLb: 0.00   // $/lb — user sets to current commodity rate
-};
+// SHOP_DEFAULTS — imported from price-defaults.js
 
 // Labor categories — only certain categories apply to certain item types
-var LABOR_CATEGORIES = [
-  { key: 'rough',      label: 'Rough',      short: 'R',  color: '#4dabf7', applies: ['duct','fitting'] },
-  { key: 'air-handler',label: 'Air Handler', short: 'AH', color: '#69db7c', applies: ['equipment'] },
-  { key: 'condenser',  label: 'Condenser',   short: 'CU', color: '#69db7c', applies: ['equipment'] },
-  { key: 'lineset',    label: 'Line Set',    short: 'LS', color: '#ffd43b', applies: ['equipment'] },
-  { key: 'trim',       label: 'Trim',        short: 'T',  color: '#da77f2', applies: ['duct','fitting','accessory'] },
-  { key: 'venting',    label: 'Venting',     short: 'V',  color: '#ff8787', applies: ['duct','fitting'] },
-  { key: 'stocking',   label: 'Stocking',    short: 'SK', color: '#a9e34b', applies: ['duct','fitting','equipment','accessory'] },
-  { key: 'startup',    label: 'Startup',     short: 'SU', color: '#ffa94d', applies: ['equipment'] },
-  { key: 'qc',         label: 'Quality Ctrl', short: 'QC', color: '#74c0fc', applies: ['duct','fitting','equipment','accessory'] },
-];
+// LABOR_CATEGORIES — imported from price-defaults.js
 
 var activeLaborCat = 'rough'; // default active labor category
 
@@ -3666,20 +3640,7 @@ function getLaborCatForSection(sectionId) {
 // Reference data per rectangular fitting type (read-only)
 // cuts: fabrication complexity reference
 // equivLF: equivalent linear feet of straight duct material the fitting consumes
-var RECT_FITTING_REF = {
-  'rect-90el':      { cuts: 4, equivLF: 2.0 },    // two cheeks + radius
-  'rect-45el':      { cuts: 3, equivLF: 1.5 },
-  'rect-22el':      { cuts: 2, equivLF: 1.0 },
-  'rect-tee':       { cuts: 5, equivLF: 2.5 },    // main + branch
-  'rectTap':        { cuts: 2, equivLF: 0.5 },    // collar only
-  'rect-wye':       { cuts: 6, equivLF: 3.0 },
-  'rect-lateral':   { cuts: 6, equivLF: 3.0 },
-  'rect-reducer':   { cuts: 3, equivLF: 1.5 },    // tapered section
-  'rect-eccReducer':{ cuts: 4, equivLF: 2.0 },    // asymmetric taper
-  'rect-sqwing':    { cuts: 5, equivLF: 2.5 },    // square corner + vanes
-  'rect-endcap':    { cuts: 1, equivLF: 0.25 },   // single face
-  'rect-transition':{ cuts: 4, equivLF: 2.0 }     // 4 panels + collar
-};
+// RECT_FITTING_REF — imported from price-defaults.js
 
 // Auto-calc raw material cost for a rect fitting at a given perimeter class and gauge
 function calcRectFittingRawCost(fittingKey, perimeterIn, gauge) {
@@ -3725,66 +3686,7 @@ function calcRectDuctAddersPerLF(widthIn, heightIn) {
 }
 
 
-// Default spiral pricing by gauge: key -> { '26': price, '22': price, ... }
-var SPIRAL_DEFAULTS = {
-  'duct-spiral-3':  { '26': 1.38, '22': 2.23 },
-  'duct-spiral-4':  { '26': 1.81, '22': 2.81 },
-  'duct-spiral-5':  { '26': 2.65, '22': 3.46 },
-  'duct-spiral-6':  { '26': 3.24, '22': 4.13 },
-  'duct-spiral-7':  { '26': 3.63, '22': 4.79 },
-  'duct-spiral-8':  { '26': 3.12, '22': 5.45 },
-  'duct-spiral-9':  { '26': 3.42, '22': 6.27 },
-  'duct-spiral-10': { '26': 3.73, '22': 6.93 },
-  'duct-spiral-11': { '26': 4.09, '22': 7.59 },
-  'duct-spiral-12': { '26': 4.45, '22': 8.25 },
-  'duct-spiral-13': { '26': 4.81, '22': 8.91 },
-  'duct-spiral-14': { '26': 5.17, '22': 9.57 },
-  'duct-spiral-15': { '26': 5.53, '22': 10.23 },
-  'duct-spiral-16': { '26': 5.89, '22': 10.89 },
-  'duct-spiral-17': { '26': 6.19, '22': 11.71 },
-  'duct-spiral-18': { '26': 6.49, '22': 12.38 },
-  'duct-spiral-20': { '26': 7.45, '24': 12.76, '22': 12.76 },
-  'duct-spiral-22': { '26': 8.06, '24': 13.96, '22': 13.96 },
-  'duct-spiral-24': { '26': 9.73, '24': 12.97, '22': 12.97 },
-  'duct-spiral-26': { '26': 11.39, '24': 13.82, '22': 13.83 },
-  'duct-spiral-28': { '26': 13.06, '24': 14.68, '22': 14.68 },
-  'duct-spiral-30': { '26': 14.72, '24': 15.54, '22': 15.54 },
-  'duct-spiral-32': { '26': 16.39, '24': 16.39, '22': 16.39 },
-  'duct-spiral-34': { '26': 17.50, '24': 17.50, '22': 17.50 },
-  'duct-spiral-36': { '26': 18.60, '24': 18.60, '22': 18.60 },
-  // Spiral Wye fitting pricing (key: 'spiral-wye-{size}', per gauge)
-  'spiral-wye-4':  { '26': 14.03 },
-  'spiral-wye-5':  { '26': 14.03 },
-  'spiral-wye-6':  { '26': 14.03 },
-  'spiral-wye-7':  { '26': 15.68 },
-  'spiral-wye-8':  { '26': 16.50 },
-  'spiral-wye-9':  { '26': 18.14 },
-  'spiral-wye-10': { '26': 19.15 },
-  'spiral-wye-12': { '26': 25.91 },
-  'spiral-wye-14': { '26': 32.72 },
-  'spiral-wye-16': { '26': 43.34 },
-  'spiral-wye-18': { '26': 57.22 },
-  'spiral-wye-20': { '26': 68.28 },
-  'spiral-wye-22': { '26': 92.11 },
-  'spiral-wye-24': { '26': 96.95 },
-};
-
-var SNAPLOCK_DEFAULTS = {
-  'duct-snaplock-4':  { '26': 1.66 },
-  'duct-snaplock-5':  { '26': 2.02 },
-  'duct-snaplock-6':  { '26': 2.46 },
-  'duct-snaplock-7':  { '26': 2.79 },
-  'duct-snaplock-8':  { '26': 3.23 },
-  'duct-snaplock-9':  { '26': 3.59 },
-  'duct-snaplock-10': { '26': 4.06 },
-  'duct-snaplock-12': { '26': 4.80 },
-  'duct-snaplock-14': { '26': 5.42 },
-  'duct-snaplock-16': { '26': 9.17 },
-  'duct-snaplock-18': { '26': 9.28 },
-  'duct-snaplock-20': { '26': 9.18 },
-  'duct-snaplock-22': { '26': 15.07 },
-  'duct-snaplock-24': { '26': 16.47 },
-};
+// SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS — imported from price-defaults.js
 
 function getGaugesForSection(sectionId) {
   return ['26', '24', '22'];
@@ -4014,6 +3916,17 @@ function lhCatKey(baseKey, cat) {
   return baseKey + '-lc-' + (cat || activeLaborCat);
 }
 
+// Resolve labor default: check size-specific key first, then base key
+function _laborDefault(baseKey, catKey) {
+  if (!LABOR_DEFAULTS) return 0;
+  // Try exact key (e.g. 'spiral-90el-12')
+  if (LABOR_DEFAULTS[baseKey] && LABOR_DEFAULTS[baseKey][catKey]) return LABOR_DEFAULTS[baseKey][catKey];
+  // Try base key without size (e.g. 'spiral-90el' from 'spiral-90el-12')
+  var baseOnly = baseKey.replace(/-\d+$/, '');
+  if (baseOnly !== baseKey && LABOR_DEFAULTS[baseOnly] && LABOR_DEFAULTS[baseOnly][catKey]) return LABOR_DEFAULTS[baseOnly][catKey];
+  return 0;
+}
+
 // Get total labor hours across all categories for an item
 function getTotalLaborHrs(baseKey, applicableCats) {
   var total = 0;
@@ -4021,7 +3934,8 @@ function getTotalLaborHrs(baseKey, applicableCats) {
   for (var i = 0; i < cats.length; i++) {
     var k = lhCatKey(baseKey, cats[i].key);
     var entry = priceBookCache ? priceBookCache[k] : null;
-    if (entry && entry.laborHrs) total += entry.laborHrs;
+    if (entry && entry.laborHrs) { total += entry.laborHrs; }
+    else { total += _laborDefault(baseKey, cats[i].key); }
   }
   return total;
 }
@@ -4033,7 +3947,8 @@ function getLaborBreakdown(baseKey, applicableCats) {
   for (var i = 0; i < cats.length; i++) {
     var k = lhCatKey(baseKey, cats[i].key);
     var entry = priceBookCache ? priceBookCache[k] : null;
-    result.push({ cat: cats[i], hrs: (entry && entry.laborHrs) ? entry.laborHrs : 0 });
+    var hrs = (entry && entry.laborHrs) ? entry.laborHrs : _laborDefault(baseKey, cats[i].key);
+    result.push({ cat: cats[i], hrs: hrs });
   }
   return result;
 }
@@ -4524,16 +4439,7 @@ function renderShopSettingsSection() {
 }
 
 // Perimeter classes aligned to vendor weight table data points
-var RECT_PERIM_CLASSES = [
-  { label: '\u226436\u2033',     maxPerim: 36,  refPerim: 36 },
-  { label: '37\u201348\u2033',   maxPerim: 48,  refPerim: 48 },
-  { label: '49\u201360\u2033',   maxPerim: 60,  refPerim: 60 },
-  { label: '61\u201372\u2033',   maxPerim: 72,  refPerim: 72 },
-  { label: '73\u201396\u2033',   maxPerim: 96,  refPerim: 96 },
-  { label: '97\u2013120\u2033',  maxPerim: 120, refPerim: 120 },
-  { label: '121\u2013144\u2033', maxPerim: 144, refPerim: 144 },
-  { label: '145\u2013168\u2033', maxPerim: 168, refPerim: 168 },
-];
+// RECT_PERIM_CLASSES — imported from price-defaults.js
 
 function renderRectDuctCalcSection(sec, gauge) {
   var html = '';
