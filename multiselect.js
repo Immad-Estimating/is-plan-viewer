@@ -343,10 +343,11 @@ function updatePanelContent() {
   html += `</select></div>`;
 
   html += `<div class="ms-panel-actions">`;
-  html += `<button class="ms-delete-btn" onclick="window._msDeleteSel()" title="Delete selected items (Del)">🗑 Delete ${count}</button>`;
-  html += `<button class="ms-copy-btn" onclick="window._msCopySel()" title="Copy selected items (Ctrl+C)">📋 Copy ${count}</button>`;
-  html += `<button class="ms-clear-btn" onclick="window._msClearSel()">Deselect All</button>`;
-  html += `<button class="ms-apply-btn" onclick="window._msApply()">Apply to ${count} Items</button>`;
+  html += `<button class="ms-delete-btn" onclick="event.stopPropagation(); window._msDeleteSel()" title="Delete selected items (Del)">🗑 Delete ${count}</button>`;
+  html += `<button class="ms-copy-btn" onclick="event.stopPropagation(); window._msCopySel()" title="Copy selected items (Ctrl+C)">📋 Copy ${count}</button>`;
+  if (_clipboard) html += `<button class="ms-copy-btn" onclick="event.stopPropagation(); window._msPasteSel()" title="Paste copied items (Ctrl+V)" style="color:#00ff88;border-color:#00ff88">📋 Paste</button>`;
+  html += `<button class="ms-clear-btn" onclick="event.stopPropagation(); window._msClearSel()">Deselect All</button>`;
+  html += `<button class="ms-apply-btn" onclick="event.stopPropagation(); window._msApply()">Apply to ${count} Items</button>`;
   html += `</div>`;
 
   _panelEl.innerHTML = html;
@@ -666,6 +667,12 @@ window._msClose = function() { clearSelection(); };
 window._msClearSel = function() { clearSelection(); };
 window._msApply = function() { applyBulkChanges(); };
 window._msDeleteSel = function() { deleteSelected(); };
-window._msCopySel = function() { copySelected(); };
+window._msCopySel = function() {
+  const n = copySelected();
+  if (n > 0) updatePanelContent(); // re-render to show Paste button
+};
+window._msPasteSel = function() {
+  pasteClipboard();
+};
 
 export default MultiSelect;
