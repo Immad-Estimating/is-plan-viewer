@@ -130,7 +130,7 @@
   .fitting-grid button:hover { background: #0f3460; color: #e0e0e0; }
   .fitting-grid button.selected { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.1); }
   /* HVAC component rows */
-  .hvac-comp-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 11px; color: #a0a0c0; transition: background 0.15s, border-color 0.15s; border: 1px solid transparent; margin-bottom: 2px; }
+  .hvac-comp-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; color: #a0a0c0; transition: background 0.15s, border-color 0.15s; border: 1px solid transparent; margin-bottom: 2px; border-left: 3px solid #4dabf7; }
   .hvac-comp-row:hover { background: #0f3460; color: #e0e0e0; }
   .hvac-comp-row.selected { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.1); }
   .hvac-comp-row .cat-badge { font-size: 10px; background: #0f3460; padding: 1px 5px; border-radius: 8px; color: #a0a0c0; flex-shrink: 0; }
@@ -2908,6 +2908,8 @@ async function saveProjectSystemSymbols(projectId) {
 }
 
 function updateSystemSymbolDropdown() {
+  // Refresh HVAC insert section whenever symbols change
+  if (typeof loadHvacInsertItems === 'function') loadHvacInsertItems();
   const sel = document.getElementById('sysSymbolSelect');
   if (!sel) return;
   const prev = sel.value;
@@ -7782,15 +7784,29 @@ function renderInsertPalette() {
   updateInsertSection('round');
   updateInsertSection('rect');
   updateInsertSection('oval');
-  // Load HVAC library items
-  loadHvacLibraryItems();
+  // Load HVAC items from project system symbols
+  loadHvacInsertItems();
   updateConfigArea();
 }
 
-async function loadHvacLibraryItems() {
-  try {
-    _hvacLibraryItems = await HVACLibrary.getAll();
-  } catch(e) { _hvacLibraryItems = []; }
+function loadHvacInsertItems() {
+  // Use project system symbols (actual extracted tags like RTU-1, EF-1, CD-1)
+  // These are the real tags from the project, not generic library templates
+  _hvacLibraryItems = (projectSystemSymbols || []).map(sym => ({
+    _symId: sym.id,
+    tag: sym.tag,
+    type: sym.equipment?.type || sym.description?.split(' · ')[0] || '',
+    category: sym.equipment?.category || sym.category || 'equipment',
+    color: sym.color || '#4dabf7',
+    manufacturer: sym.equipment?.manufacturer || '',
+    model: sym.equipment?.model || '',
+    tonnage: sym.equipment?.tonnage || null,
+    cfm: sym.equipment?.cfm || null,
+    size: sym.equipment?.size || null,
+    voltage: sym.equipment?.voltage || null,
+    heating: sym.equipment?.heating || null,
+    quantity: sym.equipment?.quantity || null,
+  }));
   const slider = document.getElementById('sliderHvac');
   if (slider) slider.max = _hvacLibraryItems.length;
   updateInsertSection('hvac');
@@ -7817,17 +7833,27 @@ window.updateInsertSection = function(section) {
     const visible = sorted.slice(0, count);
     let html = '';
     let lastCat = '';
-    visible.forEach(item => {
+    visible.forEach((item, idx) => {
       if (item.category !== lastCat) {
         const icon = HVAC_CATEGORY_ICONS[item.category] || '📦';
-        html += `<div class="hvac-cat-header">${icon} ${item.category}</div>`;
+        const catLabel = item.category.replace(/-/g, ' ');
+        html += `<div class="hvac-cat-header">${icon} ${catLabel}</div>`;
         lastCat = item.category;
       }
-      const sel = (selectedHvacComponent && selectedHvacComponent.id === item.id) ? ' selected' : '';
-      html += `<div class="hvac-comp-row${sel}" onclick="selectHvacComponent(${item.id})">`;
-      html += `<span class="cat-badge">${HVAC_CATEGORY_ICONS[item.category] || '📦'}</span>`;
-      html += `<span class="comp-tag">${item.tag || '—'}</span>`;
-      html += `<span class="comp-type">${item.type || ''}</span>`;
+      const sel = (selectedHvacComponent && selectedHvacComponent.tag === item.tag) ? ' selected' : '';
+      // Build specs summary
+      const specParts = [];
+      if (item.tonnage) specParts.push(item.tonnage + 'T');
+      if (item.cfm) specParts.push(item.cfm.toLocaleString() + ' CFM');
+      if (item.size) specParts.push(item.size);
+      if (item.manufacturer) specParts.push(item.manufacturer);
+      if (item.voltage) specParts.push(item.voltage);
+      if (item.quantity && item.quantity > 1) specParts.push('qty ' + item.quantity);
+      const specStr = specParts.length > 0 ? specParts.slice(0, 3).join(' · ') : '';
+      html += `<div class="hvac-comp-row${sel}" onclick="selectHvacComponent('${escapeHtml(item.tag)}')" style="border-left:3px solid ${item.color || '#4dabf7'}">`;
+      html += `<span class="comp-tag">${escapeHtml(item.tag)}</span>`;
+      html += `<span class="comp-type">${escapeHtml(item.type || '')}</span>`;
+      if (specStr) html += `<span style="font-size:9px;color:#666;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px" title="${escapeHtml(specParts.join(' · '))}">${escapeHtml(specStr)}</span>`;
       html += `</div>`;
     });
     container.innerHTML = html;
@@ -7870,13 +7896,19 @@ window.selectInsertFitting = function(type, shape) {
   updateConfigArea();
 };
 
-window.selectHvacComponent = function(id) {
-  const item = _hvacLibraryItems.find(i => i.id === id);
+window.selectHvacComponent = function(tag) {
+  const item = _hvacLibraryItems.find(i => i.tag === tag);
   if (!item) return;
   selectedHvacComponent = item;
   selectedFittingType = null; // clear fitting selection
   selectedFittingId = null;
-  document.getElementById('fpPreview').textContent = item.tag + ' — ' + (item.type || 'Component');
+  // Build preview with specs
+  const specParts = [];
+  if (item.tonnage) specParts.push(item.tonnage + 'T');
+  if (item.cfm) specParts.push(item.cfm.toLocaleString() + ' CFM');
+  if (item.manufacturer) specParts.push(item.manufacturer);
+  const specSuffix = specParts.length > 0 ? ' (' + specParts.join(', ') + ')' : '';
+  document.getElementById('fpPreview').textContent = item.tag + ' — ' + (item.type || 'Component') + specSuffix;
   // Re-render sections
   updateInsertSection('round');
   updateInsertSection('rect');
@@ -7892,7 +7924,15 @@ function updateConfigArea() {
   if (selectedHvacComponent) {
     dimsArea.style.display = 'none';
     hvacArea.style.display = 'block';
-    document.getElementById('hvacConfigTag').textContent = selectedHvacComponent.tag + ' — ' + (selectedHvacComponent.type || '');
+    const hc = selectedHvacComponent;
+    const hcSpecs = [];
+    if (hc.tonnage) hcSpecs.push(hc.tonnage + ' ton');
+    if (hc.cfm) hcSpecs.push(hc.cfm.toLocaleString() + ' CFM');
+    if (hc.manufacturer) hcSpecs.push(hc.manufacturer);
+    if (hc.model) hcSpecs.push(hc.model);
+    if (hc.voltage) hcSpecs.push(hc.voltage);
+    document.getElementById('hvacConfigTag').innerHTML = `<span style="color:${hc.color || '#00ff88'}">${escapeHtml(hc.tag)}</span> — ${escapeHtml(hc.type || '')}` +
+      (hcSpecs.length > 0 ? `<div style="font-size:10px;color:#a0a0c0;margin-top:2px">${escapeHtml(hcSpecs.join(' · '))}</div>` : '');
   } else {
     dimsArea.style.display = selectedFittingType ? 'block' : 'none';
     hvacArea.style.display = 'none';
@@ -8019,7 +8059,7 @@ function handleFittingClick(e) {
     const f = {
       id: fittingIdCounter,
       type: 'hvac_component',
-      hvacComponentId: hvac.id,
+      hvacComponentId: hvac._symId || null,
       hvacTag: hvac.tag || 'HVAC',
       hvacType: hvac.type || '',
       hvacCategory: hvac.category || '',
