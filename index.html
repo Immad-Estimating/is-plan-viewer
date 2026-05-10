@@ -3228,28 +3228,13 @@ window.aiReviewImportAll = async function() {
     imported++;
   }
 
-  await saveProjectSystemSymbols(activeProjectId);
-  renderSysSymbolList();
-
-  const statusEl = document.getElementById('sysSymAiStatus');
-
-  if (imported === 0) {
-    statusEl.innerHTML = `<span style="color:#555">No new items imported.</span>`;
-    window._aiReviewEquipment = null;
-    return;
-  }
-
-  statusEl.innerHTML = `<span style="color:#00ff88">\u2713 Imported ${imported} items</span>` +
-    (equipment.length > imported ? `<span style="color:#555;font-size:10px"> (${equipment.length - imported} skipped/dupes)</span>` : '');
-
-  // Step 2: HVAC Library matching — collect only the items that were actually imported
+  // Collect imported item data BEFORE wiping the DOM (innerHTML destroys the review rows)
   const importedItems = [];
   for (let idx = 0; idx < equipment.length; idx++) {
     const chk = document.getElementById('aiChk' + idx);
     if (!chk || !chk.checked) continue;
     const tag = (document.getElementById('aiTag' + idx)?.value || '').trim().toUpperCase();
     if (!tag) continue;
-    // Build item with edited values for matching
     const eq = equipment[idx];
     importedItems.push({
       tag,
@@ -3264,6 +3249,20 @@ window.aiReviewImportAll = async function() {
       heating: eq.heating || null,
     });
   }
+
+  await saveProjectSystemSymbols(activeProjectId);
+  renderSysSymbolList();
+
+  const statusEl = document.getElementById('sysSymAiStatus');
+
+  if (imported === 0) {
+    statusEl.innerHTML = `<span style="color:#555">No new items imported.</span>`;
+    window._aiReviewEquipment = null;
+    return;
+  }
+
+  statusEl.innerHTML = `<span style="color:#00ff88">\u2713 Imported ${imported} items</span>` +
+    (equipment.length > imported ? `<span style="color:#555;font-size:10px"> (${equipment.length - imported} skipped/dupes)</span>` : '');
 
   // Run library matching on imported items
   const matchResults = await HVACLibrary.matchExtractedBatch(importedItems);
