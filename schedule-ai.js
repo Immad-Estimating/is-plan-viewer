@@ -37,47 +37,71 @@ function detectProvider(apiKey) {
 
 // ── Extraction prompt ─────────────────────────────────
 
-const EXTRACTION_PROMPT = `You are an expert HVAC estimator analyzing a mechanical equipment schedule from construction drawings.
+const EXTRACTION_PROMPT = `You are an expert HVAC estimator analyzing a mechanical schedule from construction drawings.
 
-Your job: extract every piece of equipment from this schedule into structured JSON.
+Your job: extract every tagged item from this schedule into structured JSON. This could be ANY type of mechanical schedule — equipment, fans, air distribution, terminal units, accessories, or specialty items.
 
-This is a standard mechanical schedule — typically a table with columns for equipment designation, capacity, airflow, electrical, and model info. Schedules may be titled "HVAC Equipment Schedule", "Mechanical Schedule", "Rooftop Unit Schedule", "Fan Schedule", "Air Handler Schedule", etc.
+Common schedule titles you may encounter:
+- HVAC Equipment Schedule, Mechanical Schedule, Rooftop Unit Schedule
+- Fan Schedule, Exhaust Fan Schedule, Supply Fan Schedule
+- Air Distribution Schedule, Diffuser Schedule, Grille Schedule, Register Schedule
+- Terminal Unit Schedule, VAV Box Schedule, Fan Coil Schedule
+- Air Curtain Schedule, Unit Heater Schedule, Cabinet Heater Schedule
+- Damper Schedule, Louver Schedule, Hood Schedule
 
-For EACH equipment entry, extract these fields in order of priority:
+For EACH row/entry, extract these fields:
 
-=== PRIMARY FIELDS (critical — always extract these) ===
-- "tag": Equipment tag/designation (e.g., "RTU-1", "AHU-2", "EF-3", "MAU-1", "FCU-1", "HP-1", "CU-1", "ERV-1")
-- "type": Equipment type. Standardize to one of: "Rooftop Unit", "Air Handler", "Exhaust Fan", "Makeup Air Unit", "Fan Coil Unit", "Heat Pump", "Mini Split", "Condensing Unit", "ERV", "HRV", "Unit Heater", "Cabinet Heater", "VAV Box", "WSHP", "PTAC", "Package Unit", "Split System". Use the closest match.
-- "tonnage": Cooling capacity in tons (number). Convert from BTU if needed: BTU/12000 = tons. null if not listed.
-- "cfm": Supply airflow in CFM (number). Use the supply/total CFM, not outdoor air. null if not listed.
-- "model": Full model number as shown (string). This is critical for procurement.
-- "manufacturer": Brand/manufacturer name (string). Common: Carrier, Trane, Lennox, AAON, Daikin, Mitsubishi, LG, York, Rheem, Bard.
+=== PRIMARY FIELDS (always extract) ===
+- "tag": The item tag/designation exactly as shown (e.g., "RTU-1", "EF-3", "SD-1", "GR-4", "AC-1", "VAV-2A", "UH-1", "FPB-3")
+- "type": Item type. Standardize to the closest match from this list:
+  EQUIPMENT: "Rooftop Unit" | "Air Handler" | "Package Unit" | "Split System" | "Condensing Unit" | "Heat Pump" | "Mini Split" | "WSHP" | "PTAC"
+  FANS: "Exhaust Fan" | "Supply Fan" | "Return Fan" | "Transfer Fan" | "Inline Fan" | "Ceiling Fan" | "Power Ventilator" | "Kitchen Hood Fan" | "Garage Fan"
+  AIR DISTRIBUTION: "Supply Diffuser" | "Return Grille" | "Transfer Grille" | "Linear Diffuser" | "Slot Diffuser" | "Register" | "Louver" | "Intake Louver" | "Exhaust Louver"
+  TERMINAL UNITS: "VAV Box" | "Fan Powered Box" | "Fan Coil Unit" | "FPTU" | "Chilled Beam"
+  ENERGY RECOVERY: "ERV" | "HRV" | "Energy Recovery Wheel"
+  HEATING: "Unit Heater" | "Cabinet Heater" | "Radiant Heater" | "Baseboard Heater" | "Duct Heater"
+  MAKEUP AIR: "Makeup Air Unit" | "DOAS"
+  SPECIALTY: "Air Curtain" | "Fume Hood" | "Kitchen Hood" | "Damper" | "Fire Damper" | "Smoke Damper" | "Combination Fire/Smoke Damper" | "Control Damper" | "Backdraft Damper"
+  If none match, use the description from the schedule as-is.
+- "category": One of: "equipment" | "fan" | "air-distribution" | "terminal" | "energy-recovery" | "heating" | "makeup-air" | "specialty"
+- "cfm": Airflow in CFM (number or null)
+- "model": Full model number exactly as shown (string or null)
+- "manufacturer": Brand name (string or null)
 
-=== SECONDARY FIELDS (important for coordination) ===
-- "heating": Heating type and capacity (e.g., "250 MBH Gas", "15 kW Electric", "Heat Pump", null)
-- "voltage": Electrical requirements as shown (e.g., "208/3/60", "460/3/60", "120/1/60", null)
-- "refrigerant": Refrigerant type (e.g., "R-410A", "R-32", "R-454B", null)
-- "mca": Minimum circuit ampacity if shown (number or null)
-- "mocp": Maximum overcurrent protection if shown (number or null)
+=== SECONDARY FIELDS (extract if visible) ===
+- "tonnage": Cooling tonnage (number or null) — convert from BTU if needed (BTU/12000)
+- "heating": Heating capacity/type (e.g., "250 MBH Gas", "15 kW Electric", null)
+- "voltage": Electrical (e.g., "208/3/60", null)
+- "refrigerant": Refrigerant type (e.g., "R-410A", null)
+- "mca": Minimum circuit ampacity (number or null)
+- "mocp": Maximum overcurrent protection (number or null)
+- "size": Physical size for grilles/diffusers/dampers (e.g., "24x24", "12x8", "10\" round", null)
+- "quantity": If a quantity column exists showing multiples of the same tag (number or null, default null meaning 1)
+- "location": Serving area/room if shown (string or null)
 
-=== SKIP THESE (do not extract) ===
-- Entering/leaving air temperatures
-- Discharge air temperatures
+=== SKIP THESE ===
+- Entering/leaving/discharge air temperatures
 - Sound ratings/NC levels
 - Weight
-- Filter sizes (unless no other data exists for the row)
 - Coil specifications
 - Drain connection sizes
 
 Rules:
-1. Each ROW in the schedule = one equipment entry. Do not merge or skip rows.
-2. If a tag appears multiple times (e.g., "FCU-1" through "FCU-12"), create separate entries for each unique tag. If a range is shown ("FCU-1 THRU FCU-12"), expand into individual entries with the same specs.
-3. If you can partially read a field, include what you can. Use null only if truly unreadable.
-4. Model numbers often contain dashes, slashes, and mixed case — preserve exactly as shown.
-5. Some schedules split into multiple tables on one page (e.g., RTU schedule + fan schedule). Extract from ALL tables.
+1. Each ROW = one entry. Do not merge or skip rows.
+2. If a tag range is shown ("FCU-1 THRU FCU-12"), expand into individual entries with the same specs.
+3. Partially readable fields: include what you can read. null only if truly unreadable.
+4. Model numbers: preserve exactly as shown (dashes, slashes, mixed case).
+5. Multiple tables on one page: extract from ALL of them.
+6. For air distribution items (grilles/diffusers/registers): size and CFM are the primary data, tonnage will be null.
+7. For dampers: size is the primary data, CFM/tonnage may be null.
+8. For fans: CFM and HP/watts are the primary data, tonnage will be null.
 
-Return ONLY a JSON array. No markdown fencing, no explanation text, just the raw array.
-Example: [{"tag":"RTU-1","type":"Rooftop Unit","tonnage":10,"cfm":4000,"model":"RN-048-3-0-0-A00","manufacturer":"AAON","heating":"150 MBH Gas","voltage":"208/3/60","refrigerant":"R-410A","mca":42,"mocp":60}]`;
+Return ONLY a JSON array. No markdown, no explanation.
+Examples:
+[{"tag":"RTU-1","type":"Rooftop Unit","category":"equipment","tonnage":10,"cfm":4000,"model":"RN-048","manufacturer":"AAON","heating":"150 MBH Gas","voltage":"208/3/60","refrigerant":"R-410A","mca":42,"mocp":60,"size":null,"quantity":null,"location":null},
+{"tag":"EF-1","type":"Exhaust Fan","category":"fan","tonnage":null,"cfm":2500,"model":"CSP-A1200","manufacturer":"Greenheck","heating":null,"voltage":"208/1/60","refrigerant":null,"mca":null,"mocp":null,"size":null,"quantity":null,"location":"Restrooms"},
+{"tag":"SD-1","type":"Supply Diffuser","category":"air-distribution","tonnage":null,"cfm":200,"model":"STR","manufacturer":"Titus","heating":null,"voltage":null,"refrigerant":null,"mca":null,"mocp":null,"size":"24x24","quantity":12,"location":null},
+{"tag":"FSD-1","type":"Combination Fire/Smoke Damper","category":"specialty","tonnage":null,"cfm":null,"model":"FSD-35","manufacturer":"Ruskin","heating":null,"voltage":"120/1/60","refrigerant":null,"mca":null,"mocp":null,"size":"24x12","quantity":4,"location":null}]`;
 
 // ── Gemini API ────────────────────────────────────────
 
@@ -229,20 +253,42 @@ const ScheduleAI = {
   },
 
   equipmentToSymbols(equipment) {
-    const COLORS = ['#4dabf7','#69db7c','#ffd43b','#da77f2','#ff8787','#a9e34b','#ffa94d','#74c0fc','#f783ac','#63e6be','#d0bfff','#ffc078'];
-    return equipment.map((eq, i) => {
-      // Build a concise but informative description from primary fields
+    // Color palettes by category for visual distinction
+    const CAT_COLORS = {
+      'equipment':       ['#4dabf7','#339af0','#228be6','#1c7ed6'],
+      'fan':             ['#69db7c','#51cf66','#40c057','#37b24d'],
+      'air-distribution':['#ffd43b','#fcc419','#fab005','#f59f00'],
+      'terminal':        ['#da77f2','#cc5de8','#be4bdb','#ae3ec9'],
+      'energy-recovery': ['#74c0fc','#4dabf7','#339af0','#228be6'],
+      'heating':         ['#ff8787','#ff6b6b','#fa5252','#f03e3e'],
+      'makeup-air':      ['#ffa94d','#ff922b','#fd7e14','#f76707'],
+      'specialty':       ['#a9e34b','#94d82d','#82c91e','#74b816'],
+    };
+    const DEFAULT_COLORS = ['#4dabf7','#69db7c','#ffd43b','#da77f2','#ff8787','#a9e34b','#ffa94d','#74c0fc'];
+    const catCounters = {};
+
+    return equipment.map((eq) => {
+      const cat = eq.category || 'equipment';
+      if (!catCounters[cat]) catCounters[cat] = 0;
+      const palette = CAT_COLORS[cat] || DEFAULT_COLORS;
+      const color = palette[catCounters[cat]++ % palette.length];
+
+      // Build description based on category
       const descParts = [eq.type];
       if (eq.manufacturer) descParts.push(eq.manufacturer);
       if (eq.tonnage) descParts.push(eq.tonnage + ' ton');
       if (eq.cfm) descParts.push(eq.cfm + ' CFM');
+      if (eq.size) descParts.push(eq.size);
+      if (eq.quantity && eq.quantity > 1) descParts.push('qty ' + eq.quantity);
+
       return {
         tag: (eq.tag || '').toUpperCase(),
         description: descParts.filter(Boolean).join(' · '),
-        color: COLORS[i % COLORS.length],
-        // Full equipment record for downstream reference
+        color,
+        category: cat,
         equipment: {
           type: eq.type || null,
+          category: cat,
           tonnage: eq.tonnage || null,
           cfm: eq.cfm || null,
           model: eq.model || null,
@@ -252,6 +298,9 @@ const ScheduleAI = {
           refrigerant: eq.refrigerant || null,
           mca: eq.mca || null,
           mocp: eq.mocp || null,
+          size: eq.size || null,
+          quantity: eq.quantity || null,
+          location: eq.location || null,
         }
       };
     }).filter(s => s.tag);
