@@ -141,6 +141,68 @@ function injectCSS() {
 }
 .hvac-lib-detail-grid textarea { grid-column: 1 / -1; min-height: 50px; resize: vertical; }
 .hvac-lib-detail-actions { margin-top: 8px; display: flex; gap: 6px; }
+
+/* Section headers in expanded card */
+.hvac-lib-section { margin-top: 10px; }
+.hvac-lib-section-head {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 6px; cursor: pointer; user-select: none;
+}
+.hvac-lib-section-icon { font-size: 12px; }
+.hvac-lib-section-label { font-size: 10px; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.hvac-lib-section-line { flex: 1; height: 1px; background: #0f3460; }
+
+/* Pricing row — material + labor side by side */
+.hvac-lib-pricing-row {
+  display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;
+}
+.hvac-lib-price-box {
+  flex: 1; min-width: 120px; background: #1a1a2e; border: 1px solid #0f3460;
+  border-radius: 6px; padding: 8px 10px;
+}
+.hvac-lib-price-label { font-size: 10px; color: #a0a0c0; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
+.hvac-lib-price-input {
+  width: 100%; background: transparent; border: none; color: #00ff88;
+  font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
+  outline: none; padding: 0;
+}
+.hvac-lib-price-input::placeholder { color: #333; }
+.hvac-lib-price-input.labor-val { color: #ffd43b; }
+.hvac-lib-price-input.rate-val { color: #a0a0c0; font-size: 13px; font-weight: 400; }
+.hvac-lib-price-sub { font-size: 10px; color: #555; margin-top: 2px; }
+
+/* Labor radar chart */
+.hvac-lib-radar-wrap {
+  margin-top: 8px; background: #1a1a2e; border: 1px solid #0f3460;
+  border-radius: 8px; padding: 10px; overflow: hidden;
+}
+.hvac-lib-radar-toggle {
+  display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+}
+.hvac-lib-radar-toggle:hover .hvac-lib-radar-arrow { color: #e94560; }
+.hvac-lib-radar-arrow { color: #555; font-size: 10px; transition: transform 0.2s; }
+.hvac-lib-radar-arrow.open { transform: rotate(90deg); color: #e94560; }
+.hvac-lib-radar-label { font-size: 11px; color: #a0a0c0; font-weight: 600; }
+.hvac-lib-radar-total { font-size: 12px; color: #ffd43b; font-weight: 700; }
+.hvac-lib-radar-dots { display: flex; gap: 3px; align-items: center; }
+.hvac-lib-radar-dot { width: 6px; height: 6px; border-radius: 50%; }
+.hvac-lib-radar-body { margin-top: 8px; display: flex; gap: 14px; align-items: flex-start; }
+.hvac-lib-radar-cats {
+  display: flex; flex-direction: column; gap: 4px; flex: 1;
+}
+.hvac-lib-cat-row {
+  display: flex; align-items: center; gap: 6px; padding: 3px 6px;
+  border-radius: 4px; transition: background 0.1s;
+}
+.hvac-lib-cat-row:hover { background: rgba(15,52,96,0.5); }
+.hvac-lib-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.hvac-lib-cat-label { font-size: 11px; color: #a0a0c0; flex: 1; }
+.hvac-lib-cat-input {
+  width: 52px; background: #16213e; border: 1px solid #0f3460; color: #e0e0e0;
+  padding: 3px 6px; border-radius: 3px; font-size: 12px; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.hvac-lib-cat-input:focus { outline: none; border-color: #e94560; }
+.hvac-lib-cat-unit { font-size: 10px; color: #555; width: 10px; }
 .hvac-lib-btn {
   padding: 5px 12px; border-radius: 4px; border: none; font-size: 11px;
   cursor: pointer; font-weight: 600; transition: opacity .15s;
@@ -202,6 +264,90 @@ function injectCSS() {
 }
 `;
   document.head.appendChild(style);
+}
+
+// ── Labor categories (mirrors Price Book) ─────────────────────────────
+const LABOR_CATS = [
+  { key: 'rough',       label: 'Rough',        short: 'R',  color: '#4dabf7' },
+  { key: 'air-handler', label: 'Air Handler',   short: 'AH', color: '#69db7c' },
+  { key: 'condenser',   label: 'Condenser',     short: 'CU', color: '#69db7c' },
+  { key: 'lineset',     label: 'Line Set',      short: 'LS', color: '#ffd43b' },
+  { key: 'trim',        label: 'Trim',          short: 'T',  color: '#da77f2' },
+  { key: 'venting',     label: 'Venting',       short: 'V',  color: '#ff8787' },
+  { key: 'stocking',    label: 'Stocking',      short: 'SK', color: '#a9e34b' },
+  { key: 'startup',     label: 'Startup',       short: 'SU', color: '#ffa94d' },
+  { key: 'qc',          label: 'Quality Ctrl',  short: 'QC', color: '#74c0fc' },
+];
+
+// Applicable labor cats per library category
+function _applicableCats(category) {
+  switch (category) {
+    case 'equipment':       return ['air-handler','condenser','lineset','stocking','startup','qc'];
+    case 'fan':             return ['rough','stocking','startup','qc'];
+    case 'air-distribution':return ['rough','trim','stocking','qc'];
+    case 'terminal':        return ['rough','trim','stocking','startup','qc'];
+    case 'heating':         return ['rough','stocking','startup','qc'];
+    case 'energy-recovery': return ['air-handler','stocking','startup','qc'];
+    case 'makeup-air':      return ['rough','stocking','startup','qc'];
+    case 'specialty':       return ['rough','trim','stocking','qc'];
+    default:                return LABOR_CATS.map(c => c.key);
+  }
+}
+
+function _getTotalBreakdownHrs(breakdown) {
+  if (!breakdown || typeof breakdown !== 'object') return 0;
+  return Object.values(breakdown).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+}
+
+// Build radar chart SVG
+function _renderRadarSVG(breakdown, applicableKeys) {
+  const cats = LABOR_CATS;
+  const n = cats.length;
+  const cx = 80, cy = 80, r = 62;
+  let maxVal = 1;
+  for (const c of cats) { const v = breakdown[c.key] || 0; if (v > maxVal) maxVal = Math.ceil(v); }
+
+  let svg = `<svg width="170" height="170" viewBox="0 0 170 170" style="flex-shrink:0">`;
+  // Background rings
+  for (let ring = 1; ring <= 4; ring++) {
+    const rr = r * ring / 4;
+    const pts = [];
+    for (let j = 0; j < n; j++) {
+      const a = -Math.PI/2 + (2*Math.PI*j/n);
+      pts.push(`${(cx + rr*Math.cos(a)).toFixed(1)},${(cy + rr*Math.sin(a)).toFixed(1)}`);
+    }
+    svg += `<polygon points="${pts.join(' ')}" fill="none" stroke="#0f3460" stroke-width="0.5"/>`;
+  }
+  // Axes + labels
+  for (let j = 0; j < n; j++) {
+    const c = cats[j];
+    const enabled = applicableKeys.includes(c.key);
+    const a = -Math.PI/2 + (2*Math.PI*j/n);
+    const ex = cx + r*Math.cos(a), ey = cy + r*Math.sin(a);
+    svg += `<line x1="${cx}" y1="${cy}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${enabled ? '#0f3460' : '#0a1a30'}" stroke-width="0.5"/>`;
+    const lx = cx + (r+15)*Math.cos(a), ly = cy + (r+15)*Math.sin(a);
+    const anchor = Math.abs(Math.cos(a)) < 0.1 ? 'middle' : (Math.cos(a) > 0 ? 'start' : 'end');
+    svg += `<text x="${lx.toFixed(1)}" y="${(ly+3).toFixed(1)}" fill="${enabled ? c.color : '#333'}" font-size="9" text-anchor="${anchor}" font-weight="700">${c.short}</text>`;
+  }
+  // Data polygon
+  const dataPts = [];
+  for (let j = 0; j < n; j++) {
+    const a = -Math.PI/2 + (2*Math.PI*j/n);
+    const val = Math.min((breakdown[cats[j].key] || 0) / maxVal, 1);
+    dataPts.push(`${(cx + r*val*Math.cos(a)).toFixed(1)},${(cy + r*val*Math.sin(a)).toFixed(1)}`);
+  }
+  svg += `<polygon points="${dataPts.join(' ')}" fill="rgba(233,69,96,0.2)" stroke="#e94560" stroke-width="1.5"/>`;
+  // Dots
+  for (let j = 0; j < n; j++) {
+    const c = cats[j];
+    const enabled = applicableKeys.includes(c.key);
+    const a = -Math.PI/2 + (2*Math.PI*j/n);
+    const val = Math.min((breakdown[c.key] || 0) / maxVal, 1);
+    const dx = cx + r*val*Math.cos(a), dy = cy + r*val*Math.sin(a);
+    svg += `<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="3.5" fill="${enabled ? c.color : '#333'}" stroke="${enabled ? '#fff' : '#222'}" stroke-width="0.8"/>`;
+  }
+  svg += `</svg>`;
+  return svg;
 }
 
 // ── Utility helpers ───────────────────────────────────────────────────
@@ -587,73 +733,241 @@ const HVACLibrary = {
           // Expanded detail
           if (isExpanded) {
             const detail = _el('div', { className: 'hvac-lib-detail' });
-            const form = _el('div', { className: 'hvac-lib-detail-grid' });
-
-            const fields = [
-              ['Tag Template', 'tag', entry.tag],
-              ['Type', 'type', entry.type],
-              ['Manufacturer', 'manufacturer', entry.manufacturer || ''],
-              ['Model', 'model', entry.model || ''],
-              ['Tonnage', 'specs.tonnage', entry.specs?.tonnage ?? ''],
-              ['CFM', 'specs.cfm', entry.specs?.cfm ?? ''],
-              ['Voltage', 'specs.voltage', entry.specs?.voltage || ''],
-              ['Heating', 'specs.heating', entry.specs?.heating || ''],
-              ['Refrigerant', 'specs.refrigerant', entry.specs?.refrigerant || ''],
-              ['MCA', 'specs.mca', entry.specs?.mca ?? ''],
-              ['MOCP', 'specs.mocp', entry.specs?.mocp ?? ''],
-              ['Size', 'specs.size', entry.specs?.size || ''],
-              ['Material Cost ($)', 'pricing.materialCost', entry.pricing?.materialCost ?? 0],
-              ['Labor Hours', 'pricing.laborHrs', entry.pricing?.laborHrs ?? 0],
-              ['Labor Rate ($/hr)', 'pricing.laborRate', entry.pricing?.laborRate ?? ''],
-            ];
-
             const inputs = {};
-            fields.forEach(([label, path, value]) => {
-              const wrap = _el('div');
-              wrap.appendChild(_el('label', {}, label));
+
+            // ── SECTION 1: Identity ──
+            const idGrid = _el('div', { className: 'hvac-lib-detail-grid' });
+            [['Tag Template', 'tag', entry.tag], ['Type', 'type', entry.type],
+             ['Manufacturer', 'manufacturer', entry.manufacturer || ''], ['Model', 'model', entry.model || '']]
+            .forEach(([label, path, value]) => {
+              const w = _el('div');
+              w.appendChild(_el('label', {}, label));
               const inp = _el('input', { type: 'text', value: value ?? '' });
               inputs[path] = inp;
-              wrap.appendChild(inp);
-              form.appendChild(wrap);
+              w.appendChild(inp);
+              idGrid.appendChild(w);
             });
+            detail.appendChild(idGrid);
 
-            // Notes (full width)
-            const notesWrap = _el('div');
-            notesWrap.appendChild(_el('label', {}, 'Notes'));
-            const notesInp = _el('textarea', {}, entry.notes || '');
+            // ── SECTION 2: Specs (category-aware) ──
+            const specSec = _el('div', { className: 'hvac-lib-section' });
+            const specHead = _el('div', { className: 'hvac-lib-section-head' });
+            specHead.innerHTML = '<span class="hvac-lib-section-icon">📋</span><span class="hvac-lib-section-label">Specs</span><span class="hvac-lib-section-line"></span>';
+            specSec.appendChild(specHead);
+
+            const specGrid = _el('div', { className: 'hvac-lib-detail-grid' });
+            // Show relevant specs based on category
+            const specFields = [];
+            const cat = entry.category || 'equipment';
+            if (['equipment','energy-recovery','makeup-air'].includes(cat)) {
+              specFields.push(['Tonnage', 'specs.tonnage', entry.specs?.tonnage ?? '']);
+              specFields.push(['Heating', 'specs.heating', entry.specs?.heating || '']);
+              specFields.push(['Refrigerant', 'specs.refrigerant', entry.specs?.refrigerant || '']);
+            }
+            if (['equipment','fan','air-distribution','terminal','energy-recovery','makeup-air','heating'].includes(cat)) {
+              specFields.push(['CFM', 'specs.cfm', entry.specs?.cfm ?? '']);
+            }
+            if (['air-distribution','specialty','terminal'].includes(cat)) {
+              specFields.push(['Size', 'specs.size', entry.specs?.size || '']);
+            }
+            specFields.push(['Voltage', 'specs.voltage', entry.specs?.voltage || '']);
+            if (['equipment','energy-recovery','makeup-air'].includes(cat)) {
+              specFields.push(['MCA', 'specs.mca', entry.specs?.mca ?? '']);
+              specFields.push(['MOCP', 'specs.mocp', entry.specs?.mocp ?? '']);
+            }
+            specFields.forEach(([label, path, value]) => {
+              const w = _el('div');
+              w.appendChild(_el('label', {}, label));
+              const inp = _el('input', { type: 'text', value: value ?? '' });
+              inputs[path] = inp;
+              w.appendChild(inp);
+              specGrid.appendChild(w);
+            });
+            specSec.appendChild(specGrid);
+            detail.appendChild(specSec);
+
+            // ── SECTION 3: Pricing & Labor ──
+            const priceSec = _el('div', { className: 'hvac-lib-section' });
+            const priceHead = _el('div', { className: 'hvac-lib-section-head' });
+            priceHead.innerHTML = '<span class="hvac-lib-section-icon">💲</span><span class="hvac-lib-section-label">Pricing & Labor</span><span class="hvac-lib-section-line"></span>';
+            priceSec.appendChild(priceHead);
+
+            // Material + Total Labor + Rate row
+            const priceRow = _el('div', { className: 'hvac-lib-pricing-row' });
+
+            // Material cost box
+            const matBox = _el('div', { className: 'hvac-lib-price-box' });
+            matBox.innerHTML = '<div class="hvac-lib-price-label">Material Cost</div>';
+            const matInp = _el('input', {
+              className: 'hvac-lib-price-input', type: 'text',
+              value: entry.pricing?.materialCost ? '$' + entry.pricing.materialCost.toLocaleString() : '',
+              placeholder: '$0.00',
+            });
+            inputs['pricing.materialCost'] = matInp;
+            matBox.appendChild(matInp);
+            matBox.appendChild(_el('div', { className: 'hvac-lib-price-sub' }, 'per unit'));
+            priceRow.appendChild(matBox);
+
+            // Labor hours box (total from breakdown)
+            const bd = entry.pricing?.laborBreakdown || {};
+            const totalBdHrs = _getTotalBreakdownHrs(bd);
+            const displayHrs = totalBdHrs > 0 ? totalBdHrs : (entry.pricing?.laborHrs || 0);
+            const laborBox = _el('div', { className: 'hvac-lib-price-box' });
+            laborBox.innerHTML = '<div class="hvac-lib-price-label">Labor Hours</div>';
+            const laborDisp = _el('div', {
+              style: { fontSize: '18px', fontWeight: '700', color: '#ffd43b', fontVariantNumeric: 'tabular-nums' },
+            }, displayHrs > 0 ? displayHrs.toFixed(2) + 'h' : '—');
+            laborBox.appendChild(laborDisp);
+            const laborDollar = (displayHrs * (entry.pricing?.laborRate || 45));
+            laborBox.appendChild(_el('div', { className: 'hvac-lib-price-sub' },
+              displayHrs > 0 ? '$' + laborDollar.toFixed(2) + ' at $' + (entry.pricing?.laborRate || 45) + '/hr' : 'set hours below'));
+            priceRow.appendChild(laborBox);
+
+            // Rate box
+            const rateBox = _el('div', { className: 'hvac-lib-price-box', style: { maxWidth: '110px' } });
+            rateBox.innerHTML = '<div class="hvac-lib-price-label">Labor Rate</div>';
+            const rateInp = _el('input', {
+              className: 'hvac-lib-price-input rate-val', type: 'text',
+              value: entry.pricing?.laborRate ? '$' + entry.pricing.laborRate : '',
+              placeholder: '$45 default',
+            });
+            inputs['pricing.laborRate'] = rateInp;
+            rateBox.appendChild(rateInp);
+            rateBox.appendChild(_el('div', { className: 'hvac-lib-price-sub' }, 'per hour'));
+            priceRow.appendChild(rateBox);
+
+            priceSec.appendChild(priceRow);
+
+            // ── Labor breakdown radar chart ──
+            const radarWrap = _el('div', { className: 'hvac-lib-radar-wrap' });
+            let radarOpen = true; // default open
+            const applicableKeys = _applicableCats(entry.category);
+
+            const renderRadar = () => {
+              const currentBd = {};
+              LABOR_CATS.forEach(c => {
+                const inp = inputs['bd.' + c.key];
+                currentBd[c.key] = inp ? (parseFloat(inp.value) || 0) : (bd[c.key] || 0);
+              });
+
+              radarWrap.innerHTML = '';
+
+              // Toggle header
+              const toggle = _el('div', { className: 'hvac-lib-radar-toggle' });
+              toggle.innerHTML = `<span class="hvac-lib-radar-arrow ${radarOpen ? 'open' : ''}">▶</span>
+                <span class="hvac-lib-radar-label">Labor Breakdown</span>`;
+
+              // Dot summary
+              const dots = _el('span', { className: 'hvac-lib-radar-dots' });
+              LABOR_CATS.forEach(c => {
+                if ((currentBd[c.key] || 0) > 0) {
+                  const d = _el('span', { className: 'hvac-lib-radar-dot' });
+                  d.style.background = c.color;
+                  dots.appendChild(d);
+                }
+              });
+              toggle.appendChild(dots);
+
+              const total = _getTotalBreakdownHrs(currentBd);
+              toggle.appendChild(_el('span', { className: 'hvac-lib-radar-total', style: { marginLeft: 'auto' } },
+                total > 0 ? total.toFixed(2) + 'h' : '—'));
+
+              toggle.addEventListener('click', () => { radarOpen = !radarOpen; renderRadar(); });
+              radarWrap.appendChild(toggle);
+
+              if (radarOpen) {
+                const body = _el('div', { className: 'hvac-lib-radar-body' });
+
+                // SVG radar chart
+                const svgWrap = _el('div');
+                svgWrap.innerHTML = _renderRadarSVG(currentBd, applicableKeys);
+                body.appendChild(svgWrap);
+
+                // Category input rows
+                const catList = _el('div', { className: 'hvac-lib-radar-cats' });
+                LABOR_CATS.forEach(c => {
+                  const enabled = applicableKeys.includes(c.key);
+                  const row = _el('div', { className: 'hvac-lib-cat-row', style: { opacity: enabled ? '1' : '0.3' } });
+                  row.appendChild(_el('span', { className: 'hvac-lib-cat-dot', style: { background: c.color } }));
+                  row.appendChild(_el('span', { className: 'hvac-lib-cat-label' }, c.label));
+                  const catInp = _el('input', {
+                    className: 'hvac-lib-cat-input', type: 'text',
+                    value: currentBd[c.key] || '', placeholder: '0',
+                    disabled: enabled ? undefined : 'disabled',
+                  });
+                  catInp.style.color = enabled ? c.color : '#333';
+                  catInp.style.borderColor = enabled ? '#0f3460' : '#0a1a30';
+                  // Live update radar on change
+                  catInp.addEventListener('change', () => {
+                    // Update the labor total display
+                    const newBd = {};
+                    LABOR_CATS.forEach(cc => {
+                      const i = inputs['bd.' + cc.key];
+                      newBd[cc.key] = i ? (parseFloat(i.value) || 0) : 0;
+                    });
+                    const newTotal = _getTotalBreakdownHrs(newBd);
+                    laborDisp.textContent = newTotal > 0 ? newTotal.toFixed(2) + 'h' : '—';
+                    const newRate = parseFloat((rateInp.value || '').replace('$','')) || 45;
+                    laborBox.querySelector('.hvac-lib-price-sub').textContent =
+                      newTotal > 0 ? '$' + (newTotal * newRate).toFixed(2) + ' at $' + newRate + '/hr' : 'set hours below';
+                    renderRadar();
+                  });
+                  inputs['bd.' + c.key] = catInp;
+                  row.appendChild(catInp);
+                  row.appendChild(_el('span', { className: 'hvac-lib-cat-unit' }, 'h'));
+                  catList.appendChild(row);
+                });
+                body.appendChild(catList);
+                radarWrap.appendChild(body);
+              }
+            };
+
+            renderRadar();
+            priceSec.appendChild(radarWrap);
+            detail.appendChild(priceSec);
+
+            // ── SECTION 4: Notes ──
+            const notesSec = _el('div', { className: 'hvac-lib-section' });
+            const notesHead = _el('div', { className: 'hvac-lib-section-head' });
+            notesHead.innerHTML = '<span class="hvac-lib-section-icon">📝</span><span class="hvac-lib-section-label">Notes</span><span class="hvac-lib-section-line"></span>';
+            notesSec.appendChild(notesHead);
+            const notesInp = _el('textarea', {
+              style: { width: '100%', background: '#1a1a2e', border: '1px solid #0f3460', color: '#e0e0e0', padding: '6px 8px', borderRadius: '4px', fontSize: '12px', minHeight: '40px', resize: 'vertical', boxSizing: 'border-box' },
+            }, entry.notes || '');
+            notesInp.placeholder = 'Add notes...';
             inputs['notes'] = notesInp;
-            notesWrap.appendChild(notesInp);
-            form.appendChild(notesWrap);
+            notesSec.appendChild(notesInp);
+            detail.appendChild(notesSec);
 
-            detail.appendChild(form);
-
-            // Action buttons
-            const actions = _el('div', { className: 'hvac-lib-detail-actions' });
+            // ── Action buttons ──
+            const actions = _el('div', { className: 'hvac-lib-detail-actions', style: { marginTop: '12px' } });
 
             const saveBtn = _el('button', {
               className: 'hvac-lib-btn hvac-lib-btn-primary',
               onClick: async () => {
-                // Gather values
                 const updated = { ...entry };
                 updated.tag = inputs['tag'].value;
                 updated.type = inputs['type'].value;
                 updated.manufacturer = inputs['manufacturer'].value || null;
                 updated.model = inputs['model'].value || null;
                 updated.specs = {
-                  tonnage: parseFloat(inputs['specs.tonnage'].value) || null,
-                  cfm: parseFloat(inputs['specs.cfm'].value) || null,
-                  voltage: inputs['specs.voltage'].value || null,
-                  heating: inputs['specs.heating'].value || null,
-                  refrigerant: inputs['specs.refrigerant'].value || null,
-                  mca: parseFloat(inputs['specs.mca'].value) || null,
-                  mocp: parseFloat(inputs['specs.mocp'].value) || null,
-                  size: inputs['specs.size'].value || null,
+                  tonnage: parseFloat(inputs['specs.tonnage']?.value) || null,
+                  cfm: parseFloat(inputs['specs.cfm']?.value) || null,
+                  voltage: inputs['specs.voltage']?.value || null,
+                  heating: inputs['specs.heating']?.value || null,
+                  refrigerant: inputs['specs.refrigerant']?.value || null,
+                  mca: parseFloat(inputs['specs.mca']?.value) || null,
+                  mocp: parseFloat(inputs['specs.mocp']?.value) || null,
+                  size: inputs['specs.size']?.value || null,
                 };
+                const newBreakdown = {};
+                LABOR_CATS.forEach(c => { newBreakdown[c.key] = parseFloat(inputs['bd.' + c.key]?.value) || 0; });
+                const totalHrs = _getTotalBreakdownHrs(newBreakdown);
                 updated.pricing = {
-                  ...updated.pricing,
-                  materialCost: parseFloat(inputs['pricing.materialCost'].value) || 0,
-                  laborHrs: parseFloat(inputs['pricing.laborHrs'].value) || 0,
-                  laborRate: parseFloat(inputs['pricing.laborRate'].value) || null,
+                  materialCost: parseFloat((inputs['pricing.materialCost'].value || '').replace(/[\$,]/g, '')) || 0,
+                  laborHrs: totalHrs,
+                  laborRate: parseFloat((inputs['pricing.laborRate'].value || '').replace('$','')) || null,
+                  laborBreakdown: newBreakdown,
                 };
                 updated.notes = inputs['notes'].value || '';
                 await HVACLibrary.save(updated);
