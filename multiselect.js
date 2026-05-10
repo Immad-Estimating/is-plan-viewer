@@ -15,6 +15,10 @@ let _panelEl = null;
 let _dragStart = null;   // {sx, sy, px, py}
 let _dragActive = false;
 
+// Move-drag state (dragging selected items)
+let _moveDragStart = null;  // {px, py} starting PDF coords
+let _moveDragActive = false;
+
 // Lasso state
 let _lassoMode = false;  // true = freehand lasso, false = rectangle
 let _lassoPoints = [];   // [{sx,sy,px,py}] screen+pdf coords during drag
@@ -418,14 +422,69 @@ function copySelected() {
   return meas.length + fits.length + stacks.length;
 }
 
+// ── Move selected items ───────────────────────────────
+
+function isClickOnSelectedItem(pt) {
+  const page = _getCurrentPage();
+  // Check fittings
+  for (const f of (_getPageFittings(page) || [])) {
+    if (!_selectedFitIds.has(f.id)) continue;
+    if (Math.hypot(f.x - pt.x, f.y - pt.y) < 20) return true;
+  }
+  // Check stacks
+  for (const s of (_getPageStacks(page) || [])) {
+    if (!_selectedStackIds.has(s.id)) continue;
+    if (Math.hypot(s.x - pt.x, s.y - pt.y) < 20) return true;
+  }
+  // Check measurements (any point near)
+  for (const m of (_getPageMeasurements(page) || [])) {
+    if (!_selectedMeasIds.has(m.id)) continue;
+    if (!m.points) continue;
+    for (let i = 0; i < m.points.length - 1; i++) {
+      if (pointToSegDist(pt.x, pt.y, m.points[i].x, m.points[i].y, m.points[i+1].x, m.points[i+1].y) < 15) return true;
+    }
+  }
+  return false;
+}
+
+function moveSelectedItems(dx, dy) {
+  const page = _getCurrentPage();
+  const meas = _getPageMeasurements(page) || [];
+  const fits = _getPageFittings(page) || [];
+  const stacks = _getPageStacks(page) || [];
+  for (const m of meas) {
+    if (!_selectedMeasIds.has(m.id)) continue;
+    if (m.points) m.points.forEach(p => { p.x += dx; p.y += dy; });
+    if (m.labelOffset) { m.labelOffset.x += dx; m.labelOffset.y += dy; }
+  }
+  for (const f of fits) {
+    if (!_selectedFitIds.has(f.id)) continue;
+    f.x += dx; f.y += dy;
+  }
+  for (const s of stacks) {
+    if (!_selectedStackIds.has(s.id)) continue;
+    s.x += dx; s.y += dy;
+    if (s.items) s.items.forEach(it => { if (it.callout) { it.callout.x += dx; it.callout.y += dy; } });
+  }
+  if (_drawOverlay) _drawOverlay();
+}
+
 function pasteClipboard() {
   if (!_clipboard) return 0;
   const total = _clipboard.measurements.length + _clipboard.fittings.length + _clipboard.stacks.length;
   if (total === 0) return 0;
-  // Offset so paste doesn't land exactly on originals
-  const OFFSET = 20;
+  const OFFSET = 30;
   if (_pasteItems) {
-    _pasteItems(_clipboard, OFFSET, OFFSET);
+    const newIds = _pasteItems(_clipboard, OFFSET, OFFSET);
+    // Select the newly pasted items
+    if (newIds) {
+      clearSelection();
+      if (newIds.measIds) newIds.measIds.forEach(id => _selectedMeasIds.add(id));
+      if (newIds.fitIds) newIds.fitIds.forEach(id => _selectedFitIds.add(id));
+      if (newIds.stackIds) newIds.stackIds.forEach(id => _selectedStackIds.add(id));
+      onSelectionChanged();
+      if (_drawOverlay) _drawOverlay();
+    }
   }
   return total;
 }
@@ -469,6 +528,17 @@ const MultiSelect = {
   onShiftMouseDown(e, screenToPdf) {
     if (!_enabled) return false;
     const pt = screenToPdf(e.clientX, e.clientY);
+
+    // If clicking on an already-selected item, start move-drag
+    if (getSelectionCount() > 0 && isClickOnSelectedItem(pt)) {
+      _moveDragStart = { sx: e.clientX, sy: e.clientY, px: pt.x, py: pt.y };
+      _moveDragActive = false;
+      _dragStart = null;
+      return true;
+    }
+
+    _moveDragStart = null;
+    _moveDragActive = false;
     _dragStart = { sx: e.clientX, sy: e.clientY, px: pt.x, py: pt.y };
     _dragActive = false;
     _lassoPoints = [{ sx: e.clientX, sy: e.clientY, px: pt.x, py: pt.y }];
@@ -476,6 +546,24 @@ const MultiSelect = {
   },
 
   onShiftMouseMove(e, screenToPdf) {
+    // Move-drag: move all selected items
+    if (_moveDragStart) {
+      const dx = Math.abs(e.clientX - _moveDragStart.sx);
+      const dy = Math.abs(e.clientY - _moveDragStart.sy);
+      if (dx > 3 || dy > 3) _moveDragActive = true;
+      if (_moveDragActive) {
+        const pt = screenToPdf(e.clientX, e.clientY);
+        const ddx = pt.x - _moveDragStart.px;
+        const ddy = pt.y - _moveDragStart.py;
+        moveSelectedItems(ddx, ddy);
+        _moveDragStart.px = pt.x;
+        _moveDragStart.py = pt.y;
+        _moveDragStart.sx = e.clientX;
+        _moveDragStart.sy = e.clientY;
+      }
+      return;
+    }
+
     if (!_dragStart) return;
     const dx = Math.abs(e.clientX - _dragStart.sx);
     const dy = Math.abs(e.clientY - _dragStart.sy);
@@ -494,6 +582,14 @@ const MultiSelect = {
   },
 
   onShiftMouseUp(e, screenToPdf) {
+    // End move-drag
+    if (_moveDragStart) {
+      if (_moveDragActive && _scheduleSave) _scheduleSave();
+      _moveDragStart = null;
+      _moveDragActive = false;
+      return;
+    }
+
     if (!_dragStart) return;
 
     if (_dragActive) {

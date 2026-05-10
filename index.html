@@ -5496,6 +5496,22 @@ viewer.addEventListener('wheel', (e) => {
 
 // Keyboard shortcuts
 window.addEventListener('keydown', (e) => {
+  // Ctrl/Cmd+C/V: Copy/Paste — handle BEFORE input check so they work with panel focus
+  if (currentRoute.view === 'viewer' && pdfDoc && (e.ctrlKey || e.metaKey)) {
+    if (e.key === 'c' && MultiSelect.getSelectionCount() > 0) {
+      e.preventDefault();
+      const n = MultiSelect.copySelected();
+      if (n > 0 && typeof showToast === 'function') showToast(`Copied ${n} item${n !== 1 ? 's' : ''}`);
+      return;
+    }
+    if (e.key === 'v' && MultiSelect.hasClipboard()) {
+      e.preventDefault();
+      const n = MultiSelect.pasteClipboard();
+      if (n > 0 && typeof showToast === 'function') showToast(`Pasted ${n} item${n !== 1 ? 's' : ''}`);
+      return;
+    }
+  }
+
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
     if (e.key === 'Escape') {
       document.getElementById('ductPopup').classList.remove('open');
@@ -5510,21 +5526,6 @@ window.addEventListener('keydown', (e) => {
   // Only handle shortcuts when viewer is active
   if (currentRoute.view !== 'viewer') return;
   if (!pdfDoc) return;
-
-  // Ctrl/Cmd+C: Copy selected items
-  if ((e.ctrlKey || e.metaKey) && e.key === 'c' && MultiSelect.getSelectionCount() > 0) {
-    e.preventDefault();
-    const n = MultiSelect.copySelected();
-    if (n > 0 && typeof showToast === 'function') showToast(`Copied ${n} item${n !== 1 ? 's' : ''}`);
-    return;
-  }
-  // Ctrl/Cmd+V: Paste clipboard
-  if ((e.ctrlKey || e.metaKey) && e.key === 'v' && MultiSelect.hasClipboard()) {
-    e.preventDefault();
-    const n = MultiSelect.pasteClipboard();
-    if (n > 0 && typeof showToast === 'function') showToast(`Pasted ${n} item${n !== 1 ? 's' : ''}`);
-    return;
-  }
 
   // In duct draw mode: number keys, x, and backspace edit dimensions
   if (ductDrawMode && measPoints.length === 0) {
@@ -9741,6 +9742,7 @@ async function init() {
     pasteItems: (clipboard, offsetX, offsetY) => {
       const page = currentPage;
       let nextMeasId = Date.now();
+      const newMeasIds = [], newFitIds = [], newStackIds = [];
       // Paste measurements (duct runs)
       for (const m of (clipboard.measurements || [])) {
         const clone = JSON.parse(JSON.stringify(m));
@@ -9748,6 +9750,7 @@ async function init() {
         if (clone.points) clone.points = clone.points.map(p => ({ ...p, x: p.x + offsetX, y: p.y + offsetY }));
         if (!pageMeasurements[page]) pageMeasurements[page] = [];
         pageMeasurements[page].push(clone);
+        newMeasIds.push(clone.id);
       }
       // Paste fittings
       for (const f of (clipboard.fittings || [])) {
@@ -9757,6 +9760,7 @@ async function init() {
         clone.y += offsetY;
         if (!pageFittings[page]) pageFittings[page] = [];
         pageFittings[page].push(clone);
+        newFitIds.push(clone.id);
       }
       // Paste stacks
       for (const s of (clipboard.stacks || [])) {
@@ -9767,10 +9771,12 @@ async function init() {
         if (clone.items) clone.items.forEach(it => { it.id = ++stackItemIdCounter; if (it.callout) { it.callout.x += offsetX; it.callout.y += offsetY; } });
         if (!pageStacks[page]) pageStacks[page] = [];
         pageStacks[page].push(clone);
+        newStackIds.push(clone.id);
       }
       drawMeasureOverlay();
       updatePanel();
       scheduleSave();
+      return { measIds: newMeasIds, fitIds: newFitIds, stackIds: newStackIds };
     },
   });
 
