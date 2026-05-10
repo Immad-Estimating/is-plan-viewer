@@ -30,8 +30,9 @@ function stripDataUrl(dataUrl) {
 function detectProvider(apiKey) {
   if (!apiKey) return 'none';
   if (apiKey.startsWith('AIza')) return 'gemini';
+  if (apiKey.startsWith('sk-ant-')) return 'anthropic';
   if (apiKey.startsWith('sk-')) return 'openai';
-  return 'openai'; // default fallback
+  return 'openai';
 }
 
 // ── Extraction prompt ─────────────────────────────────
@@ -116,6 +117,49 @@ async function callGemini(base64DataUrl, config) {
   return parseEquipmentJSON(content);
 }
 
+// ── Anthropic Claude API ───────────────────────
+
+async function callAnthropic(base64DataUrl, config) {
+  const apiKey = config.apiKey;
+  const model = config.model || 'claude-sonnet-4-20250514';
+
+  const rawBase64 = stripDataUrl(base64DataUrl);
+  const mimeMatch = base64DataUrl.match(/^data:([^;]+);/);
+  const mediaType = mimeMatch ? mimeMatch[1] : 'image/png';
+
+  const body = {
+    model,
+    max_tokens: 4000,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: rawBase64 } },
+        { type: 'text', text: EXTRACTION_PROMPT }
+      ]
+    }]
+  };
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Anthropic API error ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const content = data.content?.[0]?.text || '';
+  return parseEquipmentJSON(content);
+}
+
 // ── OpenAI-compatible API ─────────────────────────────
 
 async function callOpenAI(base64DataUrl, config) {
@@ -173,10 +217,12 @@ const ScheduleAI = {
     onStatus?.('Converting image...');
     const base64 = await blobToBase64(blob);
 
-    onStatus?.(`Sending to ${provider === 'gemini' ? 'Gemini' : 'OpenAI'} vision...`);
-    const equipment = provider === 'gemini'
-      ? await callGemini(base64, config)
-      : await callOpenAI(base64, config);
+    const providerName = { gemini: 'Gemini', anthropic: 'Claude', openai: 'OpenAI' }[provider] || provider;
+    onStatus?.(`Sending to ${providerName} vision...`);
+    let equipment;
+    if (provider === 'gemini') equipment = await callGemini(base64, config);
+    else if (provider === 'anthropic') equipment = await callAnthropic(base64, config);
+    else equipment = await callOpenAI(base64, config);
 
     onStatus?.(`Found ${equipment.length} equipment entries`);
     return equipment;
@@ -217,16 +263,23 @@ const ScheduleAI = {
   renderConfigUI() {
     const cfg = getConfig();
     const provider = cfg.provider || detectProvider(cfg.apiKey);
+    const hints = {
+      anthropic: 'Uses existing Anthropic key — ~$0.01/extraction',
+      gemini: 'Free tier — get key at aistudio.google.com/apikey',
+      openai: 'Pay-per-use — platform.openai.com/api-keys'
+    };
+    const placeholders = { anthropic: 'sk-ant-...', gemini: 'AIza...', openai: 'sk-...' };
     return `
       <div style="padding:8px 0">
         <label style="display:block;font-size:11px;color:#a0a0c0;margin-bottom:3px">Provider</label>
-        <select id="aiCfgProvider" style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:6px 10px;border-radius:4px;font-size:12px;margin-bottom:8px" onchange="document.getElementById('aiCfgHint').textContent={'gemini':'Free — get key at aistudio.google.com/apikey','openai':'Pay-per-use — platform.openai.com/api-keys'}[this.value]||''">
-          <option value="gemini"${provider === 'gemini' ? ' selected' : ''}>Google Gemini (free tier)</option>
-          <option value="openai"${provider === 'openai' ? ' selected' : ''}>OpenAI (pay-per-use)</option>
+        <select id="aiCfgProvider" style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:6px 10px;border-radius:4px;font-size:12px;margin-bottom:8px" onchange="document.getElementById('aiCfgHint').textContent=${JSON.stringify(hints)}[this.value]||''">
+          <option value="anthropic"${provider === 'anthropic' ? ' selected' : ''}>Anthropic Claude (recommended)</option>
+          <option value="gemini"${provider === 'gemini' ? ' selected' : ''}>Google Gemini</option>
+          <option value="openai"${provider === 'openai' ? ' selected' : ''}>OpenAI</option>
         </select>
-        <div id="aiCfgHint" style="font-size:10px;color:#555;margin:-4px 0 8px">${provider === 'gemini' ? 'Free — get key at aistudio.google.com/apikey' : 'Pay-per-use — platform.openai.com/api-keys'}</div>
+        <div id="aiCfgHint" style="font-size:10px;color:#555;margin:-4px 0 8px">${hints[provider] || ''}</div>
         <label style="display:block;font-size:11px;color:#a0a0c0;margin-bottom:3px">API Key</label>
-        <input type="password" id="aiCfgKey" value="${cfg.apiKey || ''}" placeholder="${provider === 'gemini' ? 'AIza...' : 'sk-...'}" style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:6px 10px;border-radius:4px;font-size:12px;margin-bottom:8px">
+        <input type="password" id="aiCfgKey" value="${cfg.apiKey || ''}" placeholder="${placeholders[provider] || 'API key...'}" style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:6px 10px;border-radius:4px;font-size:12px;margin-bottom:8px">
         <button onclick="window._aiSaveConfig()" style="background:#00ff88;color:#1a1a2e;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">Save</button>
         <span id="aiCfgStatus" style="margin-left:8px;font-size:11px;color:#555"></span>
       </div>
