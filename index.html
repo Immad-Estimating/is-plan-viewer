@@ -3232,8 +3232,75 @@ window.aiReviewImportAll = async function() {
   renderSysSymbolList();
 
   const statusEl = document.getElementById('sysSymAiStatus');
+
+  if (imported === 0) {
+    statusEl.innerHTML = `<span style="color:#555">No new items imported.</span>`;
+    window._aiReviewEquipment = null;
+    return;
+  }
+
   statusEl.innerHTML = `<span style="color:#00ff88">\u2713 Imported ${imported} items</span>` +
     (equipment.length > imported ? `<span style="color:#555;font-size:10px"> (${equipment.length - imported} skipped/dupes)</span>` : '');
+
+  // Step 2: HVAC Library matching — collect only the items that were actually imported
+  const importedItems = [];
+  for (let idx = 0; idx < equipment.length; idx++) {
+    const chk = document.getElementById('aiChk' + idx);
+    if (!chk || !chk.checked) continue;
+    const tag = (document.getElementById('aiTag' + idx)?.value || '').trim().toUpperCase();
+    if (!tag) continue;
+    // Build item with edited values for matching
+    const eq = equipment[idx];
+    importedItems.push({
+      tag,
+      type: document.getElementById('aiType' + idx)?.value || eq.type || '',
+      category: document.getElementById('aiCat' + idx)?.value || eq.category || 'equipment',
+      manufacturer: eq.manufacturer || null,
+      model: eq.model || null,
+      tonnage: eq.tonnage || null,
+      cfm: eq.cfm || null,
+      size: eq.size || null,
+      voltage: eq.voltage || null,
+      heating: eq.heating || null,
+    });
+  }
+
+  // Run library matching on imported items
+  const matchResults = await HVACLibrary.matchExtractedBatch(importedItems);
+  const hasMatches = matchResults.some(r => r.matches && r.matches.length > 0);
+
+  if (hasMatches || importedItems.length > 0) {
+    const matchContainer = document.createElement('div');
+    matchContainer.style.cssText = 'margin-top:10px;max-height:300px;overflow-y:auto;border-top:1px solid #2a2a4a;padding-top:8px';
+    statusEl.appendChild(matchContainer);
+
+    const matchHeader = document.createElement('div');
+    matchHeader.style.cssText = 'font-size:11px;color:#a0a0c0;margin-bottom:6px;display:flex;align-items:center;gap:6px';
+    matchHeader.innerHTML = '\ud83d\udcda <span style="font-weight:600;color:#4dabf7">HVAC Library</span> \u2014 Link to existing or save new entries';
+    matchContainer.appendChild(matchHeader);
+
+    const matchContent = document.createElement('div');
+    matchContainer.appendChild(matchContent);
+
+    HVACLibrary.renderMatchStep(matchContent, matchResults, {
+      onLink: async (extracted, libraryEntry) => {
+        await HVACLibrary.incrementUsage(libraryEntry.id);
+        const sym = projectSystemSymbols.find(s => s.tag === (extracted.tag || '').toUpperCase());
+        if (sym) {
+          sym.libraryId = libraryEntry.id;
+          sym.equipment = { ...sym.equipment, ...libraryEntry.specs, manufacturer: libraryEntry.manufacturer, model: libraryEntry.model };
+          await saveProjectSystemSymbols(activeProjectId);
+          renderSysSymbolList();
+        }
+      },
+      onCreateNew: async (extracted) => {
+        const entry = HVACLibrary.createEntryFromExtracted(extracted);
+        await HVACLibrary.save(entry);
+      },
+      onSkip: () => { /* no-op */ },
+    });
+  }
+
   window._aiReviewEquipment = null;
 };
 
