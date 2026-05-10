@@ -5511,6 +5511,21 @@ window.addEventListener('keydown', (e) => {
   if (currentRoute.view !== 'viewer') return;
   if (!pdfDoc) return;
 
+  // Ctrl/Cmd+C: Copy selected items
+  if ((e.ctrlKey || e.metaKey) && e.key === 'c' && MultiSelect.getSelectionCount() > 0) {
+    e.preventDefault();
+    const n = MultiSelect.copySelected();
+    if (n > 0 && typeof showToast === 'function') showToast(`Copied ${n} item${n !== 1 ? 's' : ''}`);
+    return;
+  }
+  // Ctrl/Cmd+V: Paste clipboard
+  if ((e.ctrlKey || e.metaKey) && e.key === 'v' && MultiSelect.hasClipboard()) {
+    e.preventDefault();
+    const n = MultiSelect.pasteClipboard();
+    if (n > 0 && typeof showToast === 'function') showToast(`Pasted ${n} item${n !== 1 ? 's' : ''}`);
+    return;
+  }
+
   // In duct draw mode: number keys, x, and backspace edit dimensions
   if (ductDrawMode && measPoints.length === 0) {
     const dimInput = document.getElementById('ddDiam');
@@ -9719,6 +9734,40 @@ async function init() {
       }
       selectedFittingId = null;
       selectedMeasId = null;
+      drawMeasureOverlay();
+      updatePanel();
+      scheduleSave();
+    },
+    pasteItems: (clipboard, offsetX, offsetY) => {
+      const page = currentPage;
+      let nextMeasId = Date.now();
+      // Paste measurements (duct runs)
+      for (const m of (clipboard.measurements || [])) {
+        const clone = JSON.parse(JSON.stringify(m));
+        clone.id = ++nextMeasId;
+        if (clone.points) clone.points = clone.points.map(p => ({ ...p, x: p.x + offsetX, y: p.y + offsetY }));
+        if (!pageMeasurements[page]) pageMeasurements[page] = [];
+        pageMeasurements[page].push(clone);
+      }
+      // Paste fittings
+      for (const f of (clipboard.fittings || [])) {
+        const clone = JSON.parse(JSON.stringify(f));
+        clone.id = ++fittingIdCounter;
+        clone.x += offsetX;
+        clone.y += offsetY;
+        if (!pageFittings[page]) pageFittings[page] = [];
+        pageFittings[page].push(clone);
+      }
+      // Paste stacks
+      for (const s of (clipboard.stacks || [])) {
+        const clone = JSON.parse(JSON.stringify(s));
+        clone.id = ++stackIdCounter;
+        clone.x += offsetX;
+        clone.y += offsetY;
+        if (clone.items) clone.items.forEach(it => { it.id = ++stackItemIdCounter; if (it.callout) { it.callout.x += offsetX; it.callout.y += offsetY; } });
+        if (!pageStacks[page]) pageStacks[page] = [];
+        pageStacks[page].push(clone);
+      }
       drawMeasureOverlay();
       updatePanel();
       scheduleSave();

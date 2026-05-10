@@ -23,6 +23,9 @@ let _lassoEl = null;     // SVG overlay element
 // Deselect mode
 let _deselectMode = false;
 
+// Clipboard
+let _clipboard = null; // { measurements: [], fittings: [], stacks: [] }
+
 // App references
 let _getPageMeasurements = null;
 let _getPageFittings = null;
@@ -33,6 +36,7 @@ let _drawOverlay = null;
 let _updatePanel = null;
 let _getProjectSystemSymbols = null;
 let _deleteItems = null; // callback: (measIds, fitIds, stackIds) => void
+let _pasteItems = null; // callback: (clipboard, offsetX, offsetY) => void
 
 // ── CSS ───────────────────────────────────────────────
 const CSS = `
@@ -63,6 +67,8 @@ const CSS = `
 .ms-clear-btn:hover { border-color: #e94560; color: #e94560; }
 .ms-delete-btn { background: #e94560; color: #fff; border: none; padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; }
 .ms-delete-btn:hover { background: #c73550; }
+.ms-copy-btn { background: #0f3460; color: #4dabf7; border: 1px solid #4dabf7; padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.ms-copy-btn:hover { background: #1a4080; color: #74c0fc; }
 
 /* Mode indicator */
 .ms-mode-badge { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 55; border-radius: 6px; padding: 4px 14px; font-size: 11px; font-weight: 600; pointer-events: none; white-space: nowrap; display: none; }
@@ -334,6 +340,7 @@ function updatePanelContent() {
 
   html += `<div class="ms-panel-actions">`;
   html += `<button class="ms-delete-btn" onclick="window._msDeleteSel()" title="Delete selected items (Del)">🗑 Delete ${count}</button>`;
+  html += `<button class="ms-copy-btn" onclick="window._msCopySel()" title="Copy selected items (Ctrl+C)">📋 Copy ${count}</button>`;
   html += `<button class="ms-clear-btn" onclick="window._msClearSel()">Deselect All</button>`;
   html += `<button class="ms-apply-btn" onclick="window._msApply()">Apply to ${count} Items</button>`;
   html += `</div>`;
@@ -396,6 +403,33 @@ function deleteSelected() {
   clearSelection();
 }
 
+function copySelected() {
+  const page = _getCurrentPage();
+  const meas = (_getPageMeasurements(page) || []).filter(m => _selectedMeasIds.has(m.id));
+  const fits = (_getPageFittings(page) || []).filter(f => _selectedFitIds.has(f.id));
+  const stacks = (_getPageStacks(page) || []).filter(s => _selectedStackIds.has(s.id));
+  if (meas.length === 0 && fits.length === 0 && stacks.length === 0) return 0;
+  // Deep clone to snapshot current state
+  _clipboard = {
+    measurements: JSON.parse(JSON.stringify(meas)),
+    fittings: JSON.parse(JSON.stringify(fits)),
+    stacks: JSON.parse(JSON.stringify(stacks)),
+  };
+  return meas.length + fits.length + stacks.length;
+}
+
+function pasteClipboard() {
+  if (!_clipboard) return 0;
+  const total = _clipboard.measurements.length + _clipboard.fittings.length + _clipboard.stacks.length;
+  if (total === 0) return 0;
+  // Offset so paste doesn't land exactly on originals
+  const OFFSET = 20;
+  if (_pasteItems) {
+    _pasteItems(_clipboard, OFFSET, OFFSET);
+  }
+  return total;
+}
+
 // ── Geometry helper ───────────────────────────────────
 
 function pointToSegDist(px, py, ax, ay, bx, by) {
@@ -420,6 +454,7 @@ const MultiSelect = {
     _updatePanel = opts.updatePanel;
     _getProjectSystemSymbols = opts.getProjectSystemSymbols;
     _deleteItems = opts.deleteItems || null;
+    _pasteItems = opts.pasteItems || null;
     _enabled = true;
   },
 
@@ -519,6 +554,9 @@ const MultiSelect = {
   getSelectionCount,
   clearSelection,
   deleteSelected,
+  copySelected,
+  pasteClipboard,
+  hasClipboard() { return !!_clipboard; },
 
   // Expose current selection sets (for compiler integration)
   getSelectedMeasIds() { return _selectedMeasIds; },
@@ -532,5 +570,6 @@ window._msClose = function() { clearSelection(); };
 window._msClearSel = function() { clearSelection(); };
 window._msApply = function() { applyBulkChanges(); };
 window._msDeleteSel = function() { deleteSelected(); };
+window._msCopySel = function() { copySelected(); };
 
 export default MultiSelect;
