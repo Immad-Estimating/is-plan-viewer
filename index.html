@@ -8013,21 +8013,30 @@ window.updateInsertSection = function(section) {
       return;
     }
     container.classList.remove('collapsed');
-    // Sort by category order then render up to count items
+    // Sort by category → type → tag, then render up to count items
     const sorted = [..._hvacLibraryItems].sort((a,b) => {
       const ai = HVAC_CATEGORY_ORDER.indexOf(a.category);
       const bi = HVAC_CATEGORY_ORDER.indexOf(b.category);
-      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      if (ai !== bi) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      const tc = (a.type || '').localeCompare(b.type || '');
+      if (tc !== 0) return tc;
+      return (a.tag || '').localeCompare(b.tag || '');
     });
     const visible = sorted.slice(0, count);
     let html = '';
     let lastCat = '';
+    let lastType = '';
     visible.forEach((item, idx) => {
       if (item.category !== lastCat) {
         const icon = HVAC_CATEGORY_ICONS[item.category] || '📦';
         const catLabel = item.category.replace(/-/g, ' ');
         html += `<div class="hvac-cat-header">${icon} ${catLabel}</div>`;
         lastCat = item.category;
+        lastType = ''; // reset type when category changes
+      }
+      if (item.type && item.type !== lastType) {
+        html += `<div style="font-size:9px;color:#444;padding:2px 0 1px 6px;letter-spacing:0.3px">${escapeHtml(item.type)}</div>`;
+        lastType = item.type;
       }
       const sel = (selectedHvacComponent && selectedHvacComponent.tag === item.tag) ? ' selected' : '';
       // Build specs summary
