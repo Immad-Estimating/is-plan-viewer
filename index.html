@@ -29,6 +29,20 @@
 
   /* Select tool: combined button + sub-mode switcher */
   .select-tool-wrap { display: inline-flex; align-items: center; position: relative; }
+
+  /* Snip capture overlay */
+  .snip-overlay { display: none; position: absolute; inset: 0; z-index: 50; cursor: crosshair; }
+  .snip-overlay.active { display: block; }
+  .snip-overlay .snip-dim { background: rgba(0,0,0,0.5); position: absolute; }
+  .snip-box { position: absolute; border: 2px dashed #e94560; background: transparent; pointer-events: none; z-index: 51; }
+  .snip-bar { position: absolute; z-index: 52; display: none; background: #16213e; border: 1px solid #e94560; border-radius: 8px; padding: 6px 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); gap: 8px; align-items: center; }
+  .snip-bar.show { display: flex; }
+  .snip-bar button { border: none; padding: 5px 14px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  .snip-bar .snip-done { background: #e94560; color: #fff; }
+  .snip-bar .snip-done:hover { background: #c73550; }
+  .snip-bar .snip-cancel { background: #0f3460; color: #a0a0c0; }
+  .snip-bar .snip-cancel:hover { background: #1a4080; }
+  .snip-bar .snip-size { font-size: 10px; color: #a0a0c0; }
   .select-sub { display: none; margin-left: -1px; }
   .select-tool-wrap.active .select-sub { display: inline-flex; }
   .sel-sub-btn { background: #1a1a2e; border: 1px solid #0f3460; color: #555; padding: 4px 7px; font-size: 11px; cursor: pointer; transition: all 0.12s; }
@@ -554,6 +568,20 @@
       </div>
       <canvas id="pdfCanvas"></canvas>
       <canvas id="measureCanvas"></canvas>
+
+      <!-- Snip capture overlay -->
+      <div class="snip-overlay" id="snipOverlay">
+        <div class="snip-dim" id="snipDimTop"></div>
+        <div class="snip-dim" id="snipDimLeft"></div>
+        <div class="snip-dim" id="snipDimRight"></div>
+        <div class="snip-dim" id="snipDimBottom"></div>
+        <div class="snip-box" id="snipBox"></div>
+        <div class="snip-bar" id="snipBar">
+          <span class="snip-size" id="snipSize"></span>
+          <button class="snip-done" onclick="finishSnip()">Done ✔</button>
+          <button class="snip-cancel" onclick="cancelSnip()">Cancel</button>
+        </div>
+      </div>
       <div class="drag-overlay" id="dragOverlay"><span>Drop PDF here</span></div>
 
       <!-- Scale widget -->
@@ -812,8 +840,8 @@
       <p style="font-size:11px;color:#666;margin-bottom:6px">Or extract from a mechanical schedule:</p>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <input type="file" id="sysSymImageInput" accept="image/*,.pdf" style="display:none">
-        <button onclick="captureCanvasForAI()" style="background:#e94560;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">📸 Capture Current Page</button>
-        <button onclick="document.getElementById('sysSymImageInput').click()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">📷 Upload Image</button>
+        <button onclick="startSnipCapture()" style="background:#e94560;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✂️ Snip Schedule</button>
+        <button onclick="captureCanvasForAI()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">📸 Full Page</button>
         <button onclick="pasteScheduleFromClipboard()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">📋 Paste</button>
         <button onclick="openAiConfig()" style="background:none;border:1px solid #0f3460;color:#555;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">⚙ Configure</button>
       </div>
@@ -2853,6 +2881,127 @@ window.removeSysSymbol = async function(tag) {
   if (activeSystemSymbol === tag) { activeSystemSymbol = null; }
   await saveProjectSystemSymbols(activeProjectId);
   renderSysSymbolList();
+};
+
+// ── Snip capture tool ─────────────────────────────────
+let _snipActive = false;
+let _snipStart = null;
+let _snipRect = null; // {x, y, w, h} in viewer-relative pixels
+
+window.startSnipCapture = function() {
+  // Close the modal so the user can see the drawing
+  closeSysSymbolModal();
+  _snipActive = true;
+  _snipStart = null;
+  _snipRect = null;
+  const overlay = document.getElementById('snipOverlay');
+  overlay.classList.add('active');
+  document.getElementById('snipBar').classList.remove('show');
+  document.getElementById('snipBox').style.display = 'none';
+  _clearSnipDims();
+  showToast('Draw a rectangle around the schedule area', 3000);
+};
+
+window.cancelSnip = function() {
+  _snipActive = false;
+  document.getElementById('snipOverlay').classList.remove('active');
+  document.getElementById('snipBar').classList.remove('show');
+};
+
+function _clearSnipDims() {
+  for (const id of ['snipDimTop','snipDimLeft','snipDimRight','snipDimBottom']) {
+    const el = document.getElementById(id);
+    el.style.display = 'none';
+  }
+}
+
+function _updateSnipVisuals(sx, sy, ex, ey) {
+  const vr = document.getElementById('viewer').getBoundingClientRect();
+  const x1 = Math.min(sx, ex) - vr.left, y1 = Math.min(sy, ey) - vr.top;
+  const x2 = Math.max(sx, ex) - vr.left, y2 = Math.max(sy, ey) - vr.top;
+  const w = x2 - x1, h = y2 - y1;
+  const vw = vr.width, vh = vr.height;
+
+  // Selection box
+  const box = document.getElementById('snipBox');
+  box.style.display = 'block';
+  box.style.left = x1 + 'px'; box.style.top = y1 + 'px';
+  box.style.width = w + 'px'; box.style.height = h + 'px';
+
+  // Dim regions (top, left, right, bottom around the box)
+  const dt = document.getElementById('snipDimTop');
+  dt.style.display = 'block'; dt.style.left = '0'; dt.style.top = '0'; dt.style.width = vw + 'px'; dt.style.height = y1 + 'px';
+  const db = document.getElementById('snipDimBottom');
+  db.style.display = 'block'; db.style.left = '0'; db.style.top = y2 + 'px'; db.style.width = vw + 'px'; db.style.height = (vh - y2) + 'px';
+  const dl = document.getElementById('snipDimLeft');
+  dl.style.display = 'block'; dl.style.left = '0'; dl.style.top = y1 + 'px'; dl.style.width = x1 + 'px'; dl.style.height = h + 'px';
+  const dr = document.getElementById('snipDimRight');
+  dr.style.display = 'block'; dr.style.left = x2 + 'px'; dr.style.top = y1 + 'px'; dr.style.width = (vw - x2) + 'px'; dr.style.height = h + 'px';
+
+  _snipRect = { x: x1, y: y1, w, h };
+}
+
+// Snip overlay mouse handlers
+(function() {
+  const overlay = document.getElementById('snipOverlay');
+  let dragging = false, sx = 0, sy = 0;
+
+  overlay.addEventListener('mousedown', (e) => {
+    if (!_snipActive) return;
+    dragging = true;
+    sx = e.clientX; sy = e.clientY;
+    document.getElementById('snipBar').classList.remove('show');
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging || !_snipActive) return;
+    _updateSnipVisuals(sx, sy, e.clientX, e.clientY);
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (!dragging || !_snipActive) return;
+    dragging = false;
+    if (!_snipRect || _snipRect.w < 20 || _snipRect.h < 20) return;
+    // Show the Done bar near the selection
+    const bar = document.getElementById('snipBar');
+    bar.style.left = (_snipRect.x + _snipRect.w / 2 - 80) + 'px';
+    bar.style.top = (_snipRect.y + _snipRect.h + 8) + 'px';
+    document.getElementById('snipSize').textContent = Math.round(_snipRect.w) + ' × ' + Math.round(_snipRect.h) + 'px';
+    bar.classList.add('show');
+  });
+})();
+
+window.finishSnip = async function() {
+  if (!_snipRect || !pdfDoc) return;
+  const cvs = document.getElementById('pdfCanvas');
+
+  // Map snip rectangle from viewer coords to canvas pixel coords
+  const displayScale = currentScale / baseScale;
+  const cx = (_snipRect.x - panX) / displayScale;
+  const cy = (_snipRect.y - panY) / displayScale;
+  const cw = _snipRect.w / displayScale;
+  const ch = _snipRect.h / displayScale;
+
+  // Create a temporary canvas with just the snipped region
+  const tmpCvs = document.createElement('canvas');
+  tmpCvs.width = Math.round(cw);
+  tmpCvs.height = Math.round(ch);
+  const tmpCtx = tmpCvs.getContext('2d');
+  tmpCtx.drawImage(cvs, Math.round(cx), Math.round(cy), Math.round(cw), Math.round(ch), 0, 0, tmpCvs.width, tmpCvs.height);
+
+  // Convert to blob
+  const blob = await new Promise((res) => tmpCvs.toBlob(res, 'image/png'));
+
+  // Close snip overlay and reopen modal
+  cancelSnip();
+  openSystemSymbolManager();
+
+  // Run extraction
+  const statusEl = document.getElementById('sysSymAiStatus');
+  statusEl.textContent = 'Captured region (' + (blob.size / 1024).toFixed(0) + ' KB). Sending to AI...';
+  statusEl.style.color = '#ffd43b';
+  await runScheduleExtraction(blob);
 };
 
 // Capture current canvas page as image for AI extraction
