@@ -101,17 +101,43 @@
   .meas-edit-inline .slider-row .slider-val { font-size: 10px; color: #a0a0c0; min-width: 28px; text-align: right; }
 
   /* ===== Fitting Palette ===== */
-  .fitting-palette { display: none; position: absolute; top: 50px; left: 16px; z-index: 55; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); width: 280px; cursor: default; }
+  .fitting-palette { display: none; position: absolute; top: 50px; left: 16px; z-index: 55; background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); width: 320px; cursor: default; max-height: calc(100vh - 120px); overflow-y: auto; }
   .fitting-palette.active { display: block; }
   .fitting-palette h4 { font-size: 12px; color: #a0a0c0; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .fitting-shape-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
-  .fitting-shape-tabs button { flex: 1; background: #1a1a2e; border: 1px solid #0f3460; color: #a0a0c0; padding: 5px 4px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; transition: background 0.15s; }
-  .fitting-shape-tabs button:hover { background: #0f3460; color: #e0e0e0; }
-  .fitting-shape-tabs button.active { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.15); }
-  .fitting-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 10px; }
+  .fitting-palette::-webkit-scrollbar { width: 4px; }
+  .fitting-palette::-webkit-scrollbar-track { background: #1a1a2e; border-radius: 2px; }
+  .fitting-palette::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 2px; }
+  /* Insert palette slider sections */
+  .insert-section { margin-bottom: 6px; }
+  .insert-section-header { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+  .insert-section-header .sec-icon { font-size: 13px; flex-shrink: 0; }
+  .insert-section-header .sec-label { font-size: 11px; font-weight: 600; color: #a0a0c0; white-space: nowrap; min-width: 40px; }
+  .insert-section-header input[type=range] { flex: 1; height: 4px; -webkit-appearance: none; appearance: none; background: #0f3460; border-radius: 2px; outline: none; cursor: pointer; }
+  .insert-section-header input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #e94560; cursor: pointer; border: none; }
+  .insert-section-header input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #e94560; cursor: pointer; border: none; }
+  .insert-section-header input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; }
+  .insert-section-header input[type=range]::-moz-range-track { height: 4px; border-radius: 2px; background: #0f3460; }
+  .insert-section-items { overflow: hidden; transition: max-height 0.2s ease; }
+  .insert-section-items.collapsed { max-height: 0 !important; }
+  /* Spiral/Snaplock toggle */
+  .duct-type-toggle { display: flex; gap: 2px; margin-left: 4px; flex-shrink: 0; }
+  .duct-type-toggle button { background: #1a1a2e; border: 1px solid #0f3460; color: #666; padding: 2px 6px; border-radius: 10px; cursor: pointer; font-size: 9px; font-weight: 600; transition: all 0.15s; }
+  .duct-type-toggle button.active { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.15); }
+  .duct-type-toggle button:hover { color: #a0a0c0; }
+  /* Fitting grid (reused for each section) */
+  .fitting-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 4px; padding: 4px 0; }
   .fitting-grid button { background: #1a1a2e; border: 1px solid #0f3460; color: #a0a0c0; padding: 6px 2px; border-radius: 4px; cursor: pointer; font-size: 10px; text-align: center; transition: background 0.15s, border-color 0.15s; line-height: 1.2; }
   .fitting-grid button:hover { background: #0f3460; color: #e0e0e0; }
   .fitting-grid button.selected { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.1); }
+  /* HVAC component rows */
+  .hvac-comp-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 11px; color: #a0a0c0; transition: background 0.15s, border-color 0.15s; border: 1px solid transparent; margin-bottom: 2px; }
+  .hvac-comp-row:hover { background: #0f3460; color: #e0e0e0; }
+  .hvac-comp-row.selected { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.1); }
+  .hvac-comp-row .cat-badge { font-size: 10px; background: #0f3460; padding: 1px 5px; border-radius: 8px; color: #a0a0c0; flex-shrink: 0; }
+  .hvac-comp-row .comp-tag { font-weight: 600; color: #e0e0e0; flex-shrink: 0; }
+  .hvac-comp-row .comp-type { color: #666; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hvac-cat-header { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 0 2px 0; border-bottom: 1px solid #0f3460; margin-bottom: 2px; }
+  /* Dimension inputs */
   .fitting-dims { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
   .fitting-dims label { font-size: 11px; color: #a0a0c0; white-space: nowrap; }
   .fitting-dims input { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 4px 6px; border-radius: 4px; font-size: 12px; width: 60px; text-align: center; }
@@ -125,6 +151,12 @@
   .fitting-palette .fp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .fitting-palette .fp-header span { font-size: 12px; color: #a0a0c0; }
   .fitting-palette .fp-preview { font-size: 11px; color: #00ff88; margin-bottom: 6px; }
+  /* Config area for HVAC components */
+  .hvac-config-area { padding: 6px 0; font-size: 11px; color: #a0a0c0; }
+  .hvac-config-area .config-tag { font-weight: 600; color: #00ff88; font-size: 12px; }
+  .hvac-config-area .config-hint { color: #666; font-size: 10px; margin-top: 2px; }
+  #insertDimsArea { transition: max-height 0.2s ease; overflow: hidden; }
+  #hvacConfigArea { transition: max-height 0.2s ease; overflow: hidden; }
   .fitting-selected-highlight { stroke: #e94560 !important; }
   .viewer-container.stack-mode { cursor: crosshair; }
   .fittings-section { margin-top: 12px; border-top: 1px solid #0f3460; padding-top: 8px; }
@@ -552,7 +584,7 @@
     </span>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)" class="tool-has-tip">📐 Measure<span class="tool-tip">Measure Tool<br><b>M</b> = toggle<br>Click points to measure<br><b>Enter</b> = finish line</span></button>
     <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)" class="tool-has-tip">◎ Duct<span class="tool-tip">Duct Draw<br><b>D</b> = toggle<br>Draws measured duct runs<br>Auto-tags size &amp; gauge</span></button>
-    <button id="fittingBtn" onclick="toggleFittingMode()" title="Fittings (T)" class="tool-has-tip">🔩 Fittings<span class="tool-tip">Fittings Palette<br><b>T</b> = toggle<br><b>R</b> = rotate · <b>X</b> = mirror<br>Click canvas to place</span></button>
+    <button id="fittingBtn" onclick="toggleFittingMode()" title="Insert Palette (T)" class="tool-has-tip">📌 Insert<span class="tool-tip">Insert Palette<br><b>T</b> = toggle<br><b>R</b> = rotate · <b>X</b> = mirror<br>Click canvas to place</span></button>
     <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)" class="tool-has-tip">📌 Stack<span class="tool-tip">Vertical Stack<br><b>S</b> = toggle<br>Click to place stack point<br>Add items from palette</span></button>
     <button id="panelBtn" onclick="togglePanel()" title="Analysis Panel" class="tool-has-tip">📊 Analysis<span class="tool-tip">Measurements Panel<br>View all duct runs, fittings,<br>stacks &amp; costs per page</span></button>
     <button id="compilerBtn" onclick="toggleCompiler()" title="Compiler" class="tool-has-tip">⚙️ Compiler<span class="tool-tip">Takeoff Compiler<br>Group, filter &amp; aggregate<br>all items across drawings</span></button>
@@ -687,35 +719,85 @@
     <!-- Fitting palette -->
     <div class="fitting-palette" id="fittingPalette">
       <div class="fp-header">
-        <h4>Fittings</h4>
-        <span class="fp-preview" id="fpPreview">Select a fitting</span>
+        <h4>Insert</h4>
+        <span class="fp-preview" id="fpPreview">Select an item</span>
       </div>
-      <div class="fitting-shape-tabs">
-        <button class="active" data-shape="round" onclick="setFittingShape('round')">● Round</button>
-        <button data-shape="rect" onclick="setFittingShape('rect')">▬ Rectangular</button>
-        <button data-shape="oval" onclick="setFittingShape('oval')">⬭ Oval</button>
+
+      <!-- Round Fittings Section -->
+      <div class="insert-section" id="insertSecRound">
+        <div class="insert-section-header">
+          <span class="sec-icon">●</span>
+          <span class="sec-label">Round</span>
+          <div class="duct-type-toggle" id="roundDuctToggle">
+            <button class="active" onclick="setRoundDuctType('spiral')" id="btnSpiral">SPR</button>
+            <button onclick="setRoundDuctType('snaplock')" id="btnSnaplock">SNP</button>
+          </div>
+          <input type="range" min="0" max="11" value="0" id="sliderRound" oninput="updateInsertSection('round')">
+        </div>
+        <div class="insert-section-items" id="itemsRound"></div>
       </div>
-      <div class="fitting-grid" id="fittingGrid"></div>
-      <div class="fitting-dims">
-        <label>A:</label>
-        <input type="text" id="fpSizeA" value="14" placeholder="14">
-        <label id="fpSizeBLabel">B:</label>
-        <input type="text" id="fpSizeB" value="" placeholder="opt">
+
+      <!-- Rectangular Fittings Section -->
+      <div class="insert-section" id="insertSecRect">
+        <div class="insert-section-header">
+          <span class="sec-icon">▬</span>
+          <span class="sec-label">Rect</span>
+          <input type="range" min="0" max="12" value="0" id="sliderRect" oninput="updateInsertSection('rect')">
+        </div>
+        <div class="insert-section-items" id="itemsRect"></div>
       </div>
-      <div class="fitting-dims" style="margin-top:4px">
-        <label>Ga:</label>
-        <select id="fpGauge" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px">
-          <option value="26">26 ga</option>
-          <option value="24">24 ga</option>
-          <option value="22">22 ga</option>
-        </select>
+
+      <!-- Oval Fittings Section -->
+      <div class="insert-section" id="insertSecOval">
+        <div class="insert-section-header">
+          <span class="sec-icon">⬭</span>
+          <span class="sec-label">Oval</span>
+          <input type="range" min="0" max="7" value="0" id="sliderOval" oninput="updateInsertSection('oval')">
+        </div>
+        <div class="insert-section-items" id="itemsOval"></div>
       </div>
-      <div class="fitting-rotation">
-        <label>Rot:</label>
-        <button onclick="rotateFittingInput(-90)">↶</button>
-        <input type="text" id="fpRotation" value="0">
-        <button onclick="rotateFittingInput(90)">↷</button>
-        <label>°</label>
+
+      <!-- HVAC Components Section -->
+      <div class="insert-section" id="insertSecHvac">
+        <div class="insert-section-header">
+          <span class="sec-icon">📦</span>
+          <span class="sec-label">HVAC</span>
+          <input type="range" min="0" max="0" value="0" id="sliderHvac" oninput="updateInsertSection('hvac')">
+        </div>
+        <div class="insert-section-items" id="itemsHvac"></div>
+      </div>
+
+      <!-- Fitting dimension inputs (shown when fitting selected) -->
+      <div id="insertDimsArea">
+        <div class="fitting-dims">
+          <label>A:</label>
+          <input type="text" id="fpSizeA" value="14" placeholder="14">
+          <label id="fpSizeBLabel">B:</label>
+          <input type="text" id="fpSizeB" value="" placeholder="opt">
+        </div>
+        <div class="fitting-dims" style="margin-top:4px">
+          <label>Ga:</label>
+          <select id="fpGauge" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px">
+            <option value="26">26 ga</option>
+            <option value="24">24 ga</option>
+            <option value="22">22 ga</option>
+          </select>
+        </div>
+        <div class="fitting-rotation">
+          <label>Rot:</label>
+          <button onclick="rotateFittingInput(-90)">↶</button>
+          <input type="text" id="fpRotation" value="0">
+          <button onclick="rotateFittingInput(90)">↷</button>
+          <label>°</label>
+        </div>
+      </div>
+
+      <!-- HVAC component config (shown when HVAC component selected) -->
+      <div id="hvacConfigArea" style="display:none">
+        <div class="hvac-config-area">
+          <div class="config-tag" id="hvacConfigTag">—</div>
+          <div class="config-hint">Click canvas to place component</div>
+        </div>
       </div>
 
     </div>
@@ -7617,7 +7699,8 @@ const FITTING_NAMES = {
   'tee': 'Tee', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
   'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
-  'rectTap': 'Rect Tap'
+  'rectTap': 'Rect Tap',
+  'hvac_component': 'HVAC Component'
 };
 
 function inchesToPx(inches) {
@@ -7658,14 +7741,25 @@ window.toggleFittingMode = function() {
   updatePanel();
 };
 
+// ---- Insert Palette: Slider-based section system ----
+let selectedHvacComponent = null; // currently selected HVAC library component
+let roundDuctType = 'spiral'; // 'spiral' or 'snaplock'
+let _hvacLibraryItems = []; // cached HVAC library items
+
+const HVAC_CATEGORY_ICONS = {
+  'equipment': '🏭', 'fan': '🌀', 'air-distribution': '💨', 'terminal': '📦',
+  'energy-recovery': '♻️', 'heating': '🔥', 'makeup-air': '🌬️', 'specialty': '⚡'
+};
+const HVAC_CATEGORY_ORDER = ['equipment','fan','air-distribution','terminal','energy-recovery','heating','makeup-air','specialty'];
+
+window.setRoundDuctType = function(type) {
+  roundDuctType = type;
+  document.getElementById('btnSpiral').classList.toggle('active', type === 'spiral');
+  document.getElementById('btnSnaplock').classList.toggle('active', type === 'snaplock');
+};
+
 window.setFittingShape = function(shape) {
   currentFittingShape = shape;
-  document.querySelectorAll('.fitting-shape-tabs button').forEach(b => {
-    b.classList.toggle('active', b.dataset.shape === shape);
-  });
-  selectedFittingType = null;
-  document.getElementById('fpPreview').textContent = 'Select a fitting';
-  renderFittingGrid();
   // Update dimension labels
   const isRect = (shape === 'rect' || shape === 'oval');
   document.getElementById('fpSizeA').placeholder = isRect ? '24x12' : '14';
@@ -7676,26 +7770,148 @@ window.setFittingShape = function(shape) {
   }
 };
 
-function renderFittingGrid() {
-  const grid = document.getElementById('fittingGrid');
-  const fittings = FITTINGS_BY_SHAPE[currentFittingShape] || FITTINGS_BY_SHAPE.round;
-  grid.innerHTML = fittings.map(f =>
-    `<button data-type="${f.type}" onclick="selectFittingType('${f.type}')" title="${f.title}" ${selectedFittingType === f.type ? 'class="selected"' : ''}>${f.label}</button>`
-  ).join('');
+function renderInsertPalette() {
+  // Set slider max values based on fitting counts
+  const sliderRound = document.getElementById('sliderRound');
+  const sliderRect = document.getElementById('sliderRect');
+  const sliderOval = document.getElementById('sliderOval');
+  if (sliderRound) sliderRound.max = FITTINGS_BY_SHAPE.round.length;
+  if (sliderRect) sliderRect.max = FITTINGS_BY_SHAPE.rect.length;
+  if (sliderOval) sliderOval.max = FITTINGS_BY_SHAPE.oval.length;
+  // Render each section at current slider values
+  updateInsertSection('round');
+  updateInsertSection('rect');
+  updateInsertSection('oval');
+  // Load HVAC library items
+  loadHvacLibraryItems();
+  updateConfigArea();
 }
 
-// Initialize grid on load
-setTimeout(() => renderFittingGrid(), 0);
+async function loadHvacLibraryItems() {
+  try {
+    _hvacLibraryItems = await HVACLibrary.getAll();
+  } catch(e) { _hvacLibraryItems = []; }
+  const slider = document.getElementById('sliderHvac');
+  if (slider) slider.max = _hvacLibraryItems.length;
+  updateInsertSection('hvac');
+}
+
+window.updateInsertSection = function(section) {
+  if (section === 'hvac') {
+    const slider = document.getElementById('sliderHvac');
+    const container = document.getElementById('itemsHvac');
+    if (!slider || !container) return;
+    const count = parseInt(slider.value) || 0;
+    if (count === 0) {
+      container.innerHTML = '';
+      container.classList.add('collapsed');
+      return;
+    }
+    container.classList.remove('collapsed');
+    // Sort by category order then render up to count items
+    const sorted = [..._hvacLibraryItems].sort((a,b) => {
+      const ai = HVAC_CATEGORY_ORDER.indexOf(a.category);
+      const bi = HVAC_CATEGORY_ORDER.indexOf(b.category);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+    const visible = sorted.slice(0, count);
+    let html = '';
+    let lastCat = '';
+    visible.forEach(item => {
+      if (item.category !== lastCat) {
+        const icon = HVAC_CATEGORY_ICONS[item.category] || '📦';
+        html += `<div class="hvac-cat-header">${icon} ${item.category}</div>`;
+        lastCat = item.category;
+      }
+      const sel = (selectedHvacComponent && selectedHvacComponent.id === item.id) ? ' selected' : '';
+      html += `<div class="hvac-comp-row${sel}" onclick="selectHvacComponent(${item.id})">`;
+      html += `<span class="cat-badge">${HVAC_CATEGORY_ICONS[item.category] || '📦'}</span>`;
+      html += `<span class="comp-tag">${item.tag || '—'}</span>`;
+      html += `<span class="comp-type">${item.type || ''}</span>`;
+      html += `</div>`;
+    });
+    container.innerHTML = html;
+    return;
+  }
+  // Fitting sections (round, rect, oval)
+  const shapeMap = { round: 'round', rect: 'rect', oval: 'oval' };
+  const shape = shapeMap[section];
+  const slider = document.getElementById('slider' + section.charAt(0).toUpperCase() + section.slice(1));
+  const container = document.getElementById('items' + section.charAt(0).toUpperCase() + section.slice(1));
+  if (!slider || !container) return;
+  const count = parseInt(slider.value) || 0;
+  if (count === 0) {
+    container.innerHTML = '';
+    container.classList.add('collapsed');
+    return;
+  }
+  container.classList.remove('collapsed');
+  const fittings = FITTINGS_BY_SHAPE[shape] || [];
+  const visible = fittings.slice(0, count);
+  container.innerHTML = '<div class="fitting-grid">' + visible.map(f =>
+    `<button data-type="${f.type}" data-shape="${shape}" onclick="selectInsertFitting('${f.type}','${shape}')" title="${f.title}" ${(selectedFittingType === f.type && currentFittingShape === shape && !selectedHvacComponent) ? 'class="selected"' : ''}>${f.label}</button>`
+  ).join('') + '</div>';
+};
+
+window.selectInsertFitting = function(type, shape) {
+  // Clear HVAC selection
+  selectedHvacComponent = null;
+  // Set shape context for this fitting
+  currentFittingShape = shape;
+  // Update dimension context for shape
+  setFittingShape(shape);
+  // Select the fitting type
+  selectFittingType(type);
+  // Re-render all sections to update selection highlights
+  updateInsertSection('round');
+  updateInsertSection('rect');
+  updateInsertSection('oval');
+  updateInsertSection('hvac');
+  updateConfigArea();
+};
+
+window.selectHvacComponent = function(id) {
+  const item = _hvacLibraryItems.find(i => i.id === id);
+  if (!item) return;
+  selectedHvacComponent = item;
+  selectedFittingType = null; // clear fitting selection
+  selectedFittingId = null;
+  document.getElementById('fpPreview').textContent = item.tag + ' — ' + (item.type || 'Component');
+  // Re-render sections
+  updateInsertSection('round');
+  updateInsertSection('rect');
+  updateInsertSection('oval');
+  updateInsertSection('hvac');
+  updateConfigArea();
+};
+
+function updateConfigArea() {
+  const dimsArea = document.getElementById('insertDimsArea');
+  const hvacArea = document.getElementById('hvacConfigArea');
+  if (!dimsArea || !hvacArea) return;
+  if (selectedHvacComponent) {
+    dimsArea.style.display = 'none';
+    hvacArea.style.display = 'block';
+    document.getElementById('hvacConfigTag').textContent = selectedHvacComponent.tag + ' — ' + (selectedHvacComponent.type || '');
+  } else {
+    dimsArea.style.display = selectedFittingType ? 'block' : 'none';
+    hvacArea.style.display = 'none';
+  }
+}
+
+// Initialize insert palette on load
+setTimeout(() => renderInsertPalette(), 0);
 
 window.selectFittingType = function(type) {
   selectedFittingType = type;
+  selectedHvacComponent = null;
   selectedFittingId = null;
   document.querySelectorAll('.fitting-grid button').forEach(b => {
-    b.classList.toggle('selected', b.dataset.type === type);
+    b.classList.toggle('selected', b.dataset.type === type && b.dataset.shape === currentFittingShape);
   });
   document.getElementById('fpPreview').textContent = FITTING_NAMES[type] || type;
   // Show/hide sizeB based on type
-  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap'].includes(type);  // sqwing uses only sizeA (WxH)
+  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap'].includes(type);
   document.getElementById('fpSizeB').style.display = needsB ? '' : 'none';
   document.getElementById('fpSizeBLabel').style.display = needsB ? '' : 'none';
   // Update B label based on fitting type
@@ -7703,6 +7919,7 @@ window.selectFittingType = function(type) {
   document.getElementById('fpSizeBLabel').textContent = isReducerType ? 'Out:' : 'Br:';
   // Clear sizeB when switching to non-B fitting
   if (!needsB) document.getElementById('fpSizeB').value = '';
+  updateConfigArea();
 };
 
 
@@ -7787,6 +8004,38 @@ function handleFittingClick(e) {
       costGroup: null,
       costOverride: false,
       gauge: document.getElementById('fpGauge') ? document.getElementById('fpGauge').value : '26',
+      systemSymbol: activeSystemSymbol || null
+    };
+    pageFittings[currentPage].push(f);
+    selectedFittingId = null;
+    drawMeasureOverlay();
+    updatePanel();
+    scheduleSave();
+  } else if (selectedHvacComponent) {
+    // Place HVAC component as a labeled marker
+    if (!pageFittings[currentPage]) pageFittings[currentPage] = [];
+    fittingIdCounter++;
+    const hvac = selectedHvacComponent;
+    const f = {
+      id: fittingIdCounter,
+      type: 'hvac_component',
+      hvacComponentId: hvac.id,
+      hvacTag: hvac.tag || 'HVAC',
+      hvacType: hvac.type || '',
+      hvacCategory: hvac.category || '',
+      x: pt.x, y: pt.y,
+      rotation: 0,
+      mirrored: false,
+      sizeA: '24',
+      sizeB: '',
+      label: hvac.tag || 'HVAC',
+      phase: 'rough',
+      materialCost: (hvac.pricing && hvac.pricing.materialCost) || null,
+      laborHrs: null,
+      laborRate: null,
+      costGroup: null,
+      costOverride: false,
+      gauge: '',
       systemSymbol: activeSystemSymbol || null
     };
     pageFittings[currentPage].push(f);
@@ -8321,6 +8570,7 @@ function drawFitting(f, isSelected, isMultiSelected) {
     case 'transition': drawTransition(D, D2); break;
     case 'sqwing': drawSquareWing(D); break;
     case 'rectTap': drawRectTap(D, D2); break;
+    case 'hvac_component': drawHvacMarker(f); break;
   }
 
   mCtx.restore();
@@ -8357,6 +8607,31 @@ function drawFitting(f, isSelected, isMultiSelected) {
     mCtx.fillText(labelText, f.x, labelY);
     mCtx.restore();
   }
+}
+
+function drawHvacMarker(f) {
+  // Draw HVAC component as a labeled marker (diamond with tag)
+  const size = 18;
+  const icon = HVAC_CATEGORY_ICONS[f.hvacCategory] || '📦';
+  // Diamond shape
+  mCtx.beginPath();
+  mCtx.moveTo(0, -size);
+  mCtx.lineTo(size, 0);
+  mCtx.lineTo(0, size);
+  mCtx.lineTo(-size, 0);
+  mCtx.closePath();
+  mCtx.fillStyle = 'rgba(15, 52, 96, 0.8)';
+  mCtx.fill();
+  mCtx.stroke();
+  // Tag label below
+  mCtx.save();
+  mCtx.rotate(-(f.rotation || 0) * Math.PI / 180); // un-rotate for readable text
+  mCtx.font = 'bold 10px sans-serif';
+  mCtx.fillStyle = '#00ff88';
+  mCtx.textAlign = 'center';
+  mCtx.textBaseline = 'top';
+  mCtx.fillText(f.hvacTag || 'HVAC', 0, size + 4);
+  mCtx.restore();
 }
 
 function drawElbow(D, sweep) {
