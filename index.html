@@ -3282,49 +3282,91 @@ async function runScheduleExtraction(blob) {
       { key: 'specialty', label: '⚡ Specialty' },
     ];
 
-    // Build review rows
+    // Determine primary attribute per category
+    function primaryAttr(eq) {
+      const cat = eq.category || 'equipment';
+      // Air distribution & specialty: size is primary (with " suffix)
+      if (['air-distribution','specialty','terminal'].includes(cat)) {
+        const sz = eq.size || '';
+        if (sz) return sz.replace(/(\d+)/g, '$1"').replace('"x', '" x ');
+        if (eq.cfm) return eq.cfm.toLocaleString() + ' CFM';
+        return '';
+      }
+      // Equipment / makeup-air: tonnage primary
+      if (['equipment','energy-recovery','makeup-air'].includes(cat)) {
+        if (eq.tonnage) return eq.tonnage + ' Ton';
+        if (eq.cfm) return eq.cfm.toLocaleString() + ' CFM';
+        return '';
+      }
+      // Fans: CFM primary
+      if (cat === 'fan') {
+        if (eq.cfm) return eq.cfm.toLocaleString() + ' CFM';
+        return '';
+      }
+      // Heating
+      if (cat === 'heating') {
+        if (eq.heating) return eq.heating;
+        if (eq.cfm) return eq.cfm.toLocaleString() + ' CFM';
+        return '';
+      }
+      return '';
+    }
+
+    // Build review rows — modern card style
     let reviewHtml = '';
     equipment.forEach((eq, idx) => {
       const isDupe = projectSystemSymbols.some(s => s.tag === (eq.tag || '').toUpperCase());
-      const specParts = [];
-      if (eq.tonnage) specParts.push(eq.tonnage + 'T');
-      if (eq.cfm) specParts.push(eq.cfm + ' CFM');
-      if (eq.size) specParts.push(eq.size);
-      if (eq.manufacturer) specParts.push(eq.manufacturer);
-      if (eq.voltage) specParts.push(eq.voltage);
-      const specStr = specParts.join(' · ');
+      const pAttr = primaryAttr(eq);
+      // Secondary specs (everything not the primary)
+      const secParts = [];
+      if (eq.manufacturer) secParts.push(eq.manufacturer);
+      if (eq.model) secParts.push(eq.model);
+      if (eq.voltage) secParts.push(eq.voltage);
+      if (eq.quantity && eq.quantity > 1) secParts.push('qty ' + eq.quantity);
 
-      reviewHtml += `<div class="ai-review-row" id="aiRow${idx}" style="display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:4px;margin-bottom:3px;background:${isDupe ? 'rgba(85,85,85,0.15)' : '#1a1a2e'};border:1px solid ${isDupe ? '#333' : '#0f3460'};${isDupe ? 'opacity:0.5;' : ''}">`;
+      reviewHtml += `<div class="ai-review-row" id="aiRow${idx}" style="
+        display:flex;align-items:stretch;gap:0;margin-bottom:4px;
+        border-radius:8px;overflow:hidden;
+        background:${isDupe ? 'rgba(30,30,50,0.5)' : '#1e1e38'};
+        border:1px solid ${isDupe ? '#252540' : '#2a2a4a'};
+        ${isDupe ? 'opacity:0.45;' : ''}
+        transition:all 0.15s;
+      " onmouseenter="this.style.borderColor='#e94560'" onmouseleave="this.style.borderColor='${isDupe ? '#252540' : '#2a2a4a'}'">`;
 
-      // Checkbox
-      reviewHtml += `<input type="checkbox" id="aiChk${idx}" ${isDupe ? '' : 'checked'} style="accent-color:#e94560;flex-shrink:0;cursor:pointer" onclick="document.getElementById('aiRow${idx}').style.opacity=this.checked?'1':'0.5'">`;
+      // Left check column
+      reviewHtml += `<label style="display:flex;align-items:center;padding:0 10px;cursor:pointer;background:rgba(15,52,96,0.2);border-right:1px solid #2a2a4a">`;
+      reviewHtml += `<input type="checkbox" id="aiChk${idx}" ${isDupe ? '' : 'checked'} style="accent-color:#e94560;cursor:pointer;width:15px;height:15px" onclick="document.getElementById('aiRow${idx}').style.opacity=this.checked?'1':'0.45'">`;
+      reviewHtml += `</label>`;
 
-      // Tag (editable)
-      reviewHtml += `<input type="text" id="aiTag${idx}" value="${escapeHtml((eq.tag || '').toUpperCase())}" style="width:56px;background:transparent;border:1px solid #0f3460;color:#e0e0e0;padding:2px 4px;border-radius:3px;font-size:11px;font-weight:700;text-align:center" title="Tag">`;
+      // Main content area
+      reviewHtml += `<div style="flex:1;display:flex;flex-direction:column;gap:3px;padding:8px 10px;min-width:0">`;
 
-      // Category dropdown
-      reviewHtml += `<select id="aiCat${idx}" style="background:#16213e;border:1px solid #0f3460;color:#a0a0c0;padding:2px 4px;border-radius:3px;font-size:10px;max-width:90px;cursor:pointer">`;
+      // Top row: tag + category + type
+      reviewHtml += `<div style="display:flex;align-items:center;gap:6px">`;
+      reviewHtml += `<input type="text" id="aiTag${idx}" value="${escapeHtml((eq.tag || '').toUpperCase())}" style="width:58px;background:#16213e;border:1px solid #333;color:#fff;padding:4px 6px;border-radius:6px;font-size:12px;font-weight:700;text-align:center" title="Edit tag">`;
+      reviewHtml += `<select id="aiCat${idx}" style="background:#16213e;border:1px solid #333;color:#a0a0c0;padding:4px 6px;border-radius:6px;font-size:11px;cursor:pointer">`;
       catOptions.forEach(c => {
         reviewHtml += `<option value="${c.key}"${(eq.category || 'equipment') === c.key ? ' selected' : ''}>${c.label}</option>`;
       });
       reviewHtml += `</select>`;
-
-      // Type (editable)
-      reviewHtml += `<input type="text" id="aiType${idx}" value="${escapeHtml(eq.type || '')}" style="flex:1;min-width:0;background:transparent;border:1px solid #0f3460;color:#a0a0c0;padding:2px 4px;border-radius:3px;font-size:10px" title="Type" placeholder="Type">`;
-
-      // Specs (read-only summary, compact)
-      if (specStr) reviewHtml += `<span style="font-size:9px;color:#555;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(specStr)}">${escapeHtml(specStr)}</span>`;
-
-      // Dupe indicator
-      if (isDupe) reviewHtml += `<span style="font-size:9px;color:#555" title="Already imported">✓</span>`;
-
+      reviewHtml += `<input type="text" id="aiType${idx}" value="${escapeHtml(eq.type || '')}" style="flex:1;min-width:0;background:#16213e;border:1px solid #333;color:#c0c0d0;padding:4px 6px;border-radius:6px;font-size:11px" title="Edit type" placeholder="Type">`;
       reviewHtml += `</div>`;
+
+      // Bottom row: primary attribute + secondary specs
+      reviewHtml += `<div style="display:flex;align-items:center;gap:6px;padding-left:2px">`;
+      if (pAttr) reviewHtml += `<span style="font-size:12px;font-weight:700;color:#ffd43b;letter-spacing:0.3px">${escapeHtml(pAttr)}</span>`;
+      if (secParts.length > 0) reviewHtml += `<span style="font-size:10px;color:#666">${escapeHtml(secParts.join(' \u00b7 '))}</span>`;
+      if (isDupe) reviewHtml += `<span style="font-size:9px;color:#444;margin-left:auto;background:#222;padding:1px 6px;border-radius:4px">exists</span>`;
+      reviewHtml += `</div>`;
+
+      reviewHtml += `</div>`; // end content area
+      reviewHtml += `</div>`; // end row
     });
 
-    // Import button
-    reviewHtml += `<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">`;
-    reviewHtml += `<button onclick="aiReviewImportAll()" style="background:#00ff88;color:#1a1a2e;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">Import Selected</button>`;
-    reviewHtml += `<button onclick="document.getElementById('sysSymAiStatus').innerHTML=''" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:11px">Cancel</button>`;
+    // Import button — larger, modern
+    reviewHtml += `<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">`;
+    reviewHtml += `<button onclick="aiReviewImportAll()" style="background:linear-gradient(135deg,#00ff88,#00cc6a);color:#0a0a1a;border:none;padding:8px 22px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,255,136,0.2);transition:transform 0.1s" onmouseenter="this.style.transform='scale(1.03)'" onmouseleave="this.style.transform='scale(1)'">Import Selected</button>`;
+    reviewHtml += `<button onclick="document.getElementById('sysSymAiStatus').innerHTML=''" style="background:#1e1e38;color:#a0a0c0;border:1px solid #2a2a4a;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:12px;transition:border-color 0.15s" onmouseenter="this.style.borderColor='#e94560'" onmouseleave="this.style.borderColor='#2a2a4a'">Cancel</button>`;
     reviewHtml += `</div>`;
 
     reviewContainer.innerHTML = reviewHtml;
