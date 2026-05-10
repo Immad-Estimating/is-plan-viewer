@@ -7,7 +7,7 @@
 // =====================================================
 
 const DB_NAME = 'ISPlanViewerDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // ── IndexedDB helpers ─────────────────────────────────────────────────
 let _cdb = null;
@@ -15,6 +15,15 @@ function cOpenDB() {
   if (_cdb) return Promise.resolve(_cdb);
   return new Promise((res, rej) => {
     const r = indexedDB.open(DB_NAME, DB_VERSION);
+    r.onupgradeneeded = e => {
+      const db = e.target.result;
+      // Guard: create any stores that might be missing at this version
+      if (!db.objectStoreNames.contains('projects')) db.createObjectStore('projects', { keyPath: 'id', autoIncrement: true });
+      if (!db.objectStoreNames.contains('drawings')) { const ds = db.createObjectStore('drawings', { keyPath: 'id', autoIncrement: true }); ds.createIndex('projectId', 'projectId', { unique: false }); }
+      if (!db.objectStoreNames.contains('pageData')) { const ps = db.createObjectStore('pageData', { keyPath: 'id' }); ps.createIndex('drawingId', 'drawingId', { unique: false }); }
+      if (!db.objectStoreNames.contains('priceBook')) db.createObjectStore('priceBook', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('hvacLibrary')) { const hl = db.createObjectStore('hvacLibrary', { keyPath: 'id', autoIncrement: true }); hl.createIndex('category', 'category', { unique: false }); }
+    };
     r.onsuccess = e => { _cdb = e.target.result; res(_cdb); };
     r.onerror = e => rej(e.target.error);
   });
