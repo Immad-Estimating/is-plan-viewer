@@ -5657,6 +5657,10 @@ window.addEventListener('keydown', (e) => {
     else { rotateFittingInput(-90); }
     return;
   }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && MultiSelect.getSelectionCount() > 0) {
+    e.preventDefault();
+    MultiSelect.deleteSelected();
+  }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedStackItemId) {
     e.preventDefault();
     deleteStackItem(selectedStackItemId);
@@ -9702,6 +9706,23 @@ async function init() {
     drawOverlay: () => { drawMeasureOverlay(); _syncSelectionToCompiler(); },
     updatePanel: updatePanel,
     getProjectSystemSymbols: () => projectSystemSymbols,
+    deleteItems: (measIds, fitIds, stackIds) => {
+      const page = currentPage;
+      if (measIds.size > 0 && pageMeasurements[page]) {
+        pageMeasurements[page] = pageMeasurements[page].filter(m => !measIds.has(m.id));
+      }
+      if (fitIds.size > 0 && pageFittings[page]) {
+        pageFittings[page] = pageFittings[page].filter(f => !fitIds.has(f.id));
+      }
+      if (stackIds.size > 0 && pageStacks[page]) {
+        pageStacks[page] = pageStacks[page].filter(s => !stackIds.has(s.id));
+      }
+      selectedFittingId = null;
+      selectedMeasId = null;
+      drawMeasureOverlay();
+      updatePanel();
+      scheduleSave();
+    },
   });
 
   handleRoute();
