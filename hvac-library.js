@@ -373,6 +373,8 @@ function _el(tag, attrs, children) {
     if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
     else if (k === 'className') el.className = v;
     else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (v === undefined || v === false) { /* skip */ }
+    else if (v === true) el.setAttribute(k, '');
     else el.setAttribute(k, v);
   });
   if (typeof children === 'string') el.textContent = children;
@@ -840,16 +842,13 @@ const HVACLibrary = {
 
             // ── Labor breakdown radar chart ──
             const radarWrap = _el('div', { className: 'hvac-lib-radar-wrap' });
-            let radarOpen = true; // default open
+            let radarOpen = true;
             const applicableKeys = _applicableCats(entry.category);
+            // Persistent state for current breakdown values (survives re-renders)
+            const liveBd = {};
+            LABOR_CATS.forEach(c => { liveBd[c.key] = bd[c.key] || 0; });
 
             const renderRadar = () => {
-              const currentBd = {};
-              LABOR_CATS.forEach(c => {
-                const inp = inputs['bd.' + c.key];
-                currentBd[c.key] = inp ? (parseFloat(inp.value) || 0) : (bd[c.key] || 0);
-              });
-
               radarWrap.innerHTML = '';
 
               // Toggle header
@@ -860,7 +859,7 @@ const HVACLibrary = {
               // Dot summary
               const dots = _el('span', { className: 'hvac-lib-radar-dots' });
               LABOR_CATS.forEach(c => {
-                if ((currentBd[c.key] || 0) > 0) {
+                if (liveBd[c.key] > 0) {
                   const d = _el('span', { className: 'hvac-lib-radar-dot' });
                   d.style.background = c.color;
                   dots.appendChild(d);
@@ -868,7 +867,7 @@ const HVACLibrary = {
               });
               toggle.appendChild(dots);
 
-              const total = _getTotalBreakdownHrs(currentBd);
+              const total = _getTotalBreakdownHrs(liveBd);
               toggle.appendChild(_el('span', { className: 'hvac-lib-radar-total', style: { marginLeft: 'auto' } },
                 total > 0 ? total.toFixed(2) + 'h' : '—'));
 
@@ -880,7 +879,7 @@ const HVACLibrary = {
 
                 // SVG radar chart
                 const svgWrap = _el('div');
-                svgWrap.innerHTML = _renderRadarSVG(currentBd, applicableKeys);
+                svgWrap.innerHTML = _renderRadarSVG(liveBd, applicableKeys);
                 body.appendChild(svgWrap);
 
                 // Category input rows
@@ -890,28 +889,28 @@ const HVACLibrary = {
                   const row = _el('div', { className: 'hvac-lib-cat-row', style: { opacity: enabled ? '1' : '0.3' } });
                   row.appendChild(_el('span', { className: 'hvac-lib-cat-dot', style: { background: c.color } }));
                   row.appendChild(_el('span', { className: 'hvac-lib-cat-label' }, c.label));
-                  const catInp = _el('input', {
-                    className: 'hvac-lib-cat-input', type: 'text',
-                    value: currentBd[c.key] || '', placeholder: '0',
-                    disabled: enabled ? undefined : 'disabled',
-                  });
+
+                  const catInp = document.createElement('input');
+                  catInp.className = 'hvac-lib-cat-input';
+                  catInp.type = 'text';
+                  catInp.value = liveBd[c.key] || '';
+                  catInp.placeholder = '0';
                   catInp.style.color = enabled ? c.color : '#333';
                   catInp.style.borderColor = enabled ? '#0f3460' : '#0a1a30';
-                  // Live update radar on change
+                  if (!enabled) catInp.disabled = true;
+
+                  // Live update: snapshot value into liveBd, update totals, re-render radar
                   catInp.addEventListener('change', () => {
-                    // Update the labor total display
-                    const newBd = {};
-                    LABOR_CATS.forEach(cc => {
-                      const i = inputs['bd.' + cc.key];
-                      newBd[cc.key] = i ? (parseFloat(i.value) || 0) : 0;
-                    });
-                    const newTotal = _getTotalBreakdownHrs(newBd);
+                    liveBd[c.key] = parseFloat(catInp.value) || 0;
+                    const newTotal = _getTotalBreakdownHrs(liveBd);
                     laborDisp.textContent = newTotal > 0 ? newTotal.toFixed(2) + 'h' : '—';
                     const newRate = parseFloat((rateInp.value || '').replace('$','')) || 45;
                     laborBox.querySelector('.hvac-lib-price-sub').textContent =
                       newTotal > 0 ? '$' + (newTotal * newRate).toFixed(2) + ' at $' + newRate + '/hr' : 'set hours below';
                     renderRadar();
                   });
+
+                  // Store reference for save
                   inputs['bd.' + c.key] = catInp;
                   row.appendChild(catInp);
                   row.appendChild(_el('span', { className: 'hvac-lib-cat-unit' }, 'h'));
@@ -960,8 +959,8 @@ const HVACLibrary = {
                   mocp: parseFloat(inputs['specs.mocp']?.value) || null,
                   size: inputs['specs.size']?.value || null,
                 };
-                const newBreakdown = {};
-                LABOR_CATS.forEach(c => { newBreakdown[c.key] = parseFloat(inputs['bd.' + c.key]?.value) || 0; });
+                // Read from liveBd (always current) rather than DOM inputs
+                const newBreakdown = { ...liveBd };
                 const totalHrs = _getTotalBreakdownHrs(newBreakdown);
                 updated.pricing = {
                   materialCost: parseFloat((inputs['pricing.materialCost'].value || '').replace(/[\$,]/g, '')) || 0,
