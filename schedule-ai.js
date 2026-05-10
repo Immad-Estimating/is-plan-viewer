@@ -83,7 +83,7 @@ Example: [{"tag":"RTU-1","type":"Rooftop Unit","tonnage":10,"cfm":4000,"model":"
 
 async function callGemini(base64DataUrl, config) {
   const apiKey = config.apiKey;
-  const model = config.model || 'gemini-2.0-flash';
+  const model = config.model || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const rawBase64 = stripDataUrl(base64DataUrl);
