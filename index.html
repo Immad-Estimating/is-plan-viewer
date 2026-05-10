@@ -2944,9 +2944,9 @@ async function runScheduleExtraction(blob) {
     // Show equipment detail table
     html += '<div style="margin-top:6px;max-height:120px;overflow-y:auto;font-size:10px">';
     html += '<table style="width:100%;border-collapse:collapse">';
-    html += '<tr style="color:#555"><th style="text-align:left;padding:2px 4px">Tag</th><th style="text-align:left;padding:2px 4px">Type</th><th style="text-align:left;padding:2px 4px">Tons</th><th style="text-align:left;padding:2px 4px">CFM</th><th style="text-align:left;padding:2px 4px">Voltage</th></tr>';
+    html += '<tr style="color:#555"><th style="text-align:left;padding:2px 4px">Tag</th><th style="text-align:left;padding:2px 4px">Type</th><th style="text-align:left;padding:2px 4px">Mfr</th><th style="text-align:left;padding:2px 4px">Tons</th><th style="text-align:left;padding:2px 4px">CFM</th><th style="text-align:left;padding:2px 4px">Model</th></tr>';
     for (const eq of equipment) {
-      html += `<tr style="color:#a0a0c0"><td style="padding:2px 4px">${escapeHtml(eq.tag || '?')}</td><td style="padding:2px 4px">${escapeHtml(eq.type || '')}</td><td style="padding:2px 4px">${eq.tonnage || '—'}</td><td style="padding:2px 4px">${eq.cfm || '—'}</td><td style="padding:2px 4px">${escapeHtml(eq.voltage || '—')}</td></tr>`;
+      html += `<tr style="color:#a0a0c0"><td style="padding:2px 4px;font-weight:600;color:#e0e0e0">${escapeHtml(eq.tag || '?')}</td><td style="padding:2px 4px">${escapeHtml(eq.type || '')}</td><td style="padding:2px 4px">${escapeHtml(eq.manufacturer || '—')}</td><td style="padding:2px 4px">${eq.tonnage || '—'}</td><td style="padding:2px 4px">${eq.cfm || '—'}</td><td style="padding:2px 4px;font-size:9px;color:#666">${escapeHtml(eq.model || '—')}</td></tr>`;
     }
     html += '</table></div>';
     statusEl.innerHTML = html;

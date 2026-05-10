@@ -36,22 +36,47 @@ function detectProvider(apiKey) {
 
 // ── Extraction prompt ─────────────────────────────────
 
-const EXTRACTION_PROMPT = `You are analyzing a mechanical/HVAC schedule from construction drawings. Extract ALL equipment entries from this schedule image.
+const EXTRACTION_PROMPT = `You are an expert HVAC estimator analyzing a mechanical equipment schedule from construction drawings.
 
-For each piece of equipment, return a JSON object with these fields:
-- "tag": The system/equipment tag (e.g., "RTU-1", "AHU-2", "EF-3", "MAU-1", "FCU-1")
-- "type": Equipment type (e.g., "Rooftop Unit", "Air Handler", "Exhaust Fan", "Makeup Air Unit")
-- "tonnage": Cooling tonnage if listed (number or null)
-- "cfm": Airflow in CFM if listed (number or null)
-- "heating": Heating capacity/type if listed (e.g., "250 MBH Gas", "15 kW Electric", null)
-- "voltage": Electrical info if listed (e.g., "208/3/60", "120/1/60", null)
-- "refrigerant": Refrigerant type if listed (e.g., "R-410A", "R-32", null)
-- "model": Model number if listed (string or null)
-- "manufacturer": Manufacturer if listed (string or null)
-- "notes": Any other relevant info from the schedule row (string or null)
+Your job: extract every piece of equipment from this schedule into structured JSON.
 
-Return ONLY a JSON array of objects. No markdown, no explanation, just the array.
-If you cannot read the schedule clearly, return what you can with null for unreadable fields.`;
+This is a standard mechanical schedule — typically a table with columns for equipment designation, capacity, airflow, electrical, and model info. Schedules may be titled "HVAC Equipment Schedule", "Mechanical Schedule", "Rooftop Unit Schedule", "Fan Schedule", "Air Handler Schedule", etc.
+
+For EACH equipment entry, extract these fields in order of priority:
+
+=== PRIMARY FIELDS (critical — always extract these) ===
+- "tag": Equipment tag/designation (e.g., "RTU-1", "AHU-2", "EF-3", "MAU-1", "FCU-1", "HP-1", "CU-1", "ERV-1")
+- "type": Equipment type. Standardize to one of: "Rooftop Unit", "Air Handler", "Exhaust Fan", "Makeup Air Unit", "Fan Coil Unit", "Heat Pump", "Mini Split", "Condensing Unit", "ERV", "HRV", "Unit Heater", "Cabinet Heater", "VAV Box", "WSHP", "PTAC", "Package Unit", "Split System". Use the closest match.
+- "tonnage": Cooling capacity in tons (number). Convert from BTU if needed: BTU/12000 = tons. null if not listed.
+- "cfm": Supply airflow in CFM (number). Use the supply/total CFM, not outdoor air. null if not listed.
+- "model": Full model number as shown (string). This is critical for procurement.
+- "manufacturer": Brand/manufacturer name (string). Common: Carrier, Trane, Lennox, AAON, Daikin, Mitsubishi, LG, York, Rheem, Bard.
+
+=== SECONDARY FIELDS (important for coordination) ===
+- "heating": Heating type and capacity (e.g., "250 MBH Gas", "15 kW Electric", "Heat Pump", null)
+- "voltage": Electrical requirements as shown (e.g., "208/3/60", "460/3/60", "120/1/60", null)
+- "refrigerant": Refrigerant type (e.g., "R-410A", "R-32", "R-454B", null)
+- "mca": Minimum circuit ampacity if shown (number or null)
+- "mocp": Maximum overcurrent protection if shown (number or null)
+
+=== SKIP THESE (do not extract) ===
+- Entering/leaving air temperatures
+- Discharge air temperatures
+- Sound ratings/NC levels
+- Weight
+- Filter sizes (unless no other data exists for the row)
+- Coil specifications
+- Drain connection sizes
+
+Rules:
+1. Each ROW in the schedule = one equipment entry. Do not merge or skip rows.
+2. If a tag appears multiple times (e.g., "FCU-1" through "FCU-12"), create separate entries for each unique tag. If a range is shown ("FCU-1 THRU FCU-12"), expand into individual entries with the same specs.
+3. If you can partially read a field, include what you can. Use null only if truly unreadable.
+4. Model numbers often contain dashes, slashes, and mixed case — preserve exactly as shown.
+5. Some schedules split into multiple tables on one page (e.g., RTU schedule + fan schedule). Extract from ALL tables.
+
+Return ONLY a JSON array. No markdown fencing, no explanation text, just the raw array.
+Example: [{"tag":"RTU-1","type":"Rooftop Unit","tonnage":10,"cfm":4000,"model":"RN-048-3-0-0-A00","manufacturer":"AAON","heating":"150 MBH Gas","voltage":"208/3/60","refrigerant":"R-410A","mca":42,"mocp":60}]`;
 
 // ── Gemini API ────────────────────────────────────────
 
@@ -159,16 +184,31 @@ const ScheduleAI = {
 
   equipmentToSymbols(equipment) {
     const COLORS = ['#4dabf7','#69db7c','#ffd43b','#da77f2','#ff8787','#a9e34b','#ffa94d','#74c0fc','#f783ac','#63e6be','#d0bfff','#ffc078'];
-    return equipment.map((eq, i) => ({
-      tag: (eq.tag || '').toUpperCase(),
-      description: [eq.type, eq.tonnage ? eq.tonnage + ' ton' : null, eq.cfm ? eq.cfm + ' CFM' : null].filter(Boolean).join(' · '),
-      color: COLORS[i % COLORS.length],
-      equipment: {
-        type: eq.type || null, tonnage: eq.tonnage || null, cfm: eq.cfm || null,
-        heating: eq.heating || null, voltage: eq.voltage || null, refrigerant: eq.refrigerant || null,
-        model: eq.model || null, manufacturer: eq.manufacturer || null, notes: eq.notes || null,
-      }
-    })).filter(s => s.tag);
+    return equipment.map((eq, i) => {
+      // Build a concise but informative description from primary fields
+      const descParts = [eq.type];
+      if (eq.manufacturer) descParts.push(eq.manufacturer);
+      if (eq.tonnage) descParts.push(eq.tonnage + ' ton');
+      if (eq.cfm) descParts.push(eq.cfm + ' CFM');
+      return {
+        tag: (eq.tag || '').toUpperCase(),
+        description: descParts.filter(Boolean).join(' · '),
+        color: COLORS[i % COLORS.length],
+        // Full equipment record for downstream reference
+        equipment: {
+          type: eq.type || null,
+          tonnage: eq.tonnage || null,
+          cfm: eq.cfm || null,
+          model: eq.model || null,
+          manufacturer: eq.manufacturer || null,
+          heating: eq.heating || null,
+          voltage: eq.voltage || null,
+          refrigerant: eq.refrigerant || null,
+          mca: eq.mca || null,
+          mocp: eq.mocp || null,
+        }
+      };
+    }).filter(s => s.tag);
   },
 
   getConfig, saveConfig,
