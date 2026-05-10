@@ -472,6 +472,7 @@
     <button class="new-project-btn" onclick="openNewProjectModal()">+ New Project</button>
     <div class="separator"></div>
     <button style="background:#0f3460;color:#e0e0e0;border:1px solid #1a4080;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap" onclick="openPriceBook()" title="Global Price Book">💲 Prices</button>
+    <button style="background:#0f3460;color:#e0e0e0;border:1px solid #1a4080;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap" onclick="openHVACLibrary()" title="HVAC Component Library">📚 Library</button>
     <button style="background:#0f3460;color:#e0e0e0;border:1px solid #1a4080;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap" onclick="exportBackup()" title="Download all takeoff data as JSON backup">💾 Backup</button>
     <button style="background:#0f3460;color:#e0e0e0;border:1px solid #1a4080;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap" onclick="document.getElementById('restoreFileInput').click()" title="Restore takeoff data from JSON backup">📂 Restore</button>
     <input type="file" id="restoreFileInput" accept=".json" style="display:none" onchange="importBackup(event)">
@@ -556,6 +557,7 @@
     <button id="panelBtn" onclick="togglePanel()" title="Analysis Panel" class="tool-has-tip">📊 Analysis<span class="tool-tip">Measurements Panel<br>View all duct runs, fittings,<br>stacks &amp; costs per page</span></button>
     <button id="compilerBtn" onclick="toggleCompiler()" title="Compiler" class="tool-has-tip">⚙️ Compiler<span class="tool-tip">Takeoff Compiler<br>Group, filter &amp; aggregate<br>all items across drawings</span></button>
     <button onclick="openPriceBook()" title="Global Price Book" class="tool-has-tip">💲 Prices<span class="tool-tip">Global Price Book<br>Set material costs &amp; labor<br>rates for all item types</span></button>
+    <button onclick="openHVACLibrary()" title="HVAC Component Library" class="tool-has-tip">📚 Library<span class="tool-tip">HVAC Component Library<br>Master catalog of equipment,<br>fans, grilles &amp; more</span></button>
 
   </div>
 
@@ -801,6 +803,18 @@
   </div>
 </div>
 
+<!-- ===== HVAC LIBRARY PANEL ===== -->
+<div id="hvacLibraryPanel" style="display:none;position:fixed;z-index:300;background:#16213e;border:1px solid #0f3460;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.6);flex-direction:column;overflow:hidden;min-width:480px;min-height:400px;width:600px;height:520px">
+  <div id="hlTitleBar" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#0f3460;cursor:move;user-select:none;border-radius:10px 10px 0 0;flex-shrink:0">
+    <span style="font-weight:700;font-size:14px;color:#4dabf7">📚 HVAC Library</span>
+    <button onclick="closeHVACLibrary()" style="background:none;border:none;color:#a0a0c0;cursor:pointer;font-size:18px;padding:0 4px;line-height:1" title="Close">×</button>
+  </div>
+  <div id="hvacLibraryContent" style="overflow-y:auto;flex:1;padding:12px"></div>
+  <div id="hlResizeHandle" style="position:absolute;bottom:0;right:0;width:16px;height:16px;cursor:nwse-resize;opacity:0.4" title="Drag to resize">
+    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M14 14L8 14L14 8Z" fill="#a0a0c0"/><path d="M14 14L11 14L14 11Z" fill="#666"/></svg>
+  </div>
+</div>
+
 <!-- ===== CONFIRM DIALOG ===== -->
 <div class="confirm-overlay" id="confirmDialog">
   <div class="confirm-box">
@@ -858,13 +872,14 @@ import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379
 import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
+import HVACLibrary from './hvac-library.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
 // IndexedDB Storage Layer
 // =====================================================
 const DB_NAME = 'ISPlanViewerDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 let dbInstance = null;
 
 function openDB() {
@@ -886,6 +901,10 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('priceBook')) {
         db.createObjectStore('priceBook', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('hvacLibrary')) {
+        const hl = db.createObjectStore('hvacLibrary', { keyPath: 'id', autoIncrement: true });
+        hl.createIndex('category', 'category', { unique: false });
       }
     };
     req.onblocked = () => {
@@ -3106,20 +3125,45 @@ async function runScheduleExtraction(blob) {
     await saveProjectSystemSymbols(activeProjectId);
     renderSysSymbolList();
 
-    // Show results
+    // Show results summary
     let html = `<span style="color:#00ff88">✓ Extracted ${equipment.length} entries, added ${added} new symbols</span>`;
     if (equipment.length > added) html += `<br><span style="color:#555;font-size:10px">${equipment.length - added} duplicates skipped</span>`;
-    // Show equipment detail table
-    html += '<div style="margin-top:6px;max-height:120px;overflow-y:auto;font-size:10px">';
-    html += '<table style="width:100%;border-collapse:collapse">';
-    html += '<tr style="color:#555"><th style="text-align:left;padding:2px 4px">Tag</th><th style="text-align:left;padding:2px 4px">Type</th><th style="text-align:left;padding:2px 4px">Cat</th><th style="text-align:left;padding:2px 4px">CFM</th><th style="text-align:left;padding:2px 4px">Size</th><th style="text-align:left;padding:2px 4px">Model</th></tr>';
-    for (const eq of equipment) {
-      const catShort = {'equipment':'⚙','fan':'🌀','air-distribution':'💨','terminal':'📦','energy-recovery':'♻','heating':'🔥','makeup-air':'🌬','specialty':'⚠'}[eq.category] || '•';
-      html += `<tr style="color:#a0a0c0"><td style="padding:2px 4px;font-weight:600;color:#e0e0e0">${escapeHtml(eq.tag || '?')}</td><td style="padding:2px 4px;font-size:10px">${escapeHtml(eq.type || '')}</td><td style="padding:2px 4px" title="${escapeHtml(eq.category || '')}">${catShort}</td><td style="padding:2px 4px">${eq.cfm || '—'}</td><td style="padding:2px 4px">${escapeHtml(eq.size || (eq.tonnage ? eq.tonnage + 'T' : '—'))}</td><td style="padding:2px 4px;font-size:9px;color:#666">${escapeHtml(eq.model || '—')}</td></tr>`;
-    }
-    html += '</table></div>';
     statusEl.innerHTML = html;
     statusEl.style.color = '';
+
+    // Step 2: HVAC Library matching
+    const matchResults = await HVACLibrary.matchExtractedBatch(equipment);
+    const matchContainer = document.createElement('div');
+    matchContainer.style.cssText = 'margin-top:10px;max-height:300px;overflow-y:auto;border-top:1px solid #0f3460;padding-top:8px';
+    statusEl.appendChild(matchContainer);
+
+    // Header for match step
+    const matchHeader = document.createElement('div');
+    matchHeader.style.cssText = 'font-size:11px;color:#a0a0c0;margin-bottom:6px;display:flex;align-items:center;gap:6px';
+    matchHeader.innerHTML = '📚 <span style="font-weight:600;color:#4dabf7">HVAC Library</span> — Link to existing or save new entries';
+    matchContainer.appendChild(matchHeader);
+
+    const matchContent = document.createElement('div');
+    matchContainer.appendChild(matchContent);
+
+    HVACLibrary.renderMatchStep(matchContent, matchResults, {
+      onLink: async (extracted, libraryEntry) => {
+        await HVACLibrary.incrementUsage(libraryEntry.id);
+        // Find the system symbol for this tag and enrich it with library data
+        const sym = projectSystemSymbols.find(s => s.tag === (extracted.tag || '').toUpperCase());
+        if (sym) {
+          sym.libraryId = libraryEntry.id;
+          sym.equipment = { ...sym.equipment, ...libraryEntry.specs, manufacturer: libraryEntry.manufacturer, model: libraryEntry.model };
+          await saveProjectSystemSymbols(activeProjectId);
+          renderSysSymbolList();
+        }
+      },
+      onCreateNew: async (extracted) => {
+        const entry = HVACLibrary.createEntryFromExtracted(extracted);
+        await HVACLibrary.save(entry);
+      },
+      onSkip: () => { /* no-op */ },
+    });
 
   } catch (err) {
     if (err.message === 'NO_API_KEY') {
@@ -3594,6 +3638,63 @@ window.closePriceBook = function() {
   pbSaveLayout();
   document.getElementById('priceBookPanel').style.display = 'none';
 };
+
+// ---- HVAC Library Panel ----
+let _hlDragState = null;
+let _hlResizeState = null;
+
+window.openHVACLibrary = function() {
+  const panel = document.getElementById('hvacLibraryPanel');
+  if (panel.style.display === 'flex') { closeHVACLibrary(); return; }
+  // Center on screen
+  const w = parseInt(panel.style.width) || 600;
+  const h = parseInt(panel.style.height) || 520;
+  panel.style.left = Math.max(40, (window.innerWidth - w) / 2) + 'px';
+  panel.style.top = Math.max(40, (window.innerHeight - h) / 2) + 'px';
+  panel.style.display = 'flex';
+  HVACLibrary.renderLibraryPanel(document.getElementById('hvacLibraryContent'));
+};
+
+window.closeHVACLibrary = function() {
+  document.getElementById('hvacLibraryPanel').style.display = 'none';
+};
+
+// Drag & resize for HVAC Library panel (same pattern as Price Book)
+(function() {
+  const titleBar = document.getElementById('hlTitleBar');
+  const panel = document.getElementById('hvacLibraryPanel');
+  const resizeHandle = document.getElementById('hlResizeHandle');
+  if (!titleBar || !panel) return;
+
+  titleBar.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    _hlDragState = { sx: e.clientX - panel.offsetLeft, sy: e.clientY - panel.offsetTop };
+  });
+
+  if (resizeHandle) {
+    resizeHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      _hlResizeState = { sx: e.clientX, sy: e.clientY, w: panel.offsetWidth, h: panel.offsetHeight };
+    });
+  }
+
+  document.addEventListener('mousemove', (e) => {
+    if (_hlDragState) {
+      panel.style.left = (e.clientX - _hlDragState.sx) + 'px';
+      panel.style.top = (e.clientY - _hlDragState.sy) + 'px';
+    }
+    if (_hlResizeState) {
+      panel.style.width = Math.max(400, _hlResizeState.w + e.clientX - _hlResizeState.sx) + 'px';
+      panel.style.height = Math.max(300, _hlResizeState.h + e.clientY - _hlResizeState.sy) + 'px';
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    _hlDragState = null;
+    _hlResizeState = null;
+  });
+})();
 
 window.setPBTab = function(tab) {
   activePBTab = tab;
@@ -8776,6 +8877,7 @@ async function init() {
   await openDB();
   await loadPriceBook();
   await loadQuickbaseProjects();
+  await HVACLibrary.init();
 
   // Setup drag-to-import on left panel
   setupDragImport();
