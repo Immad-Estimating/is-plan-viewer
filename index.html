@@ -3228,11 +3228,10 @@ window.aiReviewImportAll = async function() {
     imported++;
   }
 
-  // Collect imported item data BEFORE wiping the DOM (innerHTML destroys the review rows)
+  // Collect ALL items for library matching BEFORE wiping the DOM
+  // Include both newly imported AND already-existing items (user may want to link existing ones too)
   const importedItems = [];
   for (let idx = 0; idx < equipment.length; idx++) {
-    const chk = document.getElementById('aiChk' + idx);
-    if (!chk || !chk.checked) continue;
     const tag = (document.getElementById('aiTag' + idx)?.value || '').trim().toUpperCase();
     if (!tag) continue;
     const eq = equipment[idx];
@@ -3256,19 +3255,15 @@ window.aiReviewImportAll = async function() {
   const statusEl = document.getElementById('sysSymAiStatus');
 
   if (imported === 0) {
-    statusEl.innerHTML = `<span style="color:#555">No new items imported.</span>`;
-    window._aiReviewEquipment = null;
-    return;
+    statusEl.innerHTML = `<span style="color:#a0a0c0">All items already imported — checking library matches...</span>`;
+  } else {
+    statusEl.innerHTML = `<span style="color:#00ff88">\u2713 Imported ${imported} items</span>` +
+      (equipment.length > imported ? `<span style="color:#555;font-size:10px"> (${equipment.length - imported} already existed)</span>` : '');
   }
 
-  statusEl.innerHTML = `<span style="color:#00ff88">\u2713 Imported ${imported} items</span>` +
-    (equipment.length > imported ? `<span style="color:#555;font-size:10px"> (${equipment.length - imported} skipped/dupes)</span>` : '');
-
-  // Run library matching on imported items
-  const matchResults = await HVACLibrary.matchExtractedBatch(importedItems);
-  const hasMatches = matchResults.some(r => r.matches && r.matches.length > 0);
-
-  if (hasMatches || importedItems.length > 0) {
+  // Run library matching on ALL extracted items
+  if (importedItems.length > 0) {
+    const matchResults = await HVACLibrary.matchExtractedBatch(importedItems);
     const matchContainer = document.createElement('div');
     matchContainer.style.cssText = 'margin-top:10px;max-height:300px;overflow-y:auto;border-top:1px solid #2a2a4a;padding-top:8px';
     statusEl.appendChild(matchContainer);
@@ -3301,7 +3296,7 @@ window.aiReviewImportAll = async function() {
   }
 
   window._aiReviewEquipment = null;
-};
+};  // end aiReviewImportAll
 
 window.openAiConfig = function() {
   const statusEl = document.getElementById('sysSymAiStatus');
