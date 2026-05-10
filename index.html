@@ -6754,6 +6754,23 @@ function drawMeasureOverlay() {
     drawFitting(ghost, false);
     mCtx.globalAlpha = 1.0;
   }
+  // Draw HVAC component ghost preview
+  if (fittingMode && selectedHvacComponent && fittingMousePos) {
+    const hvac = selectedHvacComponent;
+    const ghost = {
+      type: 'hvac_component',
+      hvacTag: hvac.tag || 'HVAC',
+      hvacType: hvac.type || '',
+      hvacCategory: hvac.category || 'equipment',
+      x: fittingMousePos.x, y: fittingMousePos.y,
+      rotation: 0,
+      sizeA: String(hvac.tonnage ? Math.max(24, hvac.tonnage * 4) : (hvac.size ? parseInt(hvac.size) || 24 : 24)),
+      sizeB: String(hvac.tonnage ? Math.max(16, hvac.tonnage * 2.5) : (hvac.size && hvac.size.includes('x') ? parseInt(hvac.size.split('x')[1]) || 16 : 16)),
+    };
+    mCtx.globalAlpha = 0.4;
+    drawFitting(ghost, false);
+    mCtx.globalAlpha = 1.0;
+  }
 
   // Snap preview indicator - cached to avoid getAllSnapTargets() every frame
   if ((measureMode || fittingMode) && mousePos) {
