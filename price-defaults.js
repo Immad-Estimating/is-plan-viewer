@@ -81,8 +81,22 @@ export const SPIRAL_DEFAULTS = {
   'spiral-wye-24': { '26': 96.95 },
 };
 
-// ── Snaplock duct material defaults ($/LF by gauge) ──────────────────
+// ── Snaplock duct & fitting material defaults ($/LF by gauge) ─────────
 export const SNAPLOCK_DEFAULTS = {
+  // Snaplock Saddle 45° Wye pricing
+  'snaplock-saddle45y-4':  { '26': 3.51, '24': 3.51 },
+  'snaplock-saddle45y-5':  { '26': 3.51, '24': 3.51 },
+  'snaplock-saddle45y-6':  { '26': 3.92, '24': 3.92 },
+  'snaplock-saddle45y-7':  { '26': 4.13, '24': 4.13 },
+  'snaplock-saddle45y-8':  { '26': 4.53, '24': 4.53 },
+  'snaplock-saddle45y-9':  { '26': 4.79, '24': 4.79 },
+  'snaplock-saddle45y-10': { '26': 6.48, '24': 6.48 },
+  'snaplock-saddle45y-12': { '26': 8.18, '24': 8.18 },
+  'snaplock-saddle45y-14': { '26': 10.83, '24': 10.83 },
+  'snaplock-saddle45y-16': { '26': 14.31, '24': 14.31 },
+  'snaplock-saddle45y-18': { '26': 17.07, '24': 17.07 },
+  'snaplock-saddle45y-20': { '26': 23.03, '24': 23.03 },
+  'snaplock-saddle45y-22': { '26': 24.24, '24': 24.24 },
   'duct-snaplock-4':  { '26': 1.66 },
   'duct-snaplock-5':  { '26': 2.02 },
   'duct-snaplock-6':  { '26': 2.46 },
