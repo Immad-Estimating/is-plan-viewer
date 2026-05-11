@@ -64,6 +64,14 @@ export const SPIRAL_DEFAULTS = {
   'spiral-45el-20': { '26': 75.57, '24': 75.57 },
   'spiral-45el-22': { '26': 152.97, '24': 152.97 },
   'spiral-45el-24': { '26': 169.63, '24': 169.63 },
+  // Spiral Tee pricing (main x branch, 26 ga)
+  'spiral-tee-8x8':   { '26': 28.10 },
+  'spiral-tee-10x10': { '26': 28.58 },
+  'spiral-tee-12x12': { '26': 40.33 },
+  'spiral-tee-14x14': { '26': 51.99 },
+  'spiral-tee-16x16': { '26': 65.97 },
+  'spiral-tee-18x18': { '26': 82.33 },
+  'spiral-tee-20x20': { '26': 85.29 },
   // Spiral Coupling pricing
   'spiral-coupling-4':  { '26': 2.97 },
   'spiral-coupling-5':  { '26': 3.05 },
