@@ -3738,8 +3738,14 @@ function pbSaveLayout() {
 function pbApplyLayout(panel) {
   var layout = pbRestoreLayout();
   if (layout) {
-    if (layout.left) panel.style.left = layout.left;
-    if (layout.top) panel.style.top = layout.top;
+    // Clamp saved position so panel stays on-screen
+    var x = parseInt(layout.left) || 0;
+    var y = parseInt(layout.top) || 0;
+    var pw = parseInt(layout.width) || 500;
+    x = Math.max(-pw + 80, Math.min(window.innerWidth - 80, x));
+    y = Math.max(0, Math.min(window.innerHeight - 40, y));
+    panel.style.left = x + 'px';
+    panel.style.top = y + 'px';
     if (layout.width) panel.style.width = layout.width;
     if (layout.height) panel.style.height = layout.height;
     if (layout.collapsed) pbCollapsed = layout.collapsed;
@@ -3775,6 +3781,13 @@ function pbInitDrag() {
     _pbDrag = { startX: e.clientX, startY: e.clientY, origLeft: parseInt(panel.style.left) || 0, origTop: parseInt(panel.style.top) || 0 };
     e.preventDefault();
   });
+  titleBar.addEventListener('dblclick', function() {
+    var w = parseInt(panel.style.width) || 500;
+    var h = parseInt(panel.style.height) || 520;
+    panel.style.left = Math.max(40, (window.innerWidth - w) / 2) + 'px';
+    panel.style.top = Math.max(40, (window.innerHeight - h) / 2) + 'px';
+    pbSaveLayout();
+  });
   var resizeHandle = document.getElementById('pbResizeHandle');
   resizeHandle.addEventListener('mousedown', function(e) {
     _pbResize = { startX: e.clientX, startY: e.clientY, origW: panel.offsetWidth, origH: panel.offsetHeight };
@@ -3783,8 +3796,12 @@ function pbInitDrag() {
   });
   document.addEventListener('mousemove', function(e) {
     if (_pbDrag) {
-      panel.style.left = (_pbDrag.origLeft + e.clientX - _pbDrag.startX) + 'px';
-      panel.style.top = (_pbDrag.origTop + e.clientY - _pbDrag.startY) + 'px';
+      var x = _pbDrag.origLeft + e.clientX - _pbDrag.startX;
+      var y = _pbDrag.origTop + e.clientY - _pbDrag.startY;
+      x = Math.max(-panel.offsetWidth + 80, Math.min(window.innerWidth - 80, x));
+      y = Math.max(0, Math.min(window.innerHeight - 40, y));
+      panel.style.left = x + 'px';
+      panel.style.top = y + 'px';
     }
     if (_pbResize) {
       var newW = Math.max(340, _pbResize.origW + e.clientX - _pbResize.startX);
