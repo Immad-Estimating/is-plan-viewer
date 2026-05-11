@@ -718,7 +718,7 @@
     </div>
     <!-- Fitting palette -->
     <div class="fitting-palette" id="fittingPalette">
-      <div class="fp-header">
+      <div class="fp-header" id="fpDragHandle" style="cursor:move;user-select:none">
         <h4>Insert</h4>
         <span class="fp-preview" id="fpPreview">Select an item</span>
       </div>
@@ -8082,6 +8082,32 @@ function updateConfigArea() {
 
 // Initialize insert palette on load
 setTimeout(() => renderInsertPalette(), 0);
+
+// Drag support for Insert palette
+(function() {
+  let _fpDrag = null;
+  const handle = document.getElementById('fpDragHandle');
+  const palette = document.getElementById('fittingPalette');
+  if (!handle || !palette) return;
+  handle.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    e.preventDefault();
+    _fpDrag = { sx: e.clientX - palette.offsetLeft, sy: e.clientY - palette.offsetTop };
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!_fpDrag) return;
+    let x = e.clientX - _fpDrag.sx;
+    let y = e.clientY - _fpDrag.sy;
+    // Clamp so at least 40px of the palette stays visible
+    x = Math.max(-palette.offsetWidth + 60, Math.min(window.innerWidth - 60, x));
+    y = Math.max(0, Math.min(window.innerHeight - 40, y));
+    palette.style.left = x + 'px';
+    palette.style.top = y + 'px';
+  });
+  document.addEventListener('mouseup', () => { _fpDrag = null; });
+  // Double-click header to reset position
+  handle.addEventListener('dblclick', () => { palette.style.left = '16px'; palette.style.top = '50px'; });
+})();
 
 window.selectFittingType = function(type) {
   selectedFittingType = type;
