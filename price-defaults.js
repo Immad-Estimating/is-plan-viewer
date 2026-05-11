@@ -64,6 +64,17 @@ export const SPIRAL_DEFAULTS = {
   'spiral-45el-20': { '26': 75.57, '24': 75.57 },
   'spiral-45el-22': { '26': 152.97, '24': 152.97 },
   'spiral-45el-24': { '26': 169.63, '24': 169.63 },
+  // Spiral Concentric Reducer pricing
+  'spiral-reducer-10': { '26': 20.95 },
+  'spiral-reducer-12': { '26': 23.86 },
+  'spiral-reducer-14': { '26': 26.74 },
+  'spiral-reducer-16': { '26': 29.45 },
+  'spiral-reducer-18': { '26': 32.17 },
+  'spiral-reducer-20': { '26': 37.51 },
+  'spiral-reducer-22': { '26': 40.41 },
+  'spiral-reducer-28': { '26': 45.64 },
+  'spiral-reducer-32': { '26': 49.13 },
+  'spiral-reducer-36': { '26': 52.62 },
   // Spiral Wye fitting pricing
   'spiral-wye-4':  { '26': 14.03 },
   'spiral-wye-5':  { '26': 14.03 },
