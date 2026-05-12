@@ -699,6 +699,17 @@
         </div>
       </div>
 
+      <!-- Flex drop popup (floats near endpoint) -->
+      <div id="flexDropPopup" style="display:none;position:absolute;z-index:70;background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,0.5);white-space:nowrap">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:#a0a0c0">↓ Drop</span>
+          <input type="number" id="flexDropVal" min="0" max="50" step="0.5" value="0" style="width:55px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:13px;text-align:center" onkeydown="if(event.key==='Enter'){applyFlexDrop()}">
+          <span style="font-size:11px;color:#666">ft</span>
+          <button onclick="applyFlexDrop()" style="background:#00ff88;color:#1a1a2e;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✓</button>
+          <button onclick="closeFlexDrop()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px">✕</button>
+        </div>
+      </div>
+
       <!-- Panel toggle -->
       <!-- Duct draw config bar -->
     <div class="duct-draw-bar" id="ductDrawBar">
@@ -4916,7 +4927,7 @@ viewer.addEventListener('mousedown', (e) => {
   if (!pdfDoc) return;
   if (calibrationMode) return;
   if (_snipActive) return; // snip overlay handles its own events
-  if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette') || e.target.closest('.ms-panel')) return;
+  if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette') || e.target.closest('.ms-panel') || e.target.closest('#flexDropPopup')) return;
 
   // Multi-select: Shift+Click/Drag OR persistent select mode (Q)
   if ((e.shiftKey || multiSelectModeOn) && !measureMode && !fittingMode && !stackMode) {
@@ -5233,7 +5244,7 @@ viewer.addEventListener('click', (e) => {
   if (!pdfDoc) return;
   if (isPanning) return;
 
-  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette')) {
+  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette') || e.target.closest('#flexDropPopup')) {
     return;
   }
 
@@ -6137,6 +6148,10 @@ function finishMeasurement() {
     drawMeasureOverlay();
     updatePanel();
     scheduleSave();
+    // Show flex drop popup at endpoint after flex run is placed
+    if (meas.duct.type === 'flex') {
+      showFlexDropPopup(meas.id);
+    }
     return;
   }
 
@@ -7591,6 +7606,46 @@ window.setFlexDrop = function(id, value) {
   updatePanel();
 };
 
+var _pendingFlexDropId = null;
+window.showFlexDropPopup = function(measId) {
+  _pendingFlexDropId = measId;
+  const m = findMeasurement(measId);
+  if (!m) return;
+  const lastPt = m.points[m.points.length - 1];
+  const screenPt = pdfToScreen(lastPt.x, lastPt.y);
+  const popup = document.getElementById('flexDropPopup');
+  const rect = document.getElementById('viewer').getBoundingClientRect();
+  let left = Math.min(screenPt.x + 15, rect.width - 260);
+  let top = Math.min(screenPt.y - 20, rect.height - 60);
+  left = Math.max(10, left);
+  top = Math.max(10, top);
+  popup.style.left = left + 'px';
+  popup.style.top = top + 'px';
+  popup.style.display = 'block';
+  const input = document.getElementById('flexDropVal');
+  input.value = m.duct.dropInches ? (m.duct.dropInches / 12).toFixed(1) : '0';
+  input.focus();
+  input.select();
+};
+
+window.applyFlexDrop = function() {
+  if (!_pendingFlexDropId) return;
+  const m = findMeasurement(_pendingFlexDropId);
+  if (m && m.duct && m.duct.type === 'flex') {
+    const ft = parseFloat(document.getElementById('flexDropVal').value) || 0;
+    m.duct.dropInches = Math.round(ft * 12);
+    drawMeasureOverlay();
+    scheduleSave();
+    updatePanel();
+  }
+  closeFlexDrop();
+};
+
+window.closeFlexDrop = function() {
+  document.getElementById('flexDropPopup').style.display = 'none';
+  _pendingFlexDropId = null;
+};
+
 // ---- Phase 2: Inline Cost Editors ----
 window.editFittingCost = function(id) {
   var el = document.getElementById('fc-edit-' + id);
@@ -7792,7 +7847,7 @@ function updatePanel() {
 
     for (const m of measurements) {
       const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}${m.duct.flexColor ? ' ' + m.duct.flexColor : ''}${m.duct.dropInches ? ' ↓' + m.duct.dropInches + '"' : ''}</div>` : '';
-      const flexDropInput = (m.duct && m.duct.type === 'flex') ? `<div style="display:flex;align-items:center;gap:4px;margin-top:3px"><label style="font-size:10px;color:#a0a0c0;white-space:nowrap">↓ Drop</label><input type="number" min="0" max="240" step="1" value="${m.duct.dropInches || 0}" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:2px 4px;border-radius:3px;font-size:11px;text-align:center" onchange="setFlexDrop(${m.id},this.value)"><label style="font-size:10px;color:#666">in</label></div>` : '';
+      const flexDropInput = (m.duct && m.duct.type === 'flex') ? `<div style="display:flex;align-items:center;gap:4px;margin-top:3px;cursor:pointer" onclick="showFlexDropPopup(${m.id})" title="Click to set drop distance"><span style="font-size:11px;color:#00bfff">↓ ${m.duct.dropInches ? (m.duct.dropInches/12).toFixed(1) + ' ft drop' : 'Set drop'}</span></div>` : '';
       // Elevation info + auto fittings
       let elevInfo = '';
       const elevChanges = m.points.filter(p => p.elevation && parseElevChange(p.elevation));
