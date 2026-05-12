@@ -2743,6 +2743,7 @@ const FITTINGS_BY_SHAPE = {
     { type: 'eccReducer', label: '⊐ Ecc', title: 'Offset (9)' },
     { type: 'endcap', label: '▫ Cap', title: 'End Cap' },
     { type: 'transition', label: '◇ Trans', title: 'Rect to Round Transition' },
+    { type: 'boot', label: '▣ Boot', title: 'Register Boot / Supply Can' },
   ],
   oval: [
     { type: '90el', label: '↱ 90°', title: '90° Elbow (1)' },
@@ -8184,7 +8185,7 @@ async function saveLastPage() {
 
 const FITTING_NAMES = {
   '90el': '90° Elbow', '45el': '45° Elbow', '22el': '22.5° Elbow',
-  'tee': 'Tee-Wye', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral',
+  'tee': 'Tee-Wye', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral', 'boot': 'Boot',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
   'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
   'rectTap': 'Rect Tap',
@@ -8613,6 +8614,10 @@ function handleFittingClick(e) {
 
 function getFittingBoundingRadius(f) {
   const D = inchesToPx(parseDimension(f.sizeA));
+  if (f.type === 'boot') {
+    const D2 = f.sizeB ? inchesToPx(parseDimension(f.sizeB)) : D;
+    return Math.sqrt(D * D + D2 * D2) / 2 + 5;
+  }
   return (D * 1.5 + 10) * 0.75;
 }
 
@@ -9207,6 +9212,7 @@ function drawFitting(f, isSelected, isMultiSelected) {
     case 'transition': drawTransition(D, D2); break;
     case 'sqwing': drawSquareWing(D); break;
     case 'rectTap': drawRectTap(D, D2); break;
+    case 'boot': drawBoot(D, D2); break;
     case 'hvac_component': drawHvacMarker(f); break;
   }
 
@@ -10053,6 +10059,34 @@ function drawTransition(D, D2) {
   mCtx.beginPath();
   mCtx.arc(len/2, 0, halfW2, 0, Math.PI * 2);
   mCtx.stroke();
+}
+
+function drawBoot(D, D2) {
+  // Register boot in plan view: rectangle (face size) with X pattern
+  // D = sizeA (width), D2 = sizeB (height, defaults to D if square)
+  const hw = D / 2;
+  const hh = D2 / 2;
+
+  // Outer rectangle (register face)
+  mCtx.strokeRect(-hw, -hh, D, D2);
+
+  // X pattern inside (industry convention: register/diffuser in plan)
+  mCtx.beginPath();
+  mCtx.moveTo(-hw, -hh);
+  mCtx.lineTo(hw, hh);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(hw, -hh);
+  mCtx.lineTo(-hw, hh);
+  mCtx.stroke();
+
+  // Inner rectangle (slightly inset — represents the register neck)
+  const inset = Math.min(hw, hh) * 0.2;
+  mCtx.globalAlpha = 0.5;
+  mCtx.setLineDash([3, 3]);
+  mCtx.strokeRect(-hw + inset, -hh + inset, D - inset * 2, D2 - inset * 2);
+  mCtx.setLineDash([]);
+  mCtx.globalAlpha = 1.0;
 }
 
 // App Init
