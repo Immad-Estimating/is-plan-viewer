@@ -3566,6 +3566,20 @@ const PRICE_BOOK_TABS = {
         { key: 'duct-spiral-34', snapKey: null, label: '34\u2033' },
         { key: 'duct-spiral-36', snapKey: null, label: '36\u2033' },
       ]},
+      { id: 'round-flex', hasGauge: false, title: 'Flex Duct (per 25ft roll)', toggleType: false, flexToggle: true, items: [
+        { key: 'flex-black-4',  altKey: 'flex-silver-4',  label: '4\u2033' },
+        { key: 'flex-black-5',  altKey: 'flex-silver-5',  label: '5\u2033' },
+        { key: 'flex-black-6',  altKey: 'flex-silver-6',  label: '6\u2033' },
+        { key: 'flex-black-7',  altKey: 'flex-silver-7',  label: '7\u2033' },
+        { key: 'flex-black-8',  altKey: 'flex-silver-8',  label: '8\u2033' },
+        { key: 'flex-black-9',  altKey: 'flex-silver-9',  label: '9\u2033' },
+        { key: 'flex-black-10', altKey: 'flex-silver-10', label: '10\u2033' },
+        { key: 'flex-black-12', altKey: 'flex-silver-12', label: '12\u2033' },
+        { key: 'flex-black-14', altKey: 'flex-silver-14', label: '14\u2033' },
+        { key: 'flex-black-16', altKey: 'flex-silver-16', label: '16\u2033' },
+        { key: 'flex-black-18', altKey: 'flex-silver-18', label: '18\u2033' },
+        { key: 'flex-black-20', altKey: 'flex-silver-20', label: '20\u2033' },
+      ]},
     ]
   },
   oval: {
@@ -3591,6 +3605,7 @@ var pbCollapsed = {};
 var pbGauge = { 'round-fit': '26', 'round-duct': '26', 'rect-fit': '26', 'rect-duct': '26', 'oval-fit': '26', 'oval-duct': '26' }; // active gauge per section
 var activePBTab = 'rect';
 var pbRoundType = { 'round-fit': 'spiral', 'round-duct': 'spiral' }; // toggle: 'spiral' or 'snaplock'
+var pbFlexColor = { 'round-flex': 'black' }; // toggle: 'black' or 'silver'
 var pbExpandedItems = {}; // tracks which fitting rows are expanded to show per-size pricing
 var pbPerimClass = { 'rect-fit': 0 }; // active perimeter class index per section
 
@@ -4191,6 +4206,10 @@ function pbRow(item, sectionId) {
   var gauge = pbGauge[sectionId] || null;
   // Determine active key based on spiral/snaplock toggle
   var activeKey = item.key;
+  // Flex color toggle: black/silver
+  if (item.altKey && pbFlexColor[sectionId] === 'silver') {
+    activeKey = item.altKey;
+  }
   var roundType = pbRoundType[sectionId];
   if (roundType === 'snaplock' && item.snapKey) {
     activeKey = item.snapKey;
@@ -4207,6 +4226,8 @@ function pbRow(item, sectionId) {
   var mc;
   if (gauge && (SPIRAL_DEFAULTS[activeKey] || SNAPLOCK_DEFAULTS[activeKey])) {
     mc = getMaterialForGauge(activeKey, gauge);
+  } else if (!gauge && SNAPLOCK_DEFAULTS[activeKey] && SNAPLOCK_DEFAULTS[activeKey]['26'] != null) {
+    mc = SNAPLOCK_DEFAULTS[activeKey]['26'];
   } else {
     mc = entry ? entry.materialCost : null;
   }
@@ -4556,6 +4577,20 @@ function renderPriceBook() {
     html += arrow + '  ' + sec.title + ' <span style="font-weight:400;color:#a0a0c0;font-size:10px;text-transform:none">(' + count + ')</span>';
     // Right-side controls: toggle type + gauge selector
     html += '<span style="float:right;font-weight:400;text-transform:none;display:flex;align-items:center;gap:6px">';
+    // Flex Black/Silver toggle
+    if (sec.flexToggle && !collapsed) {
+      var flexColor = pbFlexColor[sec.id] || 'black';
+      var blackActive = flexColor === 'black';
+      var blackStyle = blackActive
+        ? 'background:rgba(80,80,80,0.3);color:#ccc;border-color:#888'
+        : 'background:#1a1a2e;color:#555;border-color:#0f3460';
+      var silverStyle = !blackActive
+        ? 'background:rgba(192,192,192,0.2);color:#d0d0d0;border-color:#aaa'
+        : 'background:#1a1a2e;color:#555;border-color:#0f3460';
+      html += '<button onclick="event.stopPropagation();pbFlexColor[\x27' + sec.id + '\x27]=\x27' + (blackActive ? 'silver' : 'black') + '\x27;renderPriceBook()" style="padding:2px 8px;border-radius:3px;cursor:pointer;font-size:10px;font-weight:600;border:1px solid;white-space:nowrap;' + (blackActive ? blackStyle : silverStyle) + '">';
+      html += blackActive ? '\u25cf Black' : '\u25cb Silver';
+      html += '</button>';
+    }
     // Spiral/Snap Lock toggle (only for toggleType sections)
     if (sec.toggleType && !collapsed) {
       var roundType = pbRoundType[sec.id] || 'spiral';
