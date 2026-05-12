@@ -4427,8 +4427,15 @@ function pbRowEditable(item, sectionId) {
   var lh = lhEntry ? lhEntry.laborHrs : (entry ? entry.laborHrs : null);
   var hasShopAdder = sectionId === 'rect-acc';
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
+  var isFlex = sectionId === 'round-flex';
   html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
-  html += '<td style="padding:4px 2px">' + pbInput(activeKey, 'materialCost', mc) + '</td>';
+  if (isFlex) {
+    // Display as $/Roll (×25), save as $/ft (÷25)
+    var rollPrice = mc != null ? (mc * 25).toFixed(2) : '';
+    html += '<td style="padding:4px 2px"><input type="text" value="' + rollPrice + '" placeholder="\u2014" style="width:60px;background:#1a1a2e;border:1px solid #0f3460;color:#00ff88;padding:3px 5px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + activeKey + '\',\'materialCost\',parseFloat(this.value)/25)"></td>';
+  } else {
+    html += '<td style="padding:4px 2px">' + pbInput(activeKey, 'materialCost', mc) + '</td>';
+  }
   if (hasShopAdder) {
     var shopKey = activeKey + '-shop';
     var shopSaved = priceBookCache ? priceBookCache[shopKey] : null;
