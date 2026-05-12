@@ -6,7 +6,36 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SNAPLOCK_DEFAULTS } from './price-defaults.js';
+import { SNAPLOCK_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, SHOP_DEFAULTS } from './price-defaults.js';
+
+function getGaugeWeightPerSF(gauge) {
+  if (gauge === '22') return 1.406;
+  if (gauge === '24') return 1.156;
+  return 0.906; // 26ga default
+}
+
+function getCompilerShopSettings() {
+  const saved = _priceBookCache ? _priceBookCache['shop-settings'] : null;
+  const s = {};
+  for (const k in SHOP_DEFAULTS) s[k] = (saved && saved[k] != null) ? saved[k] : SHOP_DEFAULTS[k];
+  return s;
+}
+
+// Parse a size string like "24x12" → { W: 24, H: 12 }; non-rect returns null.
+function parseRectDims(sizeStr) {
+  if (!sizeStr) return null;
+  const m = String(sizeStr).match(/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  return { W: parseFloat(m[1]), H: parseFloat(m[2]) };
+}
+
+// Find the perim-class maxPerim for a given perimeter (inches).
+function findPerimClassMax(perimIn) {
+  for (const pc of RECT_PERIM_CLASSES) {
+    if (perimIn <= pc.maxPerim) return pc.maxPerim;
+  }
+  return RECT_PERIM_CLASSES[RECT_PERIM_CLASSES.length - 1].maxPerim;
+}
 
 const DB_NAME = 'ISPlanViewerDB';
 const DB_VERSION = 3;
@@ -336,6 +365,29 @@ function normalizeRows(allPageData, drawingNames) {
       }
       if (!matCost && SNAPLOCK_DEFAULTS[sizeKey] && SNAPLOCK_DEFAULTS[sizeKey]['26'] != null) {
         matCost = SNAPLOCK_DEFAULTS[sizeKey]['26'];
+      }
+      // Rect fitting fallback: perim-class price book override → SA-based auto-calc
+      if (!matCost && shape === 'rect' && RECT_FITTING_SA[baseKey]) {
+        const mainDims = parseRectDims(f.sizeA);
+        const branchDims = parseRectDims(f.sizeB);
+        if (mainDims) {
+          const gauge = f.gauge || '26';
+          const perim = 2 * (mainDims.W + mainDims.H);
+          const pcMax = findPerimClassMax(perim);
+          // Check Price Book perim-class override (with or without gauge suffix)
+          const pcKeyG = baseKey + '-p' + pcMax + '-g' + gauge;
+          const pcKey  = baseKey + '-p' + pcMax;
+          const pcEntry = _priceBookCache && (_priceBookCache[pcKeyG] || _priceBookCache[pcKey]);
+          if (pcEntry && pcEntry.materialCost != null) {
+            matCost = pcEntry.materialCost;
+          } else {
+            const sa = calcRectFittingSA(baseKey, mainDims.W, mainDims.H,
+                                         branchDims ? branchDims.W : undefined,
+                                         branchDims ? branchDims.H : undefined);
+            const shop = getCompilerShopSettings();
+            matCost = sa * getGaugeWeightPerSF(gauge) * (shop.sheetMetalPricePerLb || 0);
+          }
+        }
       }
       let bd = getPriceBookLaborBreakdown(sizeKey);
       if (Object.keys(bd).length === 0) bd = getPriceBookLaborBreakdown(baseKey);

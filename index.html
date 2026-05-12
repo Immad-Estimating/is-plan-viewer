@@ -968,7 +968,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, RECT_FITTING_REF, RECT_PERIM_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -3674,17 +3674,22 @@ function getLaborCatForSection(sectionId) {
 
 // Reference data per rectangular fitting type (read-only)
 // cuts: fabrication complexity reference
-// equivLF: equivalent linear feet of straight duct material the fitting consumes
-// RECT_FITTING_REF — imported from price-defaults.js
+// RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA — imported from price-defaults.js
 
-// Auto-calc raw material cost for a rect fitting at a given perimeter class and gauge
-function calcRectFittingRawCost(fittingKey, perimeterIn, gauge) {
-  var ref = RECT_FITTING_REF[fittingKey];
-  if (!ref) return null;
+// Gauge → lbs per SF (galvanized sheet metal)
+function getGaugeWeightPerSF(gauge) {
+  if (gauge === '22') return 1.406;
+  if (gauge === '24') return 1.156;
+  return 0.906; // 26ga default
+}
+
+// Auto-calc raw material cost for a rect fitting from W×H, gauge
+function calcRectFittingRawCost(fittingKey, widthIn, heightIn, gauge, branchW, branchH) {
+  if (!RECT_FITTING_SA[fittingKey]) return null;
+  var sa = calcRectFittingSA(fittingKey, widthIn, heightIn, branchW, branchH);
   var shop = getShopSettings();
-  var weightPerLF = getDuctWeightPerLF(perimeterIn, gauge);
-  var rawCost = ref.equivLF * weightPerLF * (shop.sheetMetalPricePerLb || 0);
-  return rawCost;
+  var weightPerSF = getGaugeWeightPerSF(gauge);
+  return sa * weightPerSF * (shop.sheetMetalPricePerLb || 0);
 }
 
 function getShopSettings() {
@@ -4270,15 +4275,20 @@ function pbRow(item, sectionId) {
   var mcKey = gaugeKey;
   var lhKey = activeKey;
   var autoCalcMc = null;
+  // Representative W,H for the active perim class (square approximation)
+  var pcSampleW = 12, pcSampleH = 12, pcSampleSA = 0;
   if (isRectFit) {
     var pcIdx = pbPerimClass[sectionId] || 0;
     var pc = RECT_PERIM_CLASSES[pcIdx];
     var pcMax = pc ? pc.maxPerim : 30;
     var pcRef = pc ? pc.refPerim : 36;
+    pcSampleW = pcRef / 4;
+    pcSampleH = pcRef / 4;
     mcKey = activeKey + '-p' + pcMax + (gauge ? '-g' + gauge : '');
     lhKey = activeKey + '-p' + pcMax;
-    // Auto-calc raw material from sheet metal weight
-    autoCalcMc = calcRectFittingRawCost(activeKey, pcRef, gauge || '26');
+    // Auto-calc raw material from SA × gauge weight × $/lb
+    autoCalcMc = calcRectFittingRawCost(activeKey, pcSampleW, pcSampleH, gauge || '26');
+    pcSampleSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, pcSampleW, pcSampleH) : 0;
     // Check for user override
     var pcEntry = priceBookCache ? priceBookCache[mcKey] : null;
     mc = (pcEntry && pcEntry.materialCost != null) ? pcEntry.materialCost : null;
@@ -4288,9 +4298,9 @@ function pbRow(item, sectionId) {
   var ref = RECT_FITTING_REF[activeKey];
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   html += '<td' + clickAttr + '>' + arrow + item.label;
-  // Show cuts + equiv LF reference inline for rect fittings (read-only)
-  if (isRectFit && ref) {
-    html += ' <span style="color:#666;font-size:9px">(' + ref.cuts + ' cuts, ' + ref.equivLF + ' LF)</span>';
+  // Show surface area for rect fittings (read-only, derived from perim class)
+  if (isRectFit && ref && pcSampleSA > 0) {
+    html += ' <span style="color:#666;font-size:9px">(SA: ' + pcSampleSA.toFixed(1) + ' SF)</span>';
   }
   html += '</td>';
   // Material: show auto-calc in dim green or user override in bright green

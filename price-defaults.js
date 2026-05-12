@@ -282,22 +282,51 @@ export const SNAPLOCK_DEFAULTS = {
 };
 
 // ── Rectangular fitting reference data ───────────────────────────────
-// cuts: fabrication complexity reference
-// equivLF: equivalent linear feet of straight duct material consumed
+// cuts: fabrication complexity reference (display-only)
 export const RECT_FITTING_REF = {
-  'rect-90el':       { cuts: 4, equivLF: 2.0 },
-  'rect-45el':       { cuts: 3, equivLF: 1.5 },
-  'rect-22el':       { cuts: 2, equivLF: 1.0 },
-  'rect-tee':        { cuts: 5, equivLF: 2.5 },
-  'rectTap':         { cuts: 2, equivLF: 0.5 },
-  'rect-wye':        { cuts: 6, equivLF: 3.0 },
-  'rect-lateral':    { cuts: 6, equivLF: 3.0 },
-  'rect-reducer':    { cuts: 3, equivLF: 1.5 },
-  'rect-eccReducer': { cuts: 4, equivLF: 2.0 },
-  'rect-sqwing':     { cuts: 5, equivLF: 2.5 },
-  'rect-endcap':     { cuts: 1, equivLF: 0.25 },
-  'rect-transition': { cuts: 4, equivLF: 2.0 },
+  'rect-90el':       { cuts: 4 },
+  'rect-45el':       { cuts: 3 },
+  'rect-22el':       { cuts: 2 },
+  'rect-tee':        { cuts: 5 },
+  'rectTap':         { cuts: 2 },
+  'rect-wye':        { cuts: 6 },
+  'rect-lateral':    { cuts: 6 },
+  'rect-reducer':    { cuts: 3 },
+  'rect-eccReducer': { cuts: 4 },
+  'rect-sqwing':     { cuts: 5 },
+  'rect-endcap':     { cuts: 1 },
+  'rect-transition': { cuts: 4 },
 };
+
+// ── Rectangular fitting surface area model ───────────────────────────
+// Per-fitting SA formula returning surface area in SF from W,H (and branch
+// W,H where relevant). SA × gauge_weight_per_SF × $/lb = raw material cost.
+// W is the duct width (in), H is height (in). branchW/branchH default to W/H.
+// For elbows, the smaller dim is treated as the turning (bend-plane) dim.
+export const RECT_FITTING_SA = {
+  'rect-90el':       function(W, H)         { var t = Math.min(W, H); return 2*(W+H) * t * 1.57 / 144; },
+  'rect-45el':       function(W, H)         { var t = Math.min(W, H); return (2*(W+H) * t * 1.57 / 144) * 0.6; },
+  'rect-22el':       function(W, H)         { var t = Math.min(W, H); return (2*(W+H) * t * 1.57 / 144) * 0.35; },
+  'rect-tee':        function(W, H, bW, bH) { return (2*(W+H) * W / 144) + (2*(bW+bH) * bW / 144); },
+  'rectTap':         function(W, H, bW, bH) { return 2*(bW+bH) * 3 / 144; },
+  'rect-wye':        function(W, H, bW, bH) { return ((2*(W+H) * W / 144) + (2*(bW+bH) * bW / 144)) * 1.2; },
+  'rect-lateral':    function(W, H, bW, bH) { return ((2*(W+H) * W / 144) + (2*(bW+bH) * bW / 144)) * 1.2; },
+  'rect-reducer':    function(W, H, bW, bH) { var avgP = ((2*(W+H)) + (2*(bW+bH))) / 2; return avgP * Math.max(W, H) / 144; },
+  'rect-eccReducer': function(W, H, bW, bH) { var avgP = ((2*(W+H)) + (2*(bW+bH))) / 2; return (avgP * Math.max(W, H) / 144) * 1.1; },
+  'rect-sqwing':     function(W, H)         { var t = Math.min(W, H); return (2*(W+H) * t * 1.57 / 144) * 1.1; },
+  'rect-endcap':     function(W, H)         { return W * H / 144; },
+  'rect-transition': function(W, H, bW, bH) { var avgP = ((2*(W+H)) + (2*(bW+bH))) / 2; return avgP * Math.max(W, H) / 144; },
+};
+
+export function calcRectFittingSA(fittingKey, widthIn, heightIn, branchW, branchH) {
+  var fn = RECT_FITTING_SA[fittingKey];
+  if (!fn) return 0;
+  var W = widthIn || 12;
+  var H = heightIn || W;
+  var bW = branchW || W;
+  var bH = branchH || H;
+  return fn(W, H, bW, bH);
+}
 
 // ── Rectangular perimeter classes ────────────────────────────────────
 export const RECT_PERIM_CLASSES = [
@@ -312,26 +341,28 @@ export const RECT_PERIM_CLASSES = [
 ];
 
 // ── Duct weight per linear foot (lbs) by perimeter class & gauge ─────
+// Derived from sheet weight: lbs/LF = (perim_in / 12) × lbs/SF
+// 26ga galvanized = 0.906 lbs/SF, 24ga = 1.156 lbs/SF, 22ga = 1.406 lbs/SF
 export const DUCT_WEIGHT_PER_LF = {
-  36:  { '26': 0.191, '24': 0.243, '22': 0.305 },
-  48:  { '26': 0.254, '24': 0.325, '22': 0.406 },
-  60:  { '26': 0.318, '24': 0.406, '22': 0.508 },
-  72:  { '26': 0.381, '24': 0.487, '22': 0.609 },
-  96:  { '26': 0.508, '24': 0.649, '22': 0.812 },
-  120: { '26': 0.635, '24': 0.812, '22': 1.015 },
-  144: { '26': 0.762, '24': 0.974, '22': 1.218 },
-  168: { '26': 0.889, '24': 1.136, '22': 1.422 },
-  192: { '26': 1.016, '24': 1.299, '22': 1.625 },
-  216: { '26': 1.143, '24': 1.461, '22': 1.828 },
-  240: { '26': 1.270, '24': 1.623, '22': 2.031 },
-  300: { '26': 1.588, '24': 2.029, '22': 2.539 },
-  360: { '26': 1.905, '24': 2.435, '22': 3.046 },
-  420: { '26': 2.223, '24': 2.841, '22': 3.554 },
+  36:  { '26': 2.718,  '24': 3.468,  '22': 4.218 },
+  48:  { '26': 3.624,  '24': 4.624,  '22': 5.624 },
+  60:  { '26': 4.530,  '24': 5.780,  '22': 7.030 },
+  72:  { '26': 5.436,  '24': 6.936,  '22': 8.436 },
+  96:  { '26': 7.248,  '24': 9.248,  '22': 11.248 },
+  120: { '26': 9.060,  '24': 11.560, '22': 14.060 },
+  144: { '26': 10.872, '24': 13.872, '22': 16.872 },
+  168: { '26': 12.684, '24': 16.184, '22': 19.684 },
+  192: { '26': 14.496, '24': 18.496, '22': 22.496 },
+  216: { '26': 16.308, '24': 20.808, '22': 25.308 },
+  240: { '26': 18.120, '24': 23.120, '22': 28.120 },
+  300: { '26': 22.650, '24': 28.900, '22': 35.150 },
+  360: { '26': 27.180, '24': 34.680, '22': 42.180 },
+  420: { '26': 31.710, '24': 40.460, '22': 49.210 },
 };
 
 // ── Shop settings defaults ───────────────────────────────────────────
 export const SHOP_DEFAULTS = {
-  sheetMetalPricePerLb: 0.00,
+  sheetMetalPricePerLb: 0.90,
 };
 
 // ── Labor categories ─────────────────────────────────────────────────
