@@ -59,7 +59,7 @@ async function cGet(store, key) {
 // ── Constants ─────────────────────────────────────────────────────────
 const FITTING_NAMES = {
   '90el': '90° Elbow', '45el': '45° Elbow', '22el': '22.5° Elbow',
-  'tee': 'Tee', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral',
+  'tee': 'Tee-Wye', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
   'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
   'rectTap': 'Rect Tap'
