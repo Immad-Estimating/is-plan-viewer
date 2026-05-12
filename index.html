@@ -4414,32 +4414,39 @@ function pbRow(item, sectionId) {
 }
 
 function pbRowEditable(item, sectionId) {
-  var entry = priceBookCache ? priceBookCache[item.key] : null;
+  // Resolve active key (flex Black/Silver toggle)
+  var activeKey = item.key;
+  if (item.altKey && pbFlexColor[sectionId] === 'silver') activeKey = item.altKey;
+  var entry = priceBookCache ? priceBookCache[activeKey] : null;
   var mc = entry ? entry.materialCost : null;
-  var lhEntry = priceBookCache ? priceBookCache[lhCatKey(item.key)] : null;
+  // Fallback to SNAPLOCK_DEFAULTS for flex items
+  if (mc == null && typeof SNAPLOCK_DEFAULTS !== 'undefined' && SNAPLOCK_DEFAULTS[activeKey] && SNAPLOCK_DEFAULTS[activeKey]['26'] != null) {
+    mc = SNAPLOCK_DEFAULTS[activeKey]['26'];
+  }
+  var lhEntry = priceBookCache ? priceBookCache[lhCatKey(activeKey)] : null;
   var lh = lhEntry ? lhEntry.laborHrs : (entry ? entry.laborHrs : null);
   var hasShopAdder = sectionId === 'rect-acc';
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
-  html += '<td style="padding:4px 2px">' + pbInput(item.key, 'materialCost', mc) + '</td>';
+  html += '<td style="padding:4px 2px">' + pbInput(activeKey, 'materialCost', mc) + '</td>';
   if (hasShopAdder) {
-    var shopKey = item.key + '-shop';
+    var shopKey = activeKey + '-shop';
     var shopSaved = priceBookCache ? priceBookCache[shopKey] : null;
     var shopAdder = shopSaved ? shopSaved.materialCost : null;
     html += '<td style="padding:4px 2px"><input type="text" value="' + (shopAdder != null ? shopAdder : '') + '" placeholder="\u2014" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)"></td>';
   }
   // Labor: total hours + radar trigger
-  var totalLh = getTotalLaborHrs(item.key);
-  html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + item.key + '\',\'' + (hasShopAdder ? 'accessory' : 'duct') + '\')" title="Click to edit labor breakdown">';
+  var totalLh = getTotalLaborHrs(activeKey);
+  html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + activeKey + '\',\'' + (hasShopAdder ? 'accessory' : 'duct') + '\')" title="Click to edit labor breakdown">';
   html += '<span style="color:#ffaa00;font-size:11px">' + (totalLh > 0 ? totalLh.toFixed(2) + 'h' : '\u2014') + '</span>';
   html += ' <span style="color:#555;font-size:9px">\u25BC</span>';
   html += '</td>';
   html += '</tr>';
   // Radar chart row
-  if (radarChartTarget === item.key) {
+  if (radarChartTarget === activeKey) {
     var colSpan = hasShopAdder ? 4 : 3;
     html += '<tr onclick="event.stopPropagation()"><td colspan="' + colSpan + '" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
-    html += renderRadarChart(item.key, hasShopAdder ? 'accessory' : 'duct');
+    html += renderRadarChart(activeKey, hasShopAdder ? 'accessory' : 'duct');
     html += '</td></tr>';
   }
   return html;
@@ -4451,6 +4458,8 @@ function pbColumnHeader(hasMaterialInput, sectionId) {
     matLabel = 'Rate';
   } else if (sectionId && (sectionId.indexOf('-fit') !== -1)) {
     matLabel = '$/Ea';
+  } else if (sectionId && sectionId === 'round-flex') {
+    matLabel = '$/Roll';
   } else if (sectionId && (sectionId.indexOf('-duct') !== -1)) {
     matLabel = '$/Ft';
   } else {
