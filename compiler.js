@@ -6,6 +6,8 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
+import { SNAPLOCK_DEFAULTS } from './price-defaults.js';
+
 const DB_NAME = 'ISPlanViewerDB';
 const DB_VERSION = 3;
 
@@ -312,7 +314,6 @@ function normalizeRows(allPageData, drawingNames) {
     }
 
     for (const f of (pd.fittings || [])) {
-      const matCost = f.materialCost || 0;
       const laborHrs = f.laborHrs || 0;
       const rate = f.laborRate || labRate;
       const laborCost = laborHrs * rate;
@@ -320,7 +321,22 @@ function normalizeRows(allPageData, drawingNames) {
 
       const prefix = shape === 'rect' ? 'rect' : 'spiral';
       const baseKey = prefix + '-' + f.type;
-      const sizeKey = baseKey + '-' + (f.sizeA || '');
+      // Boot uses WxH key; other fittings use single size
+      const sizeKey = (f.type === 'boot' && f.sizeA && f.sizeB)
+        ? baseKey + '-' + f.sizeA + 'x' + f.sizeB
+        : baseKey + '-' + (f.sizeA || '');
+
+      // Material cost: use stored value, or look up from price book/defaults
+      let matCost = f.materialCost || 0;
+      if (!matCost && _priceBookCache) {
+        const pbEntry = _priceBookCache[sizeKey];
+        if (pbEntry && pbEntry.materialCost != null) {
+          matCost = pbEntry.materialCost;
+        }
+      }
+      if (!matCost && SNAPLOCK_DEFAULTS[sizeKey] && SNAPLOCK_DEFAULTS[sizeKey]['26'] != null) {
+        matCost = SNAPLOCK_DEFAULTS[sizeKey]['26'];
+      }
       let bd = getPriceBookLaborBreakdown(sizeKey);
       if (Object.keys(bd).length === 0) bd = getPriceBookLaborBreakdown(baseKey);
 
