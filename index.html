@@ -4264,12 +4264,12 @@ function pbRow(item, sectionId) {
     mc = entry ? entry.materialCost : null;
   }
   var gaugeKey = gauge ? activeKey + '-g' + gauge : activeKey;
-  var hasSizes = item.sizes && item.sizes.length > 0;
-  var hasPairs = item.sizePairs && hasSizes;
+  var isRectFit = sectionId === 'rect-fit';
+  var hasSizes = (item.sizes && item.sizes.length > 0) || isRectFit;
+  var hasPairs = item.sizePairs && item.sizes && item.sizes.length > 0;
   var isExpanded = hasSizes && !!pbExpandedItems[activeKey];
   var arrow = hasSizes ? (isExpanded ? '\u25BC ' : '\u25B6 ') : '';
   var clickAttr = hasSizes ? ' onclick="togglePBItemExpand(\'' + activeKey + '\')" style="padding:4px;color:#e0e0e0;font-size:11px;cursor:pointer"' : ' style="padding:4px;color:#e0e0e0;font-size:11px"';
-  var isRectFit = sectionId === 'rect-fit';
   var hasShopAdder = isRectFit || (sectionId === 'rect-acc');
   // For rect fittings, key prices by perimeter class + auto-calc raw material
   var mcKey = gaugeKey;
@@ -4335,15 +4335,61 @@ function pbRow(item, sectionId) {
   html += '</td>';
   html += '</tr>';
   // Radar chart row (if this item is active)
-  if (radarChartTarget === lhBaseKey) {
+  // Skip when rect fit is expanded — the matching per-class sub-row will render it instead
+  if (radarChartTarget === lhBaseKey && !(isRectFit && isExpanded)) {
     var colSpan = hasShopAdder ? 4 : 3;
     html += '<tr onclick="event.stopPropagation()"><td colspan="' + colSpan + '" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
     html += renderRadarChart(lhBaseKey, lhItemType, radarChartSubType);
     html += '</td></tr>';
   }
 
+  // ---- Rect fitting: expand by perimeter class ----
+  if (isExpanded && isRectFit) {
+    for (var pi = 0; pi < RECT_PERIM_CLASSES.length; pi++) {
+      var pcSub = RECT_PERIM_CLASSES[pi];
+      var pcMaxSub = pcSub.maxPerim;
+      var pcRefSub = pcSub.refPerim;
+      var subW = pcRefSub / 4;
+      var subH = pcRefSub / 4;
+      var subSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, subW, subH) : 0;
+      var subAutoMc = calcRectFittingRawCost(activeKey, subW, subH, gauge || '26');
+      var subMcKey = activeKey + '-p' + pcMaxSub + (gauge ? '-g' + gauge : '');
+      var subLhKey = activeKey + '-p' + pcMaxSub;
+      var subEntry = priceBookCache ? priceBookCache[subMcKey] : null;
+      var subMc = (subEntry && subEntry.materialCost != null) ? subEntry.materialCost : null;
+      var subShopKey = subLhKey + '-shop';
+      var subShopSaved = priceBookCache ? priceBookCache[subShopKey] : null;
+      var subShopAdder = subShopSaved ? subShopSaved.materialCost : null;
+      var subTotalLh = getTotalLaborHrs(subLhKey);
+      var isActivePC = (pi === (pbPerimClass[sectionId] || 0));
+      var rowBg = isActivePC ? 'background:rgba(233,69,96,0.12)' : 'background:rgba(15,52,96,0.15)';
+      html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.15);' + rowBg + '">';
+      html += '<td style="padding:3px 4px 3px 20px;color:#e94560;font-size:12px;font-weight:' + (isActivePC ? '700' : '500') + '">' + pcSub.label;
+      if (subSA > 0) html += ' <span style="color:#666;font-size:9px">(SA: ' + subSA.toFixed(1) + ' SF)</span>';
+      html += '</td>';
+      html += '<td style="padding:3px 2px">';
+      if (subMc == null && subAutoMc != null && subAutoMc > 0) {
+        html += '<input type="text" value="' + subAutoMc.toFixed(2) + '" placeholder="—" '
+          + 'style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#009966;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right;font-style:italic" '
+          + 'onchange="updatePBEntry(\'' + subMcKey + '\',\'materialCost\',this.value)" title="Auto-calc from sheet weight — edit to override">';
+      } else {
+        html += pbInput(subMcKey, 'materialCost', subMc);
+      }
+      html += '</td>';
+      html += '<td style="padding:3px 2px"><input type="text" value="' + (subShopAdder != null ? subShopAdder : '') + '" placeholder="—" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + subShopKey + '\',\'materialCost\',this.value)"></td>';
+      html += '<td style="padding:3px 2px;text-align:center;cursor:pointer" onclick="event.stopPropagation();toggleRadarChart(\'' + subLhKey + '\',\'fitting\',\'\')">';
+      html += '<span style="color:#ffaa00;font-size:11px">' + (subTotalLh > 0 ? subTotalLh.toFixed(2) + 'h' : '—') + '</span>';
+      html += ' <span style="color:#555;font-size:9px">▼</span></td>';
+      html += '</tr>';
+      if (radarChartTarget === subLhKey) {
+        html += '<tr onclick="event.stopPropagation()"><td colspan="4" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+        html += renderRadarChart(subLhKey, 'fitting', '');
+        html += '</td></tr>';
+      }
+    }
+  }
   // ---- Two-dimension pricing: expandable tree with sub-rows ----
-  if (isExpanded && hasPairs) {
+  else if (isExpanded && hasPairs) {
     var isReducer = activeKey.indexOf('reducer') !== -1 || activeKey.indexOf('eccReducer') !== -1;
     var mainLabel = isReducer ? 'Inlet' : 'Main';
     var subLabel = isReducer ? 'Outlet' : 'Branch';
