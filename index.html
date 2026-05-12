@@ -708,7 +708,9 @@
         <option value="round">● Round</option>
         <option value="rect">▬ Rect</option>
         <option value="oval">⬭ Oval</option>
+        <option value="flex">〰 Flex</option>
       </select>
+      <span id="ddFlexColorGroup" style="display:none"><button id="ddFlexColorBtn" onclick="toggleDDFlexColor()" style="background:rgba(60,60,60,0.4);color:#ccc;border:1px solid #888;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">● Black</button></span>
       <span id="ddDiamGroup"><label>⌀</label><input type="text" id="ddDiam" class="dd-dim" value="14"></span>
       <span id="ddRectGroup" style="display:none"><label>W</label><input type="text" id="ddW" class="dd-dim" value="24"><label>×</label><input type="text" id="ddH" class="dd-dim" value="12"></span>
       <span id="ddLinerGroup" style="display:none"><label>Liner</label><input type="text" id="ddLiner" class="dd-dim" value="1" style="width:35px" title="Liner thickness (inches)"><label>"</label></span>
@@ -6038,17 +6040,45 @@ window.toggleDuctDraw = function() {
   }
 };
 
+var _ddFlexColor = 'black';
 window.ddTypeChanged = function() {
   const t = document.getElementById('ddType').value;
   const isRect = (t === 'rect' || t === 'oval');
-  document.getElementById('ddDiamGroup').style.display = isRect ? 'none' : '';
+  const isFlex = (t === 'flex');
+  document.getElementById('ddDiamGroup').style.display = (isRect) ? 'none' : '';
   document.getElementById('ddRectGroup').style.display = isRect ? '' : 'none';
   document.getElementById('ddLinerGroup').style.display = (t === 'rect') ? '' : 'none';
+  document.getElementById('ddFlexColorGroup').style.display = isFlex ? '' : 'none';
+  // Hide gauge for flex
+  var gaugeEl = document.getElementById('ddGauge');
+  if (gaugeEl) gaugeEl.closest('span') ? null : null;
+  var gaugeLabel = gaugeEl ? gaugeEl.previousElementSibling : null;
+  if (gaugeEl) gaugeEl.style.display = isFlex ? 'none' : '';
+  if (gaugeLabel && gaugeLabel.tagName === 'LABEL') gaugeLabel.style.display = isFlex ? 'none' : '';
+};
+window.toggleDDFlexColor = function() {
+  _ddFlexColor = _ddFlexColor === 'black' ? 'silver' : 'black';
+  var btn = document.getElementById('ddFlexColorBtn');
+  if (_ddFlexColor === 'black') {
+    btn.textContent = '\u25cf Black';
+    btn.style.background = 'rgba(60,60,60,0.4)';
+    btn.style.color = '#ccc';
+    btn.style.borderColor = '#888';
+  } else {
+    btn.textContent = '\u25cb Silver';
+    btn.style.background = 'rgba(200,200,200,0.2)';
+    btn.style.color = '#e0e0e0';
+    btn.style.borderColor = '#bbb';
+  }
 };
 
 function getDuctDrawConfig() {
   const type = document.getElementById('ddType').value;
-  const symbols = { rect: '▬', oval: '⬭', round: '●', spiral: '◎' };
+  const symbols = { rect: '▬', oval: '⬭', round: '●', spiral: '◎', flex: '〰' };
+  if (type === 'flex') {
+    const d = document.getElementById('ddDiam').value.trim() || '8';
+    return { type: 'flex', dims: d, symbol: symbols.flex, liner: 0, flexColor: _ddFlexColor, dropInches: 0 };
+  }
   if (type === 'rect' || type === 'oval') {
     const w = document.getElementById('ddW').value.trim() || '24';
     const h = document.getElementById('ddH').value.trim() || '12';
