@@ -8647,8 +8647,9 @@ function showStackPalette(stack) {
   div.style.cssText = `position:absolute;left:${screenPos.x + 30}px;top:${screenPos.y - 20}px;z-index:60;background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:10px;box-shadow:0 4px 16px rgba(0,0,0,0.4);width:260px;cursor:default;font-size:12px;color:#e0e0e0;`;
 
   let shapeTabs = `<div style="display:flex;gap:4px;margin-bottom:8px;">`;
-  ['round','rect','oval'].forEach(s => {
-    shapeTabs += `<button onclick="setStackPaletteShape('${s}')" data-shape="${s}" class="sp-shape-tab" style="flex:1;background:#1a1a2e;border:1px solid #0f3460;color:#a0a0c0;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;${s === 'round' ? 'border-color:#e94560;color:#e94560;background:rgba(233,69,96,0.15);' : ''}">${s.charAt(0).toUpperCase()+s.slice(1)}</button>`;
+  ['round','rect','oval','flex'].forEach(s => {
+    const label = s === 'flex' ? '〰 Flex' : s.charAt(0).toUpperCase()+s.slice(1);
+    shapeTabs += `<button onclick="setStackPaletteShape('${s}')" data-shape="${s}" class="sp-shape-tab" style="flex:1;background:#1a1a2e;border:1px solid #0f3460;color:#a0a0c0;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;${s === 'round' ? 'border-color:#e94560;color:#e94560;background:rgba(233,69,96,0.15);' : ''}">${label}</button>`;
   });
   shapeTabs += `</div>`;
 
@@ -8687,6 +8688,20 @@ function showStackPalette(stack) {
         <input id="spDuctRiseRect" value="" placeholder="6'" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
       </div>
     </div>
+    <div id="spInputsFlexDuct" style="display:none;margin-bottom:8px;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+        <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;width:55px;">Diameter</label>
+        <input id="spFlexDiam" value="8" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+        <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;width:55px;">Color</label>
+        <button id="spFlexColorBtn" onclick="toggleSPFlexColor()" style="background:rgba(60,60,60,0.4);color:#ccc;border:1px solid #888;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;">● Black</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label style="font-size:11px;color:#a0a0c0;white-space:nowrap;width:55px;">Rise/Drop</label>
+        <input id="spFlexRise" value="" placeholder="6'" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:12px;width:60px;text-align:center;">
+      </div>
+    </div>
     <button id="spAddBtn" onclick="addStackItemFromPalette(${stack.id})" style="width:100%;background:#00ff88;color:#1a1a2e;border:none;padding:6px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">Add Item</button>
   `;
   viewer.appendChild(div);
@@ -8712,16 +8727,41 @@ window.setStackPaletteShape = function(shape) {
   const fittingInputs = document.getElementById('spInputsFitting');
   const ductRoundInputs = document.getElementById('spInputsDuctRound');
   const ductRectInputs = document.getElementById('spInputsDuctRect');
-  if (fittingInputs) fittingInputs.style.display = 'flex';
+  const flexDuctInputs = document.getElementById('spInputsFlexDuct');
+  const isFlex = shape === 'flex';
+  if (fittingInputs) fittingInputs.style.display = isFlex ? 'none' : 'flex';
   if (ductRoundInputs) ductRoundInputs.style.display = 'none';
   if (ductRectInputs) ductRectInputs.style.display = 'none';
+  if (flexDuctInputs) flexDuctInputs.style.display = 'none';
   renderStackPaletteGrid();
+};
+
+var _spFlexColor = 'black';
+window.toggleSPFlexColor = function() {
+  _spFlexColor = _spFlexColor === 'black' ? 'silver' : 'black';
+  var btn = document.getElementById('spFlexColorBtn');
+  if (_spFlexColor === 'black') {
+    btn.textContent = '\u25cf Black';
+    btn.style.background = 'rgba(60,60,60,0.4)'; btn.style.color = '#ccc'; btn.style.borderColor = '#888';
+  } else {
+    btn.textContent = '\u25cb Silver';
+    btn.style.background = 'rgba(200,200,200,0.2)'; btn.style.color = '#e0e0e0'; btn.style.borderColor = '#bbb';
+  }
 };
 
 function renderStackPaletteGrid() {
   const grid = document.getElementById('spGrid');
   if (!grid) return;
   const shape = window._stackPaletteShape || 'round';
+
+  // Flex shape: only show flex duct run option
+  if (shape === 'flex') {
+    grid.innerHTML = `<button data-type="flexrun" onclick="selectStackPaletteType('flexrun')" title="Vertical Flex Duct" style="background:#1a1a2e;border:1px solid #0f3460;color:#a0a0c0;padding:6px 2px;border-radius:4px;cursor:pointer;font-size:10px;text-align:center;line-height:1.2;grid-column:span 2;">〰 Flex Duct</button>`;
+    // Auto-select and show flex inputs
+    selectStackPaletteType('flexrun');
+    return;
+  }
+
   const fittings = FITTINGS_BY_SHAPE[shape] || FITTINGS_BY_SHAPE.round;
   let html = '';
   // Add "Duct Run" option
@@ -8744,7 +8784,10 @@ window.selectStackPaletteType = function(type) {
   const fittingInputs = document.getElementById('spInputsFitting');
   const ductRoundInputs = document.getElementById('spInputsDuctRound');
   const ductRectInputs = document.getElementById('spInputsDuctRect');
-  if (fittingInputs) fittingInputs.style.display = (type === 'ductrun') ? 'none' : 'flex';
+  const flexDuctInputs = document.getElementById('spInputsFlexDuct');
+  const isFlex = (type === 'flexrun');
+  if (fittingInputs) fittingInputs.style.display = (type === 'ductrun' || isFlex) ? 'none' : 'flex';
+  if (flexDuctInputs) flexDuctInputs.style.display = isFlex ? 'block' : 'none';
   if (ductRoundInputs && ductRectInputs) {
     const shape = window._stackPaletteShape || 'round';
     if (type === 'ductrun' && shape === 'round') {
@@ -8766,7 +8809,11 @@ window.addStackItemFromPalette = function(stackId) {
   const shape = window._stackPaletteShape || 'round';
   let sizeA, sizeB, riseDrop = '';
 
-  if (type === 'ductrun') {
+  if (type === 'flexrun') {
+    sizeA = (document.getElementById('spFlexDiam') || {}).value || '8';
+    sizeB = '';
+    riseDrop = (document.getElementById('spFlexRise') || {}).value || '';
+  } else if (type === 'ductrun') {
     if (shape === 'round') {
       sizeA = (document.getElementById('spDuctDiam') || {}).value || '14';
       sizeB = '';
@@ -8791,17 +8838,19 @@ window.addStackItemFromPalette = function(stackId) {
   const calloutX = stack.x + 80;
   const calloutY = stack.y + (itemCount * 30);
 
-  stack.items.push({
+  const stackItem = {
     id: stackItemIdCounter,
     type: type,
-    shape: shape,
+    shape: type === 'flexrun' ? 'flex' : shape,
     sizeA: sizeA,
     sizeB: sizeB,
     riseDrop: riseDrop,
     rotation: 0,
     label: '',
     callout: { x: calloutX, y: calloutY }
-  });
+  };
+  if (type === 'flexrun') stackItem.flexColor = _spFlexColor;
+  stack.items.push(stackItem);
 
   drawMeasureOverlay();
   updatePanel();
