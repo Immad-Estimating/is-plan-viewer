@@ -7009,6 +7009,58 @@ function drawFlexDuctRun(points, duct, color) {
   mCtx.stroke();
   mCtx.setLineDash([]);
 
+  // Step 7: Drop-to-diffuser endpoint symbol (⊗ circle-with-X)
+  const dropIn = duct.dropInches || 0;
+  if (dropIn > 0) {
+    // Symbol at the LAST point of the flex run, sized to duct diameter at drawing scale
+    const endPt = spline[spline.length - 1];
+    const symbolR = halfW; // radius = half the duct diameter at scale
+    const symColor = isBlack ? 'rgba(80,80,80,0.9)' : 'rgba(190,190,190,0.9)';
+
+    // Outer circle — dashed outline
+    mCtx.globalAlpha = 0.85;
+    mCtx.strokeStyle = wallColor;
+    mCtx.lineWidth = 2;
+    mCtx.setLineDash([4, 3]);
+    mCtx.beginPath();
+    mCtx.arc(endPt.x, endPt.y, symbolR, 0, Math.PI * 2);
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+
+    // Fill circle
+    mCtx.fillStyle = isBlack ? 'rgba(40,40,40,0.3)' : 'rgba(200,200,200,0.25)';
+    mCtx.fill();
+
+    // X cross lines through full diameter
+    mCtx.globalAlpha = 0.7;
+    mCtx.lineWidth = 1.8;
+    mCtx.strokeStyle = wallColor;
+    const xOff = symbolR * 0.707; // cos(45°)
+    mCtx.beginPath();
+    mCtx.moveTo(endPt.x - xOff, endPt.y - xOff);
+    mCtx.lineTo(endPt.x + xOff, endPt.y + xOff);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.moveTo(endPt.x + xOff, endPt.y - xOff);
+    mCtx.lineTo(endPt.x - xOff, endPt.y + xOff);
+    mCtx.stroke();
+
+    // Drop distance label
+    mCtx.globalAlpha = 1.0;
+    const labelFontSize = Math.max(10, Math.min(16, halfW * 0.8));
+    mCtx.font = `bold ${labelFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    const dropLabel = '\u2193 ' + dropIn + '"';
+    const tw = mCtx.measureText(dropLabel).width;
+    const lx = endPt.x + symbolR + 6;
+    const ly = endPt.y + labelFontSize * 0.35;
+    // Label background
+    mCtx.fillStyle = 'rgba(22,33,62,0.85)';
+    mCtx.fillRect(lx - 3, ly - labelFontSize + 1, tw + 6, labelFontSize + 4);
+    // Label text
+    mCtx.fillStyle = wallColor;
+    mCtx.fillText(dropLabel, lx, ly);
+  }
+
   mCtx.restore();
 }
 
@@ -7280,6 +7332,8 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   let text = (measObj && measObj.labelText) ? measObj.labelText : label;
   if ((!measObj || !measObj.labelText) && duct) {
     text += ` ${duct.symbol} ${duct.dims}`;
+    if (duct.type === 'flex' && duct.flexColor) text += ` ${duct.flexColor}`;
+    if (duct.type === 'flex' && duct.dropInches) text += ` \u2193${duct.dropInches}\"`;
   }
 
   const effSize = (measObj && measObj.labelSize != null) ? measObj.labelSize : annoSize;
@@ -7528,6 +7582,15 @@ window.updateMeasProp = function(id, prop, value) {
   scheduleSave();
 };
 
+window.setFlexDrop = function(id, value) {
+  const m = findMeasurement(id);
+  if (!m || !m.duct || m.duct.type !== 'flex') return;
+  m.duct.dropInches = Math.max(0, parseInt(value) || 0);
+  drawMeasureOverlay();
+  scheduleSave();
+  updatePanel();
+};
+
 // ---- Phase 2: Inline Cost Editors ----
 window.editFittingCost = function(id) {
   var el = document.getElementById('fc-edit-' + id);
@@ -7728,7 +7791,8 @@ function updatePanel() {
     html += `<div class="meas-group-title">Page ${page}</div>`;
 
     for (const m of measurements) {
-      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}</div>` : '';
+      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}${m.duct.flexColor ? ' ' + m.duct.flexColor : ''}${m.duct.dropInches ? ' ↓' + m.duct.dropInches + '"' : ''}</div>` : '';
+      const flexDropInput = (m.duct && m.duct.type === 'flex') ? `<div style="display:flex;align-items:center;gap:4px;margin-top:3px"><label style="font-size:10px;color:#a0a0c0;white-space:nowrap">↓ Drop</label><input type="number" min="0" max="240" step="1" value="${m.duct.dropInches || 0}" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:2px 4px;border-radius:3px;font-size:11px;text-align:center" onchange="setFlexDrop(${m.id},this.value)"><label style="font-size:10px;color:#666">in</label></div>` : '';
       // Elevation info + auto fittings
       let elevInfo = '';
       const elevChanges = m.points.filter(p => p.elevation && parseElevChange(p.elevation));
@@ -7746,9 +7810,10 @@ function updatePanel() {
         <div class="meas-info">
           <div class="meas-length">${m.distance.formatted}</div>
           ${ductInfo}
+          ${flexDropInput}
           ${elevInfo}
           ${customLabel}
-        </div>
+        </div>`
         <button class="meas-edit-btn" onclick="editMeasurement(${m.id})" title="Edit label">✏️</button>
         <button class="meas-edit-btn" onclick="editMeasCost(${m.id})" title="Edit cost">💲</button>
         <button class="meas-delete" onclick="deleteMeasurement(${m.id})" title="Delete">×</button>
