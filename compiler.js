@@ -263,7 +263,9 @@ function normalizeRows(allPageData, drawingNames) {
 
     for (const m of (pd.measurements || [])) {
       if (!m.duct) continue;
-      const lengthFt = m.distance ? m.distance.value || 0 : 0;
+      const isFlex = m.duct.type === 'flex';
+      const dropFt = isFlex ? ((m.duct.dropInches || 0) / 12) : 0;
+      const lengthFt = (m.distance ? m.distance.value || 0 : 0) + dropFt;
       const shape = m.duct.type || 'round';
       const matPerFt = m.materialCostPerFt || 0;
       const rate = m.laborRate || labRate;
@@ -272,7 +274,9 @@ function normalizeRows(allPageData, drawingNames) {
       const laborHrs = labHrsPerFt * lengthFt;
       const laborCost = laborHrs * rate;
 
-      const ductKey = shape === 'rect' ? 'duct-rect' : shape === 'oval' ? 'duct-oval' : 'duct-round';
+      const ductKey = isFlex
+        ? 'flex-' + (m.duct.flexColor || 'black')
+        : (shape === 'rect' ? 'duct-rect' : shape === 'oval' ? 'duct-oval' : 'duct-round');
       const sizeKey = ductKey + '-' + (m.duct.dims || '');
       const laborBreakdown = getPriceBookLaborBreakdown(sizeKey);
 
@@ -294,8 +298,9 @@ function normalizeRows(allPageData, drawingNames) {
         assignedCat = co ? co.label : capitalize(fb);
       }
 
+      const flexLabel = isFlex ? ('Flex ' + capitalize(m.duct.flexColor || 'black')) : null;
       rows.push({
-        _itemType: 'Duct Run', _size: m.duct.dims || '?', _shape: capitalize(shape),
+        _itemType: isFlex ? 'Flex Duct' : 'Duct Run', _size: m.duct.dims || '?', _shape: flexLabel || capitalize(shape),
         _page: page, _drawingId: drawingId, _drawingName: drawingName,
         _lengthFt: lengthFt, _matCost: matCost, _laborHrs: laborHrs,
         _laborCost: laborCost, _totalCost: matCost + laborCost,
