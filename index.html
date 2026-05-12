@@ -7347,7 +7347,6 @@ function drawMeasurementLine(points, label, duct, color, isDashed) {
   let text = (measObj && measObj.labelText) ? measObj.labelText : label;
   if ((!measObj || !measObj.labelText) && duct) {
     text += ` ${duct.symbol} ${duct.dims}`;
-    if (duct.type === 'flex' && duct.flexColor) text += ` ${duct.flexColor}`;
     if (duct.type === 'flex' && duct.dropInches) text += ` \u2193${duct.dropInches}\"`;
   }
 
