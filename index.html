@@ -8924,8 +8924,8 @@ function drawStack(stack) {
     mCtx.setLineDash([]);
 
     // Draw fitting or duct run at stack point (scale-accurate representation)
-    if (item.type === 'ductrun') {
-      const itemShape = item.shape || (item.sizeB ? 'rect' : 'round');
+    if (item.type === 'ductrun' || item.type === 'flexrun') {
+      const itemShape = item.type === 'flexrun' ? 'flex' : (item.shape || (item.sizeB ? 'rect' : 'round'));
       const ductColor = isItemSelected ? '#e94560' : isMultiSel ? '#ffd43b' : '#00ff88';
       mCtx.save();
       mCtx.strokeStyle = ductColor;
@@ -8935,7 +8935,24 @@ function drawStack(stack) {
       const rot = ((item.rotation || 0) * Math.PI) / 180;
       mCtx.translate(stack.x, stack.y);
       mCtx.rotate(rot);
-      if (itemShape === 'round') {
+      if (itemShape === 'flex') {
+        // Flex duct in plan view = dashed circle with X
+        const diam = inchesToPx(parseDimension(item.sizeA));
+        const r = diam / 2;
+        const isBlackFlex = !item.flexColor || item.flexColor === 'black';
+        mCtx.setLineDash([4, 3]);
+        mCtx.beginPath();
+        mCtx.arc(0, 0, r, 0, Math.PI * 2);
+        mCtx.stroke();
+        mCtx.setLineDash([]);
+        // Fill
+        mCtx.fillStyle = isBlackFlex ? 'rgba(40,40,40,0.3)' : 'rgba(200,200,200,0.25)';
+        mCtx.fill();
+        // X cross
+        const cr = r * 0.707;
+        mCtx.beginPath(); mCtx.moveTo(-cr, -cr); mCtx.lineTo(cr, cr); mCtx.stroke();
+        mCtx.beginPath(); mCtx.moveTo(cr, -cr); mCtx.lineTo(-cr, cr); mCtx.stroke();
+      } else if (itemShape === 'round') {
         // Round duct in plan view = circle at scale diameter (rotation has no visual effect)
         const diam = inchesToPx(parseDimension(item.sizeA));
         const r = diam / 2;
@@ -8997,10 +9014,13 @@ function drawStack(stack) {
 
     // Callout box
     let text;
-    if (item.type === 'ductrun') {
-      const rd = item.riseDrop ? ` ↕ ${item.riseDrop}` : '';
+    if (item.type === 'flexrun') {
+      const rd = item.riseDrop ? ` \u2195 ${item.riseDrop}` : '';
+      text = `\u3030 Flex \u00d8${item.sizeA}${rd}`;
+    } else if (item.type === 'ductrun') {
+      const rd = item.riseDrop ? ` \u2195 ${item.riseDrop}` : '';
       if (item.shape === 'round' || (!item.sizeB && !item.shape)) {
-        text = `Vert. Duct Ø${item.sizeA}${rd}`;
+        text = `Vert. Duct \u00d8${item.sizeA}${rd}`;
       } else {
         text = `Vert. Duct ${item.sizeA}x${item.sizeB}${rd}`;
       }
@@ -9035,7 +9055,14 @@ function drawStack(stack) {
     mCtx.strokeStyle = iconColor;
     mCtx.fillStyle = 'transparent';
     mCtx.lineWidth = 1.5;
-    if (itemShape === 'round') {
+    if (itemShape === 'flex') {
+      // Flex icon: dashed circle
+      mCtx.setLineDash([2, 2]);
+      mCtx.beginPath();
+      mCtx.arc(iconX, iconY, 6, 0, Math.PI * 2);
+      mCtx.stroke();
+      mCtx.setLineDash([]);
+    } else if (itemShape === 'round') {
       // Circle icon
       mCtx.beginPath();
       mCtx.arc(iconX, iconY, 6, 0, Math.PI * 2);
