@@ -6882,8 +6882,140 @@ function lineLineIntersect(p1, d1, p2, d2) {
 }
 
 // Unified duct wall rendering: traces both wall paths as one continuous shape with bezier turns
+function drawFlexDuctRun(points, duct, color) {
+  if (points.length < 2) return;
+  const halfW = getDuctHalfWidthPx(duct);
+  const isBlack = !duct.flexColor || duct.flexColor === 'black';
+  const fillColor = isBlack ? 'rgba(50,50,50,0.25)' : 'rgba(180,180,180,0.2)';
+  const wallColor = color;
+
+  // Step 1: Build smooth catmull-rom spline through user points
+  // Sample the spline densely for smooth curve rendering
+  function catmullRom(p0, p1, p2, p3, t) {
+    const t2 = t * t, t3 = t2 * t;
+    return {
+      x: 0.5 * ((2*p1.x) + (-p0.x+p2.x)*t + (2*p0.x-5*p1.x+4*p2.x-p3.x)*t2 + (-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
+      y: 0.5 * ((2*p1.y) + (-p0.y+p2.y)*t + (2*p0.y-5*p1.y+4*p2.y-p3.y)*t2 + (-p0.y+3*p1.y-3*p2.y+p3.y)*t3)
+    };
+  }
+
+  // Pad endpoints for catmull-rom (duplicate first/last)
+  const pts = [points[0], ...points, points[points.length - 1]];
+  const spline = [];
+  const samplesPerSeg = 20;
+  for (let i = 0; i < pts.length - 3; i++) {
+    for (let s = 0; s <= samplesPerSeg; s++) {
+      if (i > 0 && s === 0) continue; // avoid duplicate joints
+      spline.push(catmullRom(pts[i], pts[i+1], pts[i+2], pts[i+3], s / samplesPerSeg));
+    }
+  }
+  if (spline.length < 2) return;
+
+  // Step 2: Compute cumulative arc lengths along spline
+  const arcLen = [0];
+  for (let i = 1; i < spline.length; i++) {
+    const dx = spline[i].x - spline[i-1].x;
+    const dy = spline[i].y - spline[i-1].y;
+    arcLen.push(arcLen[i-1] + Math.sqrt(dx*dx + dy*dy));
+  }
+  const totalLen = arcLen[arcLen.length - 1];
+  if (totalLen < 1) return;
+
+  // Step 3: Compute normals at each spline point
+  const normals = [];
+  for (let i = 0; i < spline.length; i++) {
+    let dx, dy;
+    if (i === 0) { dx = spline[1].x - spline[0].x; dy = spline[1].y - spline[0].y; }
+    else if (i === spline.length - 1) { dx = spline[i].x - spline[i-1].x; dy = spline[i].y - spline[i-1].y; }
+    else { dx = spline[i+1].x - spline[i-1].x; dy = spline[i+1].y - spline[i-1].y; }
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    normals.push({ x: -dy/len, y: dx/len });
+  }
+
+  // Step 4: Build corrugated walls
+  // Corrugation: sinusoidal offset added to the base halfW
+  // Frequency scales with duct size for consistent visual
+  const corrugationWavelength = halfW * 1.8; // px per wave cycle
+  const corrugationAmplitude = halfW * 0.18; // ripple depth
+  const leftWall = [];
+  const rightWall = [];
+  for (let i = 0; i < spline.length; i++) {
+    const ripple = Math.sin((arcLen[i] / corrugationWavelength) * Math.PI * 2) * corrugationAmplitude;
+    const offset = halfW + ripple;
+    leftWall.push({ x: spline[i].x + normals[i].x * offset, y: spline[i].y + normals[i].y * offset });
+    rightWall.push({ x: spline[i].x - normals[i].x * offset, y: spline[i].y - normals[i].y * offset });
+  }
+
+  // Step 5: Render
+  mCtx.save();
+
+  // Fill area between walls (semi-transparent)
+  mCtx.beginPath();
+  mCtx.moveTo(leftWall[0].x, leftWall[0].y);
+  for (let i = 1; i < leftWall.length; i++) mCtx.lineTo(leftWall[i].x, leftWall[i].y);
+  // Connect to right wall (reversed)
+  for (let i = rightWall.length - 1; i >= 0; i--) mCtx.lineTo(rightWall[i].x, rightWall[i].y);
+  mCtx.closePath();
+  mCtx.fillStyle = fillColor;
+  mCtx.fill();
+
+  // Draw corrugated walls
+  mCtx.strokeStyle = wallColor;
+  mCtx.lineWidth = 2;
+  mCtx.globalAlpha = 0.9;
+  mCtx.beginPath();
+  mCtx.moveTo(leftWall[0].x, leftWall[0].y);
+  for (let i = 1; i < leftWall.length; i++) mCtx.lineTo(leftWall[i].x, leftWall[i].y);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(rightWall[0].x, rightWall[0].y);
+  for (let i = 1; i < rightWall.length; i++) mCtx.lineTo(rightWall[i].x, rightWall[i].y);
+  mCtx.stroke();
+
+  // Step 6: Internal corrugation ribs (cross lines for accordion texture)
+  mCtx.lineWidth = 1;
+  mCtx.globalAlpha = 0.35;
+  const ribSpacing = corrugationWavelength * 0.5;
+  let nextRib = ribSpacing;
+  for (let i = 1; i < spline.length; i++) {
+    if (arcLen[i] >= nextRib) {
+      mCtx.beginPath();
+      mCtx.moveTo(leftWall[i].x, leftWall[i].y);
+      mCtx.lineTo(rightWall[i].x, rightWall[i].y);
+      mCtx.stroke();
+      nextRib += ribSpacing;
+    }
+  }
+
+  // End caps
+  mCtx.lineWidth = 2;
+  mCtx.globalAlpha = 0.9;
+  mCtx.beginPath();
+  mCtx.moveTo(leftWall[0].x, leftWall[0].y);
+  mCtx.lineTo(rightWall[0].x, rightWall[0].y);
+  mCtx.stroke();
+  mCtx.beginPath();
+  mCtx.moveTo(leftWall[leftWall.length-1].x, leftWall[leftWall.length-1].y);
+  mCtx.lineTo(rightWall[rightWall.length-1].x, rightWall[rightWall.length-1].y);
+  mCtx.stroke();
+
+  // Dashed centerline (subtle)
+  mCtx.lineWidth = 1;
+  mCtx.globalAlpha = 0.2;
+  mCtx.setLineDash([4, 6]);
+  mCtx.beginPath();
+  mCtx.moveTo(spline[0].x, spline[0].y);
+  for (let i = 1; i < spline.length; i++) mCtx.lineTo(spline[i].x, spline[i].y);
+  mCtx.stroke();
+  mCtx.setLineDash([]);
+
+  mCtx.restore();
+}
+
 function drawDuctRun(points, duct, color) {
   if (points.length < 2) return;
+  // Route flex duct to dedicated renderer
+  if (duct.type === 'flex') { drawFlexDuctRun(points, duct, color); return; }
   const halfW = getDuctHalfWidthPx(duct);
   const isSpiral = duct.type === 'spiral';
 
