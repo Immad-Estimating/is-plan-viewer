@@ -968,7 +968,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -3627,7 +3627,8 @@ var activePBTab = 'rect';
 var pbRoundType = { 'round-fit': 'spiral', 'round-duct': 'spiral' }; // toggle: 'spiral' or 'snaplock'
 var pbFlexColor = { 'round-flex': 'black' }; // toggle: 'black' or 'silver'
 var pbExpandedItems = {}; // tracks which fitting rows are expanded to show per-size pricing
-var pbPerimClass = { 'rect-fit': 0 }; // active perimeter class index per section
+var pbPerimClass = { 'rect-fit': 0 }; // active perimeter class index per section (rect duct)
+var pbMinWidthClass = { 'rect-fit': 0 }; // active min-width class index per section (rect fittings)
 
 // SMACNA galvanized sheet metal weights (lbs per SF) by gauge
 var SHEET_METAL_WEIGHT = {
@@ -3770,6 +3771,7 @@ function pbSaveLayout() {
     gauge: pbGauge,
     roundType: pbRoundType,
     perimClass: pbPerimClass,
+    minWidthClass: pbMinWidthClass,
     laborCat: activeLaborCat,
     tab: activePBTab
   };
@@ -3803,6 +3805,9 @@ function pbApplyLayout(panel) {
     }
     if (layout.perimClass) {
       for (var pk in layout.perimClass) pbPerimClass[pk] = layout.perimClass[pk];
+    }
+    if (layout.minWidthClass) {
+      for (var mwk in layout.minWidthClass) pbMinWidthClass[mwk] = layout.minWidthClass[mwk];
     }
     if (layout.laborCat) activeLaborCat = layout.laborCat;
     if (layout.tab) activePBTab = layout.tab;
@@ -4147,14 +4152,14 @@ function renderRadarChart(baseKey, itemType, subType) {
       html += '<span id="' + uid + 'bl" style="color:#da77f2;font-size:14px;font-weight:700">' + secSz + '\u2033</span>';
     }
   } else {
-    var currentPCIdx = pbPerimClass['rect-fit'] || 0;
-    html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">SIZE</span>';
-    html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length-1) + '" value="' + currentPCIdx + '" ';
+    var currentMWIdx = pbMinWidthClass['rect-fit'] || 0;
+    html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">MIN</span>';
+    html += '<input type="range" min="0" max="' + (RECT_MIN_WIDTH_CLASSES.length-1) + '" value="' + currentMWIdx + '" ';
     html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:140px;accent-color:#e94560" ';
     html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
-    html += 'onchange="radarSliderPerim(this.value)">';
-    var pcLabel = RECT_PERIM_CLASSES[currentPCIdx] ? RECT_PERIM_CLASSES[currentPCIdx].label : '';
-    html += '<span style="color:#e94560;font-size:12px;font-weight:600;text-align:center;max-width:60px">' + pcLabel + '</span>';
+    html += 'onchange="radarSliderMinWidth(this.value)">';
+    var mwLabel = RECT_MIN_WIDTH_CLASSES[currentMWIdx] ? RECT_MIN_WIDTH_CLASSES[currentMWIdx].label : '';
+    html += '<span style="color:#e94560;font-size:12px;font-weight:600;text-align:center;max-width:60px">' + mwLabel + '</span>';
   }
   html += '</div>';
 
@@ -4195,15 +4200,15 @@ window.radarSlideRd = function(dim, idx, key) {
   renderPriceBook();
 };
 
-window.radarSliderPerim = function(idx) {
+window.radarSliderMinWidth = function(idx) {
   var i = parseInt(idx);
-  var oldIdx = pbPerimClass['rect-fit'] || 0;
-  pbPerimClass['rect-fit'] = i;
-  // Update radarChartTarget key to match new perim class so chart stays open
+  var oldIdx = pbMinWidthClass['rect-fit'] || 0;
+  pbMinWidthClass['rect-fit'] = i;
+  // Update radarChartTarget key to match new min-width class so chart stays open
   if (radarChartTarget) {
-    var oldMax = RECT_PERIM_CLASSES[oldIdx] ? RECT_PERIM_CLASSES[oldIdx].maxPerim : 30;
-    var newMax = RECT_PERIM_CLASSES[i] ? RECT_PERIM_CLASSES[i].maxPerim : 30;
-    radarChartTarget = radarChartTarget.replace('-p' + oldMax, '-p' + newMax);
+    var oldMax = RECT_MIN_WIDTH_CLASSES[oldIdx] ? RECT_MIN_WIDTH_CLASSES[oldIdx].maxMin : 6;
+    var newMax = RECT_MIN_WIDTH_CLASSES[i] ? RECT_MIN_WIDTH_CLASSES[i].maxMin : 6;
+    radarChartTarget = radarChartTarget.replace('-mw' + oldMax, '-mw' + newMax);
   }
   renderPriceBook();
   pbSaveLayout();
@@ -4275,32 +4280,31 @@ function pbRow(item, sectionId) {
   var mcKey = gaugeKey;
   var lhKey = activeKey;
   var autoCalcMc = null;
-  // Representative W,H for the active perim class (square approximation)
-  var pcSampleW = 12, pcSampleH = 12, pcSampleSA = 0;
+  // Representative W,H for the active min-width class (~2:1 aspect)
+  var mwSampleW = 12, mwSampleH = 6, mwSampleSA = 0;
   if (isRectFit) {
-    var pcIdx = pbPerimClass[sectionId] || 0;
-    var pc = RECT_PERIM_CLASSES[pcIdx];
-    var pcMax = pc ? pc.maxPerim : 30;
-    var pcRef = pc ? pc.refPerim : 36;
-    pcSampleW = pcRef / 4;
-    pcSampleH = pcRef / 4;
-    mcKey = activeKey + '-p' + pcMax + (gauge ? '-g' + gauge : '');
-    lhKey = activeKey + '-p' + pcMax;
+    var mwIdx = pbMinWidthClass[sectionId] || 0;
+    var mwCls = RECT_MIN_WIDTH_CLASSES[mwIdx];
+    var mwMax = mwCls ? mwCls.maxMin : 6;
+    mwSampleW = mwCls ? mwCls.repW : 12;
+    mwSampleH = mwCls ? mwCls.repH : 6;
+    mcKey = activeKey + '-mw' + mwMax + (gauge ? '-g' + gauge : '');
+    lhKey = activeKey + '-mw' + mwMax;
     // Auto-calc raw material from SA × gauge weight × $/lb
-    autoCalcMc = calcRectFittingRawCost(activeKey, pcSampleW, pcSampleH, gauge || '26');
-    pcSampleSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, pcSampleW, pcSampleH) : 0;
+    autoCalcMc = calcRectFittingRawCost(activeKey, mwSampleW, mwSampleH, gauge || '26');
+    mwSampleSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, mwSampleW, mwSampleH) : 0;
     // Check for user override
-    var pcEntry = priceBookCache ? priceBookCache[mcKey] : null;
-    mc = (pcEntry && pcEntry.materialCost != null) ? pcEntry.materialCost : null;
-    var pcLhEntry = priceBookCache ? priceBookCache[lhCatKey(lhKey)] : null;
-    lh = pcLhEntry ? pcLhEntry.laborHrs : null;
+    var mwEntry = priceBookCache ? priceBookCache[mcKey] : null;
+    mc = (mwEntry && mwEntry.materialCost != null) ? mwEntry.materialCost : null;
+    var mwLhEntry = priceBookCache ? priceBookCache[lhCatKey(lhKey)] : null;
+    lh = mwLhEntry ? mwLhEntry.laborHrs : null;
   }
   var ref = RECT_FITTING_REF[activeKey];
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   html += '<td' + clickAttr + '>' + arrow + item.label;
-  // Show surface area for rect fittings (read-only, derived from perim class)
-  if (isRectFit && ref && pcSampleSA > 0) {
-    html += ' <span style="color:#666;font-size:9px">(SA: ' + pcSampleSA.toFixed(1) + ' SF)</span>';
+  // Show surface area for rect fittings (read-only, derived from min-width class)
+  if (isRectFit && ref && mwSampleSA > 0) {
+    html += ' <span style="color:#666;font-size:9px">(SA: ' + mwSampleSA.toFixed(1) + ' SF)</span>';
   }
   html += '</td>';
   // Material: show auto-calc in dim green or user override in bright green
@@ -4343,28 +4347,27 @@ function pbRow(item, sectionId) {
     html += '</td></tr>';
   }
 
-  // ---- Rect fitting: expand by perimeter class ----
+  // ---- Rect fitting: expand by min-width class ----
   if (isExpanded && isRectFit) {
-    for (var pi = 0; pi < RECT_PERIM_CLASSES.length; pi++) {
-      var pcSub = RECT_PERIM_CLASSES[pi];
-      var pcMaxSub = pcSub.maxPerim;
-      var pcRefSub = pcSub.refPerim;
-      var subW = pcRefSub / 4;
-      var subH = pcRefSub / 4;
+    for (var mi = 0; mi < RECT_MIN_WIDTH_CLASSES.length; mi++) {
+      var mwSub = RECT_MIN_WIDTH_CLASSES[mi];
+      var mwMaxSub = mwSub.maxMin;
+      var subW = mwSub.repW;
+      var subH = mwSub.repH;
       var subSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, subW, subH) : 0;
       var subAutoMc = calcRectFittingRawCost(activeKey, subW, subH, gauge || '26');
-      var subMcKey = activeKey + '-p' + pcMaxSub + (gauge ? '-g' + gauge : '');
-      var subLhKey = activeKey + '-p' + pcMaxSub;
+      var subMcKey = activeKey + '-mw' + mwMaxSub + (gauge ? '-g' + gauge : '');
+      var subLhKey = activeKey + '-mw' + mwMaxSub;
       var subEntry = priceBookCache ? priceBookCache[subMcKey] : null;
       var subMc = (subEntry && subEntry.materialCost != null) ? subEntry.materialCost : null;
       var subShopKey = subLhKey + '-shop';
       var subShopSaved = priceBookCache ? priceBookCache[subShopKey] : null;
       var subShopAdder = subShopSaved ? subShopSaved.materialCost : null;
       var subTotalLh = getTotalLaborHrs(subLhKey);
-      var isActivePC = (pi === (pbPerimClass[sectionId] || 0));
-      var rowBg = isActivePC ? 'background:rgba(233,69,96,0.12)' : 'background:rgba(15,52,96,0.15)';
+      var isActiveMW = (mi === (pbMinWidthClass[sectionId] || 0));
+      var rowBg = isActiveMW ? 'background:rgba(233,69,96,0.12)' : 'background:rgba(15,52,96,0.15)';
       html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.15);' + rowBg + '">';
-      html += '<td style="padding:3px 4px 3px 20px;color:#e94560;font-size:12px;font-weight:' + (isActivePC ? '700' : '500') + '">' + pcSub.label;
+      html += '<td style="padding:3px 4px 3px 20px;color:#e94560;font-size:12px;font-weight:' + (isActiveMW ? '700' : '500') + '">' + mwSub.label;
       if (subSA > 0) html += ' <span style="color:#666;font-size:9px">(SA: ' + subSA.toFixed(1) + ' SF)</span>';
       html += '</td>';
       html += '<td style="padding:3px 2px">';

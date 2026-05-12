@@ -340,6 +340,21 @@ export const RECT_PERIM_CLASSES = [
   { label: '145\u2013168\u2033', maxPerim: 168, refPerim: 168 },
 ];
 
+// \u2500\u2500 Rectangular min-width classes (rect fittings) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// The narrow dimension drives fabrication difficulty and labor for fittings,
+// so fitting prices are keyed by min(W,H) bucket. repW/repH are representative
+// dimensions (~2:1 aspect) used for SA preview and auto-calc in the Price Book.
+export const RECT_MIN_WIDTH_CLASSES = [
+  { label: '\u22646\u2033',    maxMin: 6,  repW: 12, repH: 6 },
+  { label: '7\u20138\u2033',   maxMin: 8,  repW: 16, repH: 8 },
+  { label: '9\u201310\u2033',  maxMin: 10, repW: 20, repH: 10 },
+  { label: '11\u201312\u2033', maxMin: 12, repW: 24, repH: 12 },
+  { label: '13\u201316\u2033', maxMin: 16, repW: 30, repH: 16 },
+  { label: '17\u201320\u2033', maxMin: 20, repW: 36, repH: 20 },
+  { label: '21\u201324\u2033', maxMin: 24, repW: 42, repH: 24 },
+  { label: '25\u201330\u2033', maxMin: 30, repW: 48, repH: 30 },
+];
+
 // ── Duct weight per linear foot (lbs) by perimeter class & gauge ─────
 // Derived from sheet weight: lbs/LF = (perim_in / 12) × lbs/SF
 // 26ga galvanized = 0.906 lbs/SF, 24ga = 1.156 lbs/SF, 22ga = 1.406 lbs/SF

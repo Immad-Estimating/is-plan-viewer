@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SNAPLOCK_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, SHOP_DEFAULTS } from './price-defaults.js';
+import { SNAPLOCK_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, SHOP_DEFAULTS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -29,12 +29,13 @@ function parseRectDims(sizeStr) {
   return { W: parseFloat(m[1]), H: parseFloat(m[2]) };
 }
 
-// Find the perim-class maxPerim for a given perimeter (inches).
-function findPerimClassMax(perimIn) {
-  for (const pc of RECT_PERIM_CLASSES) {
-    if (perimIn <= pc.maxPerim) return pc.maxPerim;
+// Find the min-width class maxMin for a rect fitting's W × H (narrow dim drives the bucket).
+function findMinWidthClass(widthIn, heightIn) {
+  const minDim = Math.min(widthIn, heightIn);
+  for (const c of RECT_MIN_WIDTH_CLASSES) {
+    if (minDim <= c.maxMin) return c.maxMin;
   }
-  return RECT_PERIM_CLASSES[RECT_PERIM_CLASSES.length - 1].maxPerim;
+  return RECT_MIN_WIDTH_CLASSES[RECT_MIN_WIDTH_CLASSES.length - 1].maxMin;
 }
 
 const DB_NAME = 'ISPlanViewerDB';
@@ -366,20 +367,19 @@ function normalizeRows(allPageData, drawingNames) {
       if (!matCost && SNAPLOCK_DEFAULTS[sizeKey] && SNAPLOCK_DEFAULTS[sizeKey]['26'] != null) {
         matCost = SNAPLOCK_DEFAULTS[sizeKey]['26'];
       }
-      // Rect fitting fallback: perim-class price book override → SA-based auto-calc
+      // Rect fitting fallback: min-width-class price book override → SA-based auto-calc
       if (!matCost && shape === 'rect' && RECT_FITTING_SA[baseKey]) {
         const mainDims = parseRectDims(f.sizeA);
         const branchDims = parseRectDims(f.sizeB);
         if (mainDims) {
           const gauge = f.gauge || '26';
-          const perim = 2 * (mainDims.W + mainDims.H);
-          const pcMax = findPerimClassMax(perim);
-          // Check Price Book perim-class override (with or without gauge suffix)
-          const pcKeyG = baseKey + '-p' + pcMax + '-g' + gauge;
-          const pcKey  = baseKey + '-p' + pcMax;
-          const pcEntry = _priceBookCache && (_priceBookCache[pcKeyG] || _priceBookCache[pcKey]);
-          if (pcEntry && pcEntry.materialCost != null) {
-            matCost = pcEntry.materialCost;
+          const mwMax = findMinWidthClass(mainDims.W, mainDims.H);
+          // Check Price Book min-width-class override (with or without gauge suffix)
+          const mwKeyG = baseKey + '-mw' + mwMax + '-g' + gauge;
+          const mwKey  = baseKey + '-mw' + mwMax;
+          const mwEntry = _priceBookCache && (_priceBookCache[mwKeyG] || _priceBookCache[mwKey]);
+          if (mwEntry && mwEntry.materialCost != null) {
+            matCost = mwEntry.materialCost;
           } else {
             const sa = calcRectFittingSA(baseKey, mainDims.W, mainDims.H,
                                          branchDims ? branchDims.W : undefined,
