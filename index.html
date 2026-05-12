@@ -3704,6 +3704,7 @@ function calcRectDuctAddersPerLF(widthIn, heightIn) {
 // SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS — imported from price-defaults.js
 
 function getGaugesForSection(sectionId) {
+  if (sectionId === 'round-flex') return null;
   return ['26', '24', '22'];
 }
 
@@ -3925,6 +3926,12 @@ window.togglePBRoundType = function(sectionId) {
   pbRoundType[sectionId] = current === 'spiral' ? 'snaplock' : 'spiral';
   renderPriceBook();
   pbSaveLayout();
+};
+
+window.togglePBFlexColor = function(sectionId) {
+  var current = pbFlexColor[sectionId] || 'black';
+  pbFlexColor[sectionId] = current === 'black' ? 'silver' : 'black';
+  renderPriceBook();
 };
 
 window.togglePBItemExpand = function(itemKey) {
@@ -4580,16 +4587,8 @@ function renderPriceBook() {
     // Flex Black/Silver toggle
     if (sec.flexToggle && !collapsed) {
       var flexColor = pbFlexColor[sec.id] || 'black';
-      var blackActive = flexColor === 'black';
-      var blackStyle = blackActive
-        ? 'background:rgba(80,80,80,0.3);color:#ccc;border-color:#888'
-        : 'background:#1a1a2e;color:#555;border-color:#0f3460';
-      var silverStyle = !blackActive
-        ? 'background:rgba(192,192,192,0.2);color:#d0d0d0;border-color:#aaa'
-        : 'background:#1a1a2e;color:#555;border-color:#0f3460';
-      html += '<button onclick="event.stopPropagation();pbFlexColor[\x27' + sec.id + '\x27]=\x27' + (blackActive ? 'silver' : 'black') + '\x27;renderPriceBook()" style="padding:2px 8px;border-radius:3px;cursor:pointer;font-size:10px;font-weight:600;border:1px solid;white-space:nowrap;' + (blackActive ? blackStyle : silverStyle) + '">';
-      html += blackActive ? '\u25cf Black' : '\u25cb Silver';
-      html += '</button>';
+      var isBlack = flexColor === 'black';
+      html += '<button onclick="event.stopPropagation();togglePBFlexColor(\'' + sec.id + '\')" style="padding:2px 8px;border-radius:3px;cursor:pointer;font-size:10px;font-weight:600;border:1px solid;white-space:nowrap;' + (isBlack ? 'background:rgba(60,60,60,0.4);color:#ccc;border-color:#888' : 'background:rgba(200,200,200,0.2);color:#e0e0e0;border-color:#bbb') + '">' + (isBlack ? '\u25cf Black' : '\u25cb Silver') + '</button>';
     }
     // Spiral/Snap Lock toggle (only for toggleType sections)
     if (sec.toggleType && !collapsed) {
