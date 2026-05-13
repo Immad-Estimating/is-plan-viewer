@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -500,13 +500,99 @@ function normalizeRows(allPageData, drawingNames) {
       for (const it of (s.items || [])) {
         const shape = it.shape || 'round';
         const ec = {}; for (const c of LABOR_CATEGORIES) ec[c.key] = 0;
+        let stMatCost = 0;
+        let stLengthFt = 0;
+        const stGauge = it.gauge || '26';
+
+        if (it.type === 'ductrun' || it.type === 'flexrun') {
+          // Vertical duct run: parse rise/drop as length
+          const rd = it.riseDrop ? parseFloat(String(it.riseDrop).replace(/[^\d.]/g, '')) : 0;
+          stLengthFt = rd || 0;
+          if (stLengthFt > 0) {
+            const isRect = shape === 'rect' || shape === 'oval';
+            if (isRect && it.sizeA && it.sizeB) {
+              const w = parseFloat(it.sizeA) || 24, h = parseFloat(it.sizeB) || 12;
+              const perim = 2 * (w + h);
+              const wPerLF = (perim / 12) * getGaugeWeightPerSF(stGauge);
+              stMatCost = wPerLF * (getCompilerShopSettings().sheetMetalPricePerLb || 0) * stLengthFt;
+              // Liner
+              const _lo = LINER_OPTIONS[LINER_OPTIONS.length - 1];
+              const _le = _priceBookCache ? _priceBookCache[_lo.key] : null;
+              const _lsf = (_le && _le.materialCost != null) ? _le.materialCost : 0;
+              if (_lsf > 0) stMatCost += (perim / 12) * _lsf * stLengthFt;
+              // Shop OH by perim class
+              let pcM = 168;
+              for (const pc of RECT_PERIM_CLASSES) { if (perim <= pc.maxPerim) { pcM = pc.maxPerim; break; } }
+              if (RECT_DUCT_SHOP_DEFAULTS[pcM] != null) stMatCost += RECT_DUCT_SHOP_DEFAULTS[pcM] * stLengthFt;
+            } else {
+              // Round/flex duct
+              const dia = parseFloat(it.sizeA) || 14;
+              const sizeKey = (it.type === 'flexrun' ? 'flex-' + (it.flexColor || 'black') : 'duct-spiral') + '-' + Math.round(dia);
+              const pbE = _priceBookCache && _priceBookCache[sizeKey];
+              if (pbE && pbE.materialCost != null) stMatCost = pbE.materialCost * stLengthFt;
+              else if (SPIRAL_DEFAULTS[sizeKey] && SPIRAL_DEFAULTS[sizeKey]['26'] != null) stMatCost = SPIRAL_DEFAULTS[sizeKey]['26'] * stLengthFt;
+              else if (SNAPLOCK_DEFAULTS[sizeKey] && SNAPLOCK_DEFAULTS[sizeKey]['26'] != null) stMatCost = SNAPLOCK_DEFAULTS[sizeKey]['26'] * stLengthFt;
+            }
+          }
+        } else {
+          // Stack fitting: same pricing logic as canvas fittings
+          const prefix = shape === 'rect' ? 'rect' : 'spiral';
+          const stBaseKey = it.type === 'rectTap' ? 'rectTap' : prefix + '-' + it.type;
+          const mainDims = parseRectDims(it.sizeA);
+          const branchDims = parseRectDims(it.sizeB);
+
+          if (shape === 'rect' && stBaseKey === 'rect-plenum') {
+            const pE = _priceBookCache && _priceBookCache['rect-plenum'];
+            stMatCost = (pE && pE.materialCost != null) ? pE.materialCost : RECT_PLENUM_DEFAULT;
+          } else if (shape === 'rect' && stBaseKey === 'rect-flex-conn' && mainDims) {
+            const mw = findMinWidthClass(mainDims.W, mainDims.H);
+            const mwE = _priceBookCache && (_priceBookCache[stBaseKey + '-mw' + mw + '-g' + stGauge] || _priceBookCache[stBaseKey + '-mw' + mw]);
+            stMatCost = (mwE && mwE.materialCost != null) ? mwE.materialCost : (RECT_FLEX_CONN_DEFAULTS[mw] || 0);
+          } else if (shape === 'rect' && RECT_FITTING_SA[stBaseKey] && mainDims) {
+            const sa = calcRectFittingSA(stBaseKey, mainDims.W, mainDims.H,
+              branchDims ? branchDims.W : undefined, branchDims ? branchDims.H : undefined);
+            const shop = getCompilerShopSettings();
+            stMatCost = sa * getGaugeWeightPerSF(stGauge) * (shop.sheetMetalPricePerLb || 0);
+            // Liner
+            const _lo2 = LINER_OPTIONS[LINER_OPTIONS.length - 1];
+            const _le2 = _priceBookCache ? _priceBookCache[_lo2.key] : null;
+            const _lsf2 = (_le2 && _le2.materialCost != null) ? _le2.materialCost : 0;
+            if (_lsf2 > 0) stMatCost += sa * _lsf2;
+            // Shop OH
+            const mw2 = findMinWidthClass(mainDims.W, mainDims.H);
+            const _sk = stBaseKey + '-mw' + mw2 + '-shop';
+            const _se = _priceBookCache && _priceBookCache[_sk];
+            let _soh = (_se && _se.materialCost != null) ? _se.materialCost : null;
+            if (_soh == null) {
+              if ((stBaseKey === 'rect-reducer' || stBaseKey === 'rect-eccReducer') && RECT_REDUCER_SHOP_DEFAULTS[mw2] != null) _soh = RECT_REDUCER_SHOP_DEFAULTS[mw2];
+              else if (stBaseKey === 'rect-endcap' && RECT_ENDCAP_SHOP_DEFAULTS[mw2] != null) _soh = RECT_ENDCAP_SHOP_DEFAULTS[mw2];
+              else if (stBaseKey === 'rect-transition' && RECT_TRANSITION_SHOP_DEFAULTS[mw2] != null) _soh = RECT_TRANSITION_SHOP_DEFAULTS[mw2];
+              else if (stBaseKey === 'rectTap' && RECT_TAP_SHOP_DEFAULTS[mw2] != null) _soh = RECT_TAP_SHOP_DEFAULTS[mw2];
+              else {
+                const perim2 = 2 * (mainDims.W + mainDims.H);
+                let pcM2 = 168;
+                for (const pc of RECT_PERIM_CLASSES) { if (perim2 <= pc.maxPerim) { pcM2 = pc.maxPerim; break; } }
+                if (RECT_DUCT_SHOP_DEFAULTS[pcM2] != null) _soh = RECT_DUCT_SHOP_DEFAULTS[pcM2];
+              }
+            }
+            if (_soh != null && _soh > 0) stMatCost += _soh;
+          } else if (shape === 'round') {
+            // Round fitting: check Price Book → spiral/snaplock defaults
+            const sizeKey = stBaseKey + '-' + (it.sizeA || '');
+            const pbE = _priceBookCache && _priceBookCache[sizeKey];
+            if (pbE && pbE.materialCost != null) stMatCost = pbE.materialCost;
+            else if (SPIRAL_DEFAULTS[sizeKey] && SPIRAL_DEFAULTS[sizeKey]['26'] != null) stMatCost = SPIRAL_DEFAULTS[sizeKey]['26'];
+            else if (SNAPLOCK_DEFAULTS[sizeKey] && SNAPLOCK_DEFAULTS[sizeKey]['26'] != null) stMatCost = SNAPLOCK_DEFAULTS[sizeKey]['26'];
+          }
+        }
+
         rows.push({
-          _itemType: it.type === 'ductrun' ? 'Vert. Duct' : (FITTING_NAMES[it.type] || it.type),
+          _itemType: it.type === 'ductrun' ? 'Vert. Duct' : (it.type === 'flexrun' ? 'Vert. Flex' : (FITTING_NAMES[it.type] || it.type)),
           _size: it.sizeA + (it.sizeB ? '×' + it.sizeB : ''), _shape: capitalize(shape),
           _page: page, _drawingId: drawingId, _drawingName: drawingName,
-          _lengthFt: 0, _matCost: 0, _laborHrs: 0, _laborCost: 0, _totalCost: 0,
+          _lengthFt: stLengthFt, _matCost: stMatCost, _laborHrs: 0, _laborCost: 0, _totalCost: stMatCost,
           _laborCatHrs: { ...ec }, _laborCatCost: { ...ec }, _laborCatLabel: 'unassigned',
-          phase: null, costGroup: null, gauge: null,
+          phase: null, costGroup: null, gauge: stGauge,
           systemSymbol: null,
           _sourceType: 'stack', _sourceId: it.id, _sourceStackId: s.id,
         });
