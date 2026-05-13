@@ -968,7 +968,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -3523,7 +3523,8 @@ const PRICE_BOOK_TABS = {
         { key: 'duct-rect', label: 'Rect Duct (per ft)' },
       ]},
       { id: 'rect-acc', hasGauge: false, title: 'Accessories & Add-Ons', hasShopAdder: true, items: [
-        { key: 'rect-liner', label: 'Duct Liner ($/SF)' },
+        { key: 'liner-1', label: '1\u2033 Liner ($/SF)', isLiner: true },
+        { key: 'liner-1.5', label: '1.5\u2033 Liner ($/SF)', isLiner: true },
         { key: 'rect-wrap', label: 'Wrap Insulation ($/SF)' },
         { key: 'rect-nosing', label: 'Nosing / Edging ($/LF)' },
         { key: 'rect-turning-vanes', label: 'Turning Vanes ($/Ea)' },
@@ -3634,6 +3635,8 @@ var pbFlexColor = { 'round-flex': 'black' }; // toggle: 'black' or 'silver'
 var pbExpandedItems = {}; // tracks which fitting rows are expanded to show per-size pricing
 var pbPerimClass = { 'rect-fit': 0 }; // active perimeter class index per section (rect duct)
 var pbMinWidthClass = { 'rect-fit': 0 }; // active min-width class index per section (rect fittings)
+var pbLinerActive = false; // when true, rect duct/fit prices include liner adder
+var pbActiveLiner = null;  // active liner key (e.g. 'liner-1') — null = no liner selected
 
 // SMACNA galvanized sheet metal weights (lbs per SF) by gauge
 var SHEET_METAL_WEIGHT = {
@@ -3696,6 +3699,13 @@ function calcRectFittingRawCost(fittingKey, widthIn, heightIn, gauge, branchW, b
   var shop = getShopSettings();
   var weightPerSF = getGaugeWeightPerSF(gauge);
   return sa * weightPerSF * (shop.sheetMetalPricePerLb || 0);
+}
+
+// Get active liner $/SF from Price Book (0 if no liner selected or liner toggle off)
+function getActiveLinerPricePerSF() {
+  if (!pbLinerActive || !pbActiveLiner) return 0;
+  var entry = priceBookCache ? priceBookCache[pbActiveLiner] : null;
+  return (entry && entry.materialCost != null) ? entry.materialCost : 0;
 }
 
 function getShopSettings() {
@@ -3783,7 +3793,9 @@ function pbSaveLayout() {
     perimClass: pbPerimClass,
     minWidthClass: pbMinWidthClass,
     laborCat: activeLaborCat,
-    tab: activePBTab
+    tab: activePBTab,
+    linerActive: pbLinerActive,
+    activeLiner: pbActiveLiner
   };
   localStorage.setItem('pbLayout', JSON.stringify(layout));
 }
@@ -3819,6 +3831,8 @@ function pbApplyLayout(panel) {
     if (layout.minWidthClass) {
       for (var mwk in layout.minWidthClass) pbMinWidthClass[mwk] = layout.minWidthClass[mwk];
     }
+    if (layout.linerActive != null) pbLinerActive = layout.linerActive;
+    if (layout.activeLiner) pbActiveLiner = layout.activeLiner;
     if (layout.laborCat) activeLaborCat = layout.laborCat;
     if (layout.tab) activePBTab = layout.tab;
   } else {
@@ -4302,6 +4316,11 @@ function pbRow(item, sectionId) {
     lhKey = activeKey + '-mw' + mwMax;
     // Auto-calc raw material from SA × gauge weight × $/lb
     autoCalcMc = calcRectFittingRawCost(activeKey, mwSampleW, mwSampleH, gauge || '26');
+    // Add liner adder to fitting auto-calc when toggle active
+    if (pbLinerActive && autoCalcMc != null) {
+      var fitLinerSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, mwSampleW, mwSampleH) : 0;
+      autoCalcMc += fitLinerSA * getActiveLinerPricePerSF();
+    }
     mwSampleSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, mwSampleW, mwSampleH) : 0;
     // Check for user override
     var mwEntry = priceBookCache ? priceBookCache[mcKey] : null;
@@ -4366,6 +4385,11 @@ function pbRow(item, sectionId) {
       var subH = mwSub.repH;
       var subSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, subW, subH) : 0;
       var subAutoMc = calcRectFittingRawCost(activeKey, subW, subH, gauge || '26');
+      // Add liner adder to sub-row auto-calc when toggle active
+      if (pbLinerActive && subAutoMc != null) {
+        var subLinerSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, subW, subH) : 0;
+        subAutoMc += subLinerSA * getActiveLinerPricePerSF();
+      }
       var subMcKey = activeKey + '-mw' + mwMaxSub + (gauge ? '-g' + gauge : '');
       var subLhKey = activeKey + '-mw' + mwMaxSub;
       var subEntry = priceBookCache ? priceBookCache[subMcKey] : null;
@@ -4504,7 +4528,16 @@ function pbRowEditable(item, sectionId) {
   var hasShopAdder = sectionId === 'rect-acc';
   var html = '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
   var isFlex = sectionId === 'round-flex';
-  html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
+  // Liner items get a radio button for selection
+  if (item.isLiner) {
+    var isActive = pbActiveLiner === activeKey;
+    var radioBg = isActive ? 'background:#ff6b6b;border-color:#ff6b6b' : 'background:#1a1a2e;border-color:#0f3460';
+    html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">';
+    html += '<span onclick="event.stopPropagation();setActiveLiner(\'' + activeKey + '\')" style="display:inline-block;width:12px;height:12px;border-radius:50%;border:2px solid;cursor:pointer;vertical-align:middle;margin-right:6px;' + radioBg + '" title="Set as active liner"></span>';
+    html += item.label + '</td>';
+  } else {
+    html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + '</td>';
+  }
   if (isFlex) {
     // Display as $/Roll (×25), save as $/ft (÷25)
     var rollPrice = mc != null ? (mc * 25).toFixed(2) : '';
@@ -4572,7 +4605,6 @@ function renderShopSettingsSection() {
   var html = '';
   html += '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Setting</th><th colspan="2" style="padding:4px;text-align:right">Value</th></tr>';
   html += shopSettingInput('sheetMetalPricePerLb', s.sheetMetalPricePerLb || '', 'Sheet Metal Price', '$/lb', '#00ff88');
-  html += shopSettingInput('linerPricePerSF', s.linerPricePerSF || '', 'Duct Liner', '$/SF', '#ff6b6b');
   html += shopSettingInput('wrapInsulationPerSF', s.wrapInsulationPerSF || '', 'Wrap Insulation', '$/SF', '#ffa94d');
   // Live preview
   html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3);background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:6px 4px;font-size:10px;color:#a0a0c0">';
@@ -4583,14 +4615,6 @@ function renderShopSettingsSection() {
     html += ' \u2192 <span style="color:#00ff88">$' + preview.rawMaterialPerLF.toFixed(2) + ' raw/LF</span>';
   }
   html += '</td></tr>';
-  // Liner preview
-  if (s.linerPricePerSF > 0) {
-    var linerPreview = (72/12) * s.linerPricePerSF; // 72" perim = 6ft × $/SF
-    html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3);background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:4px;font-size:10px;color:#a0a0c0">';
-    html += '<span style="color:#666">Liner @ 72\u2033 perim =</span> <span style="color:#ff6b6b">$' + linerPreview.toFixed(2) + '/LF</span>';
-    if (preview.rawMaterialPerLF > 0) html += ' \u2192 <span style="color:#e0e0e0">$' + (preview.rawMaterialPerLF + linerPreview).toFixed(2) + ' total/LF</span>';
-    html += '</td></tr>';
-  }
   // SMACNA gauge weight reference
   html += '<tr style="background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:4px;font-size:9px;color:#666">';
   html += 'SMACNA lbs/SF: 26ga=1.031 | 24ga=1.406 | 22ga=1.781 | 20ga=2.156 | 18ga=2.781';
@@ -4607,11 +4631,18 @@ function renderRectDuctCalcSection(sec, gauge) {
   for (var i = 0; i < RECT_PERIM_CLASSES.length; i++) {
     var pc = RECT_PERIM_CLASSES[i];
     var calc = calcRectDuctRawPerLF(pc.refPerim, gauge);
+    // Liner adder per LF when toggle is active
+    var linerAdder = 0;
+    if (pbLinerActive) {
+      var linerSF = getActiveLinerPricePerSF();
+      linerAdder = (pc.refPerim / 12) * linerSF;
+    }
     var classKey = 'duct-rect-p' + pc.maxPerim;
     var gKey = classKey + '-g' + gauge;
     // Raw material: auto-calc (read-only display) or user-override
     var saved = priceBookCache ? priceBookCache[gKey] : null;
-    var rawMc = (saved && saved.materialCost != null) ? saved.materialCost : (calc.rawMaterialPerLF > 0 ? calc.rawMaterialPerLF : null);
+    var baseRaw = (saved && saved.materialCost != null) ? saved.materialCost : (calc.rawMaterialPerLF > 0 ? calc.rawMaterialPerLF : null);
+    var rawMc = baseRaw != null ? baseRaw + linerAdder : (linerAdder > 0 ? linerAdder : null);
     var isAutoCalc = !(saved && saved.materialCost != null) && calc.rawMaterialPerLF > 0;
     // Shop adder: per perimeter class, editable
     var shopKey = classKey + '-shop';
@@ -4657,6 +4688,25 @@ function renderRectDuctCalcSection(sec, gauge) {
 
 window.setLaborCat = function(catKey) {
   activeLaborCat = catKey;
+  renderPriceBook();
+  pbSaveLayout();
+};
+
+window.setActiveLiner = function(key) {
+  // Radio behavior: clicking active liner deselects it
+  pbActiveLiner = (pbActiveLiner === key) ? null : key;
+  // Auto-enable liner toggle when a liner is selected
+  if (pbActiveLiner) pbLinerActive = true;
+  renderPriceBook();
+  pbSaveLayout();
+};
+
+window.togglePBLiner = function() {
+  pbLinerActive = !pbLinerActive;
+  if (pbLinerActive && !pbActiveLiner) {
+    // Default to 1" liner if none selected
+    pbActiveLiner = LINER_OPTIONS[0].key;
+  }
   renderPriceBook();
   pbSaveLayout();
 };
@@ -4733,6 +4783,16 @@ function renderPriceBook() {
           : 'background:#1a1a2e;color:#a0a0c0;border-color:#0f3460';
         html += '<button onclick="event.stopPropagation();setPBGauge(\'' + sec.id + '\',\'' + g + '\')" style="padding:2px 6px;border-radius:3px;cursor:pointer;font-size:10px;font-weight:600;border:1px solid;margin-left:3px;' + gStyle + '">' + g + 'ga</button>';
       }
+    }
+    // LINER toggle button for rect-fit and rect-duct sections
+    if (sec.id === 'rect-fit' || sec.id === 'rect-duct') {
+      var lnStyle = pbLinerActive
+        ? 'background:#ff6b6b;color:#fff;border-color:#ff6b6b'
+        : 'background:#1a1a2e;color:#666;border-color:#0f3460';
+      var lnLabel = pbLinerActive && pbActiveLiner
+        ? (LINER_OPTIONS.find(function(o){return o.key===pbActiveLiner})||{}).label || 'LINER'
+        : 'LINER';
+      html += ' <button onclick="event.stopPropagation();togglePBLiner()" style="padding:2px 6px;border-radius:3px;cursor:pointer;font-size:9px;font-weight:600;border:1px solid;margin-left:6px;' + lnStyle + '" title="Toggle liner adder in prices">' + lnLabel + '</button>';
     }
     html += '</span>';
     html += '</td></tr>';

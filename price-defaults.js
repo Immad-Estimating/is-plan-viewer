@@ -378,9 +378,16 @@ export const DUCT_WEIGHT_PER_LF = {
 // ── Shop settings defaults ───────────────────────────────────────────
 export const SHOP_DEFAULTS = {
   sheetMetalPricePerLb: 0.90,
-  linerPricePerSF: 0,       // duct liner $/SF — user sets in Price Book shop settings
   wrapInsulationPerSF: 0,   // external wrap insulation $/SF
 };
+
+// ── Liner thickness options ──────────────────────────────────────
+// Standard rectangular duct liner thicknesses. User enters $/SF per thickness
+// in the Price Book accessories section. Active liner selection is a radio button.
+export const LINER_OPTIONS = [
+  { key: 'liner-1', label: '1\u2033 Liner', thickness: 1.0 },
+  { key: 'liner-1.5', label: '1.5\u2033 Liner', thickness: 1.5 },
+];
 
 // ── Labor categories ─────────────────────────────────────────────────
 export const LABOR_CATEGORIES = [

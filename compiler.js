@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF } from './price-defaults.js';
+import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -301,15 +301,19 @@ function normalizeRows(allPageData, drawingNames) {
       const lengthFt = (m.distance ? m.distance.value || 0 : 0) + dropFt;
       const shape = m.duct.type || 'round';
       const matPerFt = m.materialCostPerFt || 0;
-      // Liner adder: if duct is lined, add liner $/SF × perimeter in feet per LF
+      // Liner adder: if duct is lined, lookup $/SF from Price Book by liner thickness
       let linerPerFt = 0;
       if (m.lined && m.duct.liner > 0) {
-        const shop = getCompilerShopSettings();
         const dims = (m.duct.dims || '').split('x');
         let perimFt = 0;
         if (dims.length === 2) { perimFt = (2 * (parseFloat(dims[0]) + parseFloat(dims[1]))) / 12; }
         else if (dims.length === 1) { perimFt = (Math.PI * parseFloat(dims[0])) / 12; }
-        linerPerFt = perimFt * (shop.linerPricePerSF || 0);
+        // Find matching liner option by thickness
+        const linerThick = m.duct.liner;
+        const linerOpt = LINER_OPTIONS.find(o => o.thickness === linerThick) || LINER_OPTIONS[0];
+        const linerEntry = _priceBookCache ? _priceBookCache[linerOpt.key] : null;
+        const linerSF = (linerEntry && linerEntry.materialCost != null) ? linerEntry.materialCost : 0;
+        linerPerFt = perimFt * linerSF;
       }
       const rate = m.laborRate || labRate;
       const labHrsPerFt = m.laborHrsPerFt || 0;
