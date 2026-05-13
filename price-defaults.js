@@ -296,6 +296,7 @@ export const RECT_FITTING_REF = {
   'rect-sqwing':     { cuts: 5 },
   'rect-endcap':     { cuts: 1 },
   'rect-transition': { cuts: 4 },
+  'rect-flex-conn':  { cuts: 0 },
 };
 
 // ── Rectangular fitting surface area model ───────────────────────────
