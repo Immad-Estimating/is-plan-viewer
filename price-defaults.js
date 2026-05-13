@@ -492,3 +492,17 @@ export const SNAPLOCK_TAP_DEFAULTS = {
   'snaplock-tap-12x10on12': {},  // no pricing
   'snaplock-tap-12x10on14': {},  // no pricing
 };
+
+// ── Rectangular duct shop overhead defaults ($/LF by perimeter class) ──
+// Back-calculated from Immad's total pricing (includes fab labor, not liner/metal)
+// Total = Raw Metal (auto-calc) + Liner (accessory) + Shop Adder (below)
+export const RECT_DUCT_SHOP_DEFAULTS = {
+  36:  13.00,   // Small (<33")
+  48:  13.87,   // Small-Med (33-48")
+  60:  13.68,   // Medium (48-96")
+  72:  13.68,   // Medium
+  96:  13.68,   // Medium
+  120: 54.05,   // XL (>96")
+  144: 54.05,   // XL
+  168: 54.05,   // XL
+};

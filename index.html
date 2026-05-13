@@ -724,7 +724,7 @@
       <span id="ddFlexColorGroup" style="display:none"><button id="ddFlexColorBtn" onclick="toggleDDFlexColor()" style="background:rgba(60,60,60,0.4);color:#ccc;border:1px solid #888;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">● Black</button></span>
       <span id="ddDiamGroup"><label>⌀</label><input type="text" id="ddDiam" class="dd-dim" value="14"></span>
       <span id="ddRectGroup" style="display:none"><label>W</label><input type="text" id="ddW" class="dd-dim" value="24"><label>×</label><input type="text" id="ddH" class="dd-dim" value="12"></span>
-      <span id="ddLinerGroup" style="display:none"><label>Liner</label><input type="text" id="ddLiner" class="dd-dim" value="1" style="width:35px" title="Liner thickness (inches)"><label>"</label></span>
+      <span id="ddLinerGroup" style="display:none"><label>Liner</label><select id="ddLiner" style="padding:3px 6px;font-size:12px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;border-radius:4px"><option value="0">None</option><option value="1">1"</option><option value="1.5" selected>1.5"</option></select></span>
       <label>Ga</label><select id="ddGauge" style="padding:3px 6px;font-size:12px"><option value="26">26</option><option value="24">24</option><option value="22">22</option></select>
       <span class="dd-hint">Click to draw · Enter to finish</span>
       <button class="tool-pin-btn" id="ddPinBtn" onclick="event.stopPropagation(); togglePinDuctBar()" title="Pin position">📌</button>
@@ -968,7 +968,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -4647,7 +4647,13 @@ function renderRectDuctCalcSection(sec, gauge) {
     // Shop adder: per perimeter class, editable
     var shopKey = classKey + '-shop';
     var shopSaved = priceBookCache ? priceBookCache[shopKey] : null;
-    var shopAdder = shopSaved ? shopSaved.materialCost : null;
+    var shopAdder = (shopSaved && shopSaved.materialCost != null) ? shopSaved.materialCost : null;
+    // Fallback to RECT_DUCT_SHOP_DEFAULTS if no user override
+    var shopIsDefault = false;
+    if (shopAdder == null && RECT_DUCT_SHOP_DEFAULTS[pc.maxPerim] != null) {
+      shopAdder = RECT_DUCT_SHOP_DEFAULTS[pc.maxPerim];
+      shopIsDefault = true;
+    }
     // Labor hrs: total across all categories
     var totalDuctLh = getTotalLaborHrs(classKey);
     html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
@@ -4664,11 +4670,13 @@ function renderRectDuctCalcSection(sec, gauge) {
         + 'onchange="updatePBEntry(\'' + gKey + '\',\'materialCost\',this.value)">';
     }
     html += '</td>';
-    // Shop adder column
+    // Shop adder column (italic if default, solid if user-overridden)
     html += '<td style="padding:4px 2px">';
-    html += '<input type="text" value="' + (shopAdder != null ? shopAdder : '') + '" placeholder="\u2014" '
-      + 'style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" '
-      + 'onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)">';
+    var shopColor = shopIsDefault ? '#cc8800' : '#ffaa00';
+    var shopItalic = shopIsDefault ? 'font-style:italic' : '';
+    html += '<input type="text" value="' + (shopAdder != null ? shopAdder.toFixed(2) : '') + '" placeholder="\u2014" '
+      + 'style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:' + shopColor + ';padding:3px 4px;border-radius:3px;font-size:11px;text-align:right;' + shopItalic + '" '
+      + 'onchange="updatePBEntry(\'' + shopKey + '\',\'materialCost\',this.value)" title="' + (shopIsDefault ? 'Default from pricing log \u2014 edit to override' : 'User override') + '">';
     html += '</td>';
     // Labor hrs
     html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + classKey + '\',\'duct\',\'\')" title="Click to edit labor breakdown">';
