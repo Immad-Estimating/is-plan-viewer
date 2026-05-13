@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS } from './price-defaults.js';
+import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -441,6 +441,7 @@ function normalizeRows(allPageData, drawingNames) {
             if ((baseKey === 'rect-reducer' || baseKey === 'rect-eccReducer') && RECT_REDUCER_SHOP_DEFAULTS[mwMax] != null) _fittingShopDefault = RECT_REDUCER_SHOP_DEFAULTS[mwMax];
             else if (baseKey === 'rect-endcap' && RECT_ENDCAP_SHOP_DEFAULTS[mwMax] != null) _fittingShopDefault = RECT_ENDCAP_SHOP_DEFAULTS[mwMax];
             else if (baseKey === 'rect-transition' && RECT_TRANSITION_SHOP_DEFAULTS[mwMax] != null) _fittingShopDefault = RECT_TRANSITION_SHOP_DEFAULTS[mwMax];
+            else if (baseKey === 'rectTap' && RECT_TAP_SHOP_DEFAULTS[mwMax] != null) _fittingShopDefault = RECT_TAP_SHOP_DEFAULTS[mwMax];
             if (_fittingShopDefault != null) {
               const shopKey = baseKey + '-mw' + mwMax + '-shop';
               const shopEntry = _priceBookCache && _priceBookCache[shopKey];

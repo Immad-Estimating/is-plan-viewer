@@ -344,6 +344,19 @@ export const RECT_TRANSITION_SHOP_DEFAULTS = {
   30: 45.13,   // Large
 };
 
+// ── Rect straight tap (IKO) shop overhead defaults ($/EA by min-width) ───
+// From Immad's IKO pricing: Sm=$20, Sm/Med=$30, Med=$40, Lg=$50
+export const RECT_TAP_SHOP_DEFAULTS = {
+  6:  18.80,   // IKO Small
+  8:  28.40,   // IKO Small/Med
+  10: 28.40,   // IKO Small/Med
+  12: 37.61,   // IKO Med
+  16: 37.61,   // IKO Med
+  20: 46.28,   // IKO Large
+  24: 46.28,   // IKO Large
+  30: 46.28,   // IKO Large
+};
+
 // ── Rectangular flex connector defaults ($/EA by min-width class) ────
 // Flat vendor/shop pricing, no SA formula. Scaled from $25 avg at 11-12" class.
 export const RECT_FLEX_CONN_DEFAULTS = {
