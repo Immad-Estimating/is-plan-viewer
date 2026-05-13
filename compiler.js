@@ -366,7 +366,8 @@ function normalizeRows(allPageData, drawingNames) {
       const shape = inferFittingShape(f);
 
       const prefix = shape === 'rect' ? 'rect' : 'spiral';
-      const baseKey = prefix + '-' + f.type;
+      // rectTap already has 'rect' prefix baked in — don't double-prefix
+      const baseKey = f.type === 'rectTap' ? 'rectTap' : prefix + '-' + f.type;
       // Boot uses WxH key; other fittings use single size
       const sizeKey = (f.type === 'boot' && f.sizeA && f.sizeB)
         ? baseKey + '-' + f.sizeA + 'x' + f.sizeB
