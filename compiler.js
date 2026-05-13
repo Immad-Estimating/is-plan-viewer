@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_LATERAL_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -411,13 +411,6 @@ function normalizeRows(allPageData, drawingNames) {
           }
         }
       }
-      // Rect 45° lateral: flat all-in pricing (no SA calc)
-      if (!matCost && shape === 'rect' && baseKey === 'rect-lateral') {
-        const mainDims = parseRectDims(f.sizeA);
-        if (mainDims) {
-          const mwMax = findMinWidthClass(mainDims.W, mainDims.H);
-          const mwE = _priceBookCache && (_priceBookCache[baseKey + '-mw' + mwMax + '-g' + (f.gauge || '26')] || _priceBookCache[baseKey + '-mw' + mwMax]);
-          matCost = (mwE && mwE.materialCost != null) ? mwE.materialCost : (RECT_LATERAL_DEFAULTS[mwMax] || 0);
         }
       }
       // Rect fitting fallback: min-width-class price book override → SA-based auto-calc
@@ -458,6 +451,7 @@ function normalizeRows(allPageData, drawingNames) {
               else if (baseKey === 'rect-endcap' && RECT_ENDCAP_SHOP_DEFAULTS[mwMax] != null) _shopOH = RECT_ENDCAP_SHOP_DEFAULTS[mwMax];
               else if (baseKey === 'rect-transition' && RECT_TRANSITION_SHOP_DEFAULTS[mwMax] != null) _shopOH = RECT_TRANSITION_SHOP_DEFAULTS[mwMax];
               else if (baseKey === 'rectTap' && RECT_TAP_SHOP_DEFAULTS[mwMax] != null) _shopOH = RECT_TAP_SHOP_DEFAULTS[mwMax];
+              else if (baseKey === 'rect-45el' && RECT_45EL_SHOP_DEFAULTS[mwMax] != null) _shopOH = RECT_45EL_SHOP_DEFAULTS[mwMax];
               // Fallback: use duct shop overhead for fittings without specific defaults
               // (elbows, tees, wyes, laterals, sq-wing) — uses the perim-class duct rate
               else {
@@ -557,10 +551,7 @@ function normalizeRows(allPageData, drawingNames) {
             const mw = findMinWidthClass(mainDims.W, mainDims.H);
             const mwE = _priceBookCache && (_priceBookCache[stBaseKey + '-mw' + mw + '-g' + stGauge] || _priceBookCache[stBaseKey + '-mw' + mw]);
             stMatCost = (mwE && mwE.materialCost != null) ? mwE.materialCost : (RECT_FLEX_CONN_DEFAULTS[mw] || 0);
-          } else if (shape === 'rect' && stBaseKey === 'rect-lateral' && mainDims) {
-            const mw = findMinWidthClass(mainDims.W, mainDims.H);
-            const mwE = _priceBookCache && (_priceBookCache[stBaseKey + '-mw' + mw + '-g' + stGauge] || _priceBookCache[stBaseKey + '-mw' + mw]);
-            stMatCost = (mwE && mwE.materialCost != null) ? mwE.materialCost : (RECT_LATERAL_DEFAULTS[mw] || 0);
+            stMatCost = (mwE && mwE.materialCost != null) ? mwE.materialCost : (0[mw] || 0);
           } else if (shape === 'rect' && RECT_FITTING_SA[stBaseKey] && mainDims) {
             const sa = calcRectFittingSA(stBaseKey, mainDims.W, mainDims.H,
               branchDims ? branchDims.W : undefined, branchDims ? branchDims.H : undefined);
@@ -581,6 +572,7 @@ function normalizeRows(allPageData, drawingNames) {
               else if (stBaseKey === 'rect-endcap' && RECT_ENDCAP_SHOP_DEFAULTS[mw2] != null) _soh = RECT_ENDCAP_SHOP_DEFAULTS[mw2];
               else if (stBaseKey === 'rect-transition' && RECT_TRANSITION_SHOP_DEFAULTS[mw2] != null) _soh = RECT_TRANSITION_SHOP_DEFAULTS[mw2];
               else if (stBaseKey === 'rectTap' && RECT_TAP_SHOP_DEFAULTS[mw2] != null) _soh = RECT_TAP_SHOP_DEFAULTS[mw2];
+              else if (stBaseKey === 'rect-45el' && RECT_45EL_SHOP_DEFAULTS[mw2] != null) _soh = RECT_45EL_SHOP_DEFAULTS[mw2];
               else {
                 const perim2 = 2 * (mainDims.W + mainDims.H);
                 let pcM2 = 168;

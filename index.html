@@ -968,7 +968,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_LATERAL_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -4316,9 +4316,6 @@ function pbRow(item, sectionId) {
     else if (activeKey === 'rect-flex-conn' && RECT_FLEX_CONN_DEFAULTS[mwMax] != null) {
       autoCalcMc = RECT_FLEX_CONN_DEFAULTS[mwMax];
     }
-    // 45° Lateral: flat all-in pricing
-    else if (activeKey === 'rect-lateral' && RECT_LATERAL_DEFAULTS[mwMax] != null) {
-      autoCalcMc = RECT_LATERAL_DEFAULTS[mwMax];
     } else {
       autoCalcMc = calcRectFittingRawCost(activeKey, mwSampleW, mwSampleH, gauge || '26');
       // Add liner adder to fitting auto-calc when toggle active
@@ -4395,9 +4392,6 @@ function pbRow(item, sectionId) {
       if (activeKey === 'rect-flex-conn' && RECT_FLEX_CONN_DEFAULTS[mwMaxSub] != null) {
         subAutoMc = RECT_FLEX_CONN_DEFAULTS[mwMaxSub];
       }
-      // 45° Lateral: flat all-in pricing
-      else if (activeKey === 'rect-lateral' && RECT_LATERAL_DEFAULTS[mwMaxSub] != null) {
-        subAutoMc = RECT_LATERAL_DEFAULTS[mwMaxSub];
       } else {
         subAutoMc = calcRectFittingRawCost(activeKey, subW, subH, gauge || '26');
         // Add liner adder to sub-row auto-calc when toggle active
@@ -4421,6 +4415,7 @@ function pbRow(item, sectionId) {
         else if (activeKey === 'rect-endcap' && RECT_ENDCAP_SHOP_DEFAULTS[mwMaxSub] != null) _fsd = RECT_ENDCAP_SHOP_DEFAULTS[mwMaxSub];
         else if (activeKey === 'rect-transition' && RECT_TRANSITION_SHOP_DEFAULTS[mwMaxSub] != null) _fsd = RECT_TRANSITION_SHOP_DEFAULTS[mwMaxSub];
         else if (activeKey === 'rectTap' && RECT_TAP_SHOP_DEFAULTS[mwMaxSub] != null) _fsd = RECT_TAP_SHOP_DEFAULTS[mwMaxSub];
+        else if (activeKey === 'rect-45el' && RECT_45EL_SHOP_DEFAULTS[mwMaxSub] != null) _fsd = RECT_45EL_SHOP_DEFAULTS[mwMaxSub];
         if (_fsd != null) { subShopAdder = _fsd; subShopIsDefault = true; }
       }
       var subTotalLh = getTotalLaborHrs(subLhKey);

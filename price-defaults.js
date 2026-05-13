@@ -357,19 +357,6 @@ export const RECT_TAP_SHOP_DEFAULTS = {
   30: 46.28,   // IKO Large
 };
 
-// ── Rect 45° Lateral flat pricing ($/EA by min-width class) ────────
-// Flat total price (metal+liner+shop all-in), no SA auto-calc
-// From Immad: Small=$40, Med=$57.50 (interpolated), Large=$75
-export const RECT_LATERAL_DEFAULTS = {
-  6:  40.00,   // Small
-  8:  40.00,   // Small
-  10: 44.50,   // Med (interpolated)
-  12: 48.75,   // Med
-  16: 57.50,   // Med
-  20: 62.50,   // Large (interpolated)
-  24: 67.50,   // Large
-  30: 75.00,   // Large
-};
 
 // ── Rectangular flex connector defaults ($/EA by min-width class) ────
 // Flat vendor/shop pricing, no SA formula. Scaled from $25 avg at 11-12" class.
@@ -591,4 +578,18 @@ export const RECT_DUCT_SHOP_DEFAULTS = {
   120: 54.05,   // XL (>96")
   144: 54.05,   // XL
   168: 54.05,   // XL
+};
+
+// ── Rect 45° Elbow shop overhead defaults ($/EA by min-width class) ──
+// From Immad: Small=$40, Med=$57.50 (interpolated), Large=$75
+// Shop OH = total - SA metal - SA liner (floor at $0)
+export const RECT_45EL_SHOP_DEFAULTS = {
+  6:  37.75,
+  8:  35.99,
+  10: 38.24,
+  12: 39.73,   // 24x12 → $4.61 metal + $4.41 liner + $39.73 shop = $48.75
+  16: 42.14,
+  20: 39.12,
+  24: 34.44,
+  30: 26.16,
 };
