@@ -3561,7 +3561,7 @@ const PRICE_BOOK_TABS = {
         { key: 'spiral-starting-collar', snapKey: 'snaplock-starting-collar', label: 'Starting Collar', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
 
         { key: 'spiral-flex-conn', snapKey: 'snaplock-flex-conn', label: 'Flex Connector', sizes: [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24] },
-        { key: 'spiral-tap', snapKey: 'snaplock-tap', label: 'Saddle Tap', sizePairs: true, sizes: [6, 8, 9, 10, 12, 14] },
+        { key: 'spiral-tap', snapKey: 'snaplock-tap', label: 'Saddle Tap', sizePairs: true, sizes: [8, 10, 12, 14, 16, 18, 20] },
 
       ]},
       { id: 'round-duct', hasGauge: true, title: 'Ductwork', toggleType: true, items: [
@@ -3749,6 +3749,11 @@ function getMaterialForGauge(key, gauge) {
   if (def && def[gauge] != null) return def[gauge];
   var slDef = SNAPLOCK_DEFAULTS[key];
   if (slDef && slDef[gauge] != null) return slDef[gauge];
+  // Saddle tap defaults
+  var stDef = SPIRAL_TAP_DEFAULTS[key];
+  if (stDef && stDef[gauge] != null) return stDef[gauge];
+  var sltDef = SNAPLOCK_TAP_DEFAULTS[key];
+  if (sltDef && sltDef[gauge] != null) return sltDef[gauge];
   return null;
 }
 

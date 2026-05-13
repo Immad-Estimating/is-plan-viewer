@@ -437,24 +437,24 @@ export const LABOR_DEFAULTS = {
 };
 
 // ── Spiral Saddle Tap pricing (exposed, $/EA by branch×main) ─────────
-// Key format: spiral-tap-{branch}x{main}
+// Key format: spiral-tap-{main}x{branch} (matches Price Book pair key pattern)
 export const SPIRAL_TAP_DEFAULTS = {
   'spiral-tap-8x8':   { '26': 14.51 },  // General Metals
-  'spiral-tap-6x10':  { '26': 12.45 },  // General Metals
-  'spiral-tap-8x10':  { '26': 8.50 },   // Hercules
-  'spiral-tap-9x10':  { '26': 15.08 },  // General Metals
+  'spiral-tap-10x6':  { '26': 12.45 },  // General Metals
+  'spiral-tap-10x8':  { '26': 8.50 },   // Hercules
+  'spiral-tap-10x9':  { '26': 15.08 },  // General Metals
   'spiral-tap-10x10': { '26': 15.47 },  // General Metals
-  'spiral-tap-8x12':  { '26': 17.50 },  // Hercules
-  'spiral-tap-10x12': { '26': 10.75 },  // Hercules
+  'spiral-tap-12x8':  { '26': 17.50 },  // Hercules
+  'spiral-tap-12x10': { '26': 10.75 },  // Hercules
   'spiral-tap-12x12': { '26': 16.89 },  // General Metals
-  'spiral-tap-8x14':  { '26': 14.51 },  // General Metals
-  'spiral-tap-12x14': { '26': 13.90 },  // Hercules
-  'spiral-tap-12x16': { '26': 16.90 },  // General Metals
-  'spiral-tap-14x16': { '26': 15.60 },  // Hercules
-  'spiral-tap-12x18': { '26': 16.89 },  // General Metals
-  'spiral-tap-14x18': { '26': 22.46 },  // General Metals
-  'spiral-tap-10x20': { '26': 15.47 },  // General Metals
-  'spiral-tap-12x20': { '26': 16.89 },  // General Metals
+  'spiral-tap-14x8':  { '26': 14.51 },  // General Metals
+  'spiral-tap-14x12': { '26': 13.90 },  // Hercules
+  'spiral-tap-16x12': { '26': 16.90 },  // General Metals
+  'spiral-tap-16x14': { '26': 15.60 },  // Hercules
+  'spiral-tap-18x12': { '26': 16.89 },  // General Metals
+  'spiral-tap-18x14': { '26': 22.46 },  // General Metals
+  'spiral-tap-20x10': { '26': 15.47 },  // General Metals
+  'spiral-tap-20x12': { '26': 16.89 },  // General Metals
   // Rectangular branch saddle taps on spiral main
   'spiral-tap-12x10on12': { '26': 16.89 },  // General Metals
   'spiral-tap-12x10on14': { '26': 16.90 },  // General Metals
@@ -463,22 +463,22 @@ export const SPIRAL_TAP_DEFAULTS = {
 // ── Snaplock Saddle Tap pricing (unexposed, $/EA by branch×main) ─────
 // Most have no vendor pricing yet — placeholders for manual entry
 export const SNAPLOCK_TAP_DEFAULTS = {
-  'snaplock-tap-6x10':  {},  // no pricing
+  'snaplock-tap-10x6':  {},  // no pricing
   'snaplock-tap-8x8':   {},  // no pricing
-  'snaplock-tap-8x10':  { '26': 17.50 },  // Hercules
-  'snaplock-tap-8x12':  { '26': 13.93 },  // General Metals
-  'snaplock-tap-8x14':  {},  // no pricing
-  'snaplock-tap-9x10':  {},  // no pricing
+  'snaplock-tap-10x8':  { '26': 17.50 },  // Hercules
+  'snaplock-tap-12x8':  { '26': 13.93 },  // General Metals
+  'snaplock-tap-14x8':  {},  // no pricing
+  'snaplock-tap-10x9':  {},  // no pricing
   'snaplock-tap-10x10': {},  // no pricing
-  'snaplock-tap-10x12': {},  // no pricing
-  'snaplock-tap-10x20': {},  // no pricing
+  'snaplock-tap-12x10': {},  // no pricing
+  'snaplock-tap-20x10': {},  // no pricing
   'snaplock-tap-12x12': {},  // no pricing
-  'snaplock-tap-12x14': {},  // no pricing
-  'snaplock-tap-12x16': {},  // no pricing
-  'snaplock-tap-12x18': {},  // no pricing
-  'snaplock-tap-12x20': {},  // no pricing
-  'snaplock-tap-14x16': {},  // no pricing
-  'snaplock-tap-14x18': {},  // no pricing
+  'snaplock-tap-14x12': {},  // no pricing
+  'snaplock-tap-16x12': {},  // no pricing
+  'snaplock-tap-18x12': {},  // no pricing
+  'snaplock-tap-20x12': {},  // no pricing
+  'snaplock-tap-16x14': {},  // no pricing
+  'snaplock-tap-18x14': {},  // no pricing
   // Rectangular branch
   'snaplock-tap-12x10on12': {},  // no pricing
   'snaplock-tap-12x10on14': {},  // no pricing
