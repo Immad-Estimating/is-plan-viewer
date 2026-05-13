@@ -968,7 +968,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -2744,6 +2744,8 @@ const FITTINGS_BY_SHAPE = {
     { type: 'endcap', label: '▫ Cap', title: 'End Cap' },
     { type: 'transition', label: '◇ Trans', title: 'Rect to Round Transition' },
     { type: 'boot', label: '▣ Boot', title: 'Register Boot / Supply Can' },
+    { type: 'flex-conn', label: '≈ Flex', title: 'Flex Connector' },
+    { type: 'plenum', label: '□ Plen', title: 'Plenum (W×H × Length)' },
   ],
   oval: [
     { type: '90el', label: '↱ 90°', title: '90° Elbow (1)' },
@@ -3519,6 +3521,7 @@ const PRICE_BOOK_TABS = {
         { key: 'rect-endcap', label: 'End Cap' },
         { key: 'rect-transition', label: 'Rect to Round Trans.' },
         { key: 'rect-flex-conn', label: 'Flex Connector' },
+        { key: 'rect-plenum', label: 'Plenum' },
       ]},
       { id: 'rect-duct', hasGauge: true, title: 'Ductwork (Auto-Calc)', isRectDuctCalc: true, items: [
         { key: 'duct-rect', label: 'Rect Duct (per ft)' },
@@ -4295,7 +4298,8 @@ function pbRow(item, sectionId) {
   }
   var gaugeKey = gauge ? activeKey + '-g' + gauge : activeKey;
   var isRectFit = sectionId === 'rect-fit';
-  var hasSizes = (item.sizes && item.sizes.length > 0) || isRectFit;
+  var isPlenum = activeKey === 'rect-plenum';
+  var hasSizes = ((item.sizes && item.sizes.length > 0) || isRectFit) && !isPlenum;
   var hasPairs = item.sizePairs && item.sizes && item.sizes.length > 0;
   var isExpanded = hasSizes && !!pbExpandedItems[activeKey];
   var arrow = hasSizes ? (isExpanded ? '\u25BC ' : '\u25B6 ') : '';
@@ -4316,8 +4320,12 @@ function pbRow(item, sectionId) {
     mcKey = activeKey + '-mw' + mwMax + (gauge ? '-g' + gauge : '');
     lhKey = activeKey + '-mw' + mwMax;
     // Auto-calc raw material from SA × gauge weight × $/lb
+    // Plenum: flat pricing, no size scaling
+    if (isPlenum) {
+      autoCalcMc = RECT_PLENUM_DEFAULT;
+    }
     // Flex connector: flat pricing from defaults, no SA calc
-    if (activeKey === 'rect-flex-conn' && RECT_FLEX_CONN_DEFAULTS[mwMax] != null) {
+    else if (activeKey === 'rect-flex-conn' && RECT_FLEX_CONN_DEFAULTS[mwMax] != null) {
       autoCalcMc = RECT_FLEX_CONN_DEFAULTS[mwMax];
     } else {
       autoCalcMc = calcRectFittingRawCost(activeKey, mwSampleW, mwSampleH, gauge || '26');
@@ -8350,7 +8358,7 @@ const FITTING_NAMES = {
   'tee': 'Tee-Wye', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral', 'boot': 'Boot',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
   'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
-  'rectTap': 'Rect Tap',
+  'rectTap': 'Rect Tap', 'flex-conn': 'Flex Connector', 'plenum': 'Plenum',
   'hvac_component': 'HVAC Component'
 };
 

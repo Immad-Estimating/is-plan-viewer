@@ -297,7 +297,11 @@ export const RECT_FITTING_REF = {
   'rect-endcap':     { cuts: 1 },
   'rect-transition': { cuts: 4 },
   'rect-flex-conn':  { cuts: 0 },
+  'rect-plenum':     { cuts: 0 },
 };
+
+// ── Plenum default pricing (flat $/EA, no size scaling) ─────────────
+export const RECT_PLENUM_DEFAULT = 125.00;
 
 // ── Rectangular flex connector defaults ($/EA by min-width class) ────
 // Flat vendor/shop pricing, no SA formula. Scaled from $25 avg at 11-12" class.
