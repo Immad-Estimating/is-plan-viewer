@@ -435,3 +435,51 @@ export const LABOR_DEFAULTS = {
   // 'rect-volume-damper': { rough: 0 },
   // 'rect-fire-damper':   { rough: 0 },
 };
+
+// ── Spiral Saddle Tap pricing (exposed, $/EA by branch×main) ─────────
+// Key format: spiral-tap-{branch}x{main}
+export const SPIRAL_TAP_DEFAULTS = {
+  'spiral-tap-8x8':   { '26': 14.51 },  // General Metals
+  'spiral-tap-6x10':  { '26': 12.45 },  // General Metals
+  'spiral-tap-8x10':  { '26': 8.50 },   // Hercules
+  'spiral-tap-9x10':  { '26': 15.08 },  // General Metals
+  'spiral-tap-10x10': { '26': 15.47 },  // General Metals
+  'spiral-tap-8x12':  { '26': 17.50 },  // Hercules
+  'spiral-tap-10x12': { '26': 10.75 },  // Hercules
+  'spiral-tap-12x12': { '26': 16.89 },  // General Metals
+  'spiral-tap-8x14':  { '26': 14.51 },  // General Metals
+  'spiral-tap-12x14': { '26': 13.90 },  // Hercules
+  'spiral-tap-12x16': { '26': 16.90 },  // General Metals
+  'spiral-tap-14x16': { '26': 15.60 },  // Hercules
+  'spiral-tap-12x18': { '26': 16.89 },  // General Metals
+  'spiral-tap-14x18': { '26': 22.46 },  // General Metals
+  'spiral-tap-10x20': { '26': 15.47 },  // General Metals
+  'spiral-tap-12x20': { '26': 16.89 },  // General Metals
+  // Rectangular branch saddle taps on spiral main
+  'spiral-tap-12x10on12': { '26': 16.89 },  // General Metals
+  'spiral-tap-12x10on14': { '26': 16.90 },  // General Metals
+};
+
+// ── Snaplock Saddle Tap pricing (unexposed, $/EA by branch×main) ─────
+// Most have no vendor pricing yet — placeholders for manual entry
+export const SNAPLOCK_TAP_DEFAULTS = {
+  'snaplock-tap-6x10':  {},  // no pricing
+  'snaplock-tap-8x8':   {},  // no pricing
+  'snaplock-tap-8x10':  { '26': 17.50 },  // Hercules
+  'snaplock-tap-8x12':  { '26': 13.93 },  // General Metals
+  'snaplock-tap-8x14':  {},  // no pricing
+  'snaplock-tap-9x10':  {},  // no pricing
+  'snaplock-tap-10x10': {},  // no pricing
+  'snaplock-tap-10x12': {},  // no pricing
+  'snaplock-tap-10x20': {},  // no pricing
+  'snaplock-tap-12x12': {},  // no pricing
+  'snaplock-tap-12x14': {},  // no pricing
+  'snaplock-tap-12x16': {},  // no pricing
+  'snaplock-tap-12x18': {},  // no pricing
+  'snaplock-tap-12x20': {},  // no pricing
+  'snaplock-tap-14x16': {},  // no pricing
+  'snaplock-tap-14x18': {},  // no pricing
+  // Rectangular branch
+  'snaplock-tap-12x10on12': {},  // no pricing
+  'snaplock-tap-12x10on14': {},  // no pricing
+};

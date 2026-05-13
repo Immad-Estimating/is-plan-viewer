@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SNAPLOCK_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, SHOP_DEFAULTS } from './price-defaults.js';
+import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, SHOP_DEFAULTS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -366,6 +366,13 @@ function normalizeRows(allPageData, drawingNames) {
       }
       if (!matCost && SNAPLOCK_DEFAULTS[sizeKey] && SNAPLOCK_DEFAULTS[sizeKey]['26'] != null) {
         matCost = SNAPLOCK_DEFAULTS[sizeKey]['26'];
+      }
+      // Saddle tap fallback: check spiral and snaplock tap defaults
+      if (!matCost && SPIRAL_TAP_DEFAULTS[sizeKey] && SPIRAL_TAP_DEFAULTS[sizeKey]['26'] != null) {
+        matCost = SPIRAL_TAP_DEFAULTS[sizeKey]['26'];
+      }
+      if (!matCost && SNAPLOCK_TAP_DEFAULTS[sizeKey] && SNAPLOCK_TAP_DEFAULTS[sizeKey]['26'] != null) {
+        matCost = SNAPLOCK_TAP_DEFAULTS[sizeKey]['26'];
       }
       // Rect fitting fallback: min-width-class price book override → SA-based auto-calc
       if (!matCost && shape === 'rect' && RECT_FITTING_SA[baseKey]) {
