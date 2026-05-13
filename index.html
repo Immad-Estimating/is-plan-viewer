@@ -4572,6 +4572,8 @@ function renderShopSettingsSection() {
   var html = '';
   html += '<tr style="color:#a0a0c0;font-size:10px;text-transform:uppercase;letter-spacing:0.3px"><th style="padding:4px;text-align:left">Setting</th><th colspan="2" style="padding:4px;text-align:right">Value</th></tr>';
   html += shopSettingInput('sheetMetalPricePerLb', s.sheetMetalPricePerLb || '', 'Sheet Metal Price', '$/lb', '#00ff88');
+  html += shopSettingInput('linerPricePerSF', s.linerPricePerSF || '', 'Duct Liner', '$/SF', '#ff6b6b');
+  html += shopSettingInput('wrapInsulationPerSF', s.wrapInsulationPerSF || '', 'Wrap Insulation', '$/SF', '#ffa94d');
   // Live preview
   html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3);background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:6px 4px;font-size:10px;color:#a0a0c0">';
   var preview = calcRectDuctRawPerLF(72, '26');
@@ -4581,6 +4583,14 @@ function renderShopSettingsSection() {
     html += ' \u2192 <span style="color:#00ff88">$' + preview.rawMaterialPerLF.toFixed(2) + ' raw/LF</span>';
   }
   html += '</td></tr>';
+  // Liner preview
+  if (s.linerPricePerSF > 0) {
+    var linerPreview = (72/12) * s.linerPricePerSF; // 72" perim = 6ft × $/SF
+    html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3);background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:4px;font-size:10px;color:#a0a0c0">';
+    html += '<span style="color:#666">Liner @ 72\u2033 perim =</span> <span style="color:#ff6b6b">$' + linerPreview.toFixed(2) + '/LF</span>';
+    if (preview.rawMaterialPerLF > 0) html += ' \u2192 <span style="color:#e0e0e0">$' + (preview.rawMaterialPerLF + linerPreview).toFixed(2) + ' total/LF</span>';
+    html += '</td></tr>';
+  }
   // SMACNA gauge weight reference
   html += '<tr style="background:rgba(15,52,96,0.1)"><td colspan="3" style="padding:4px;font-size:9px;color:#666">';
   html += 'SMACNA lbs/SF: 26ga=1.031 | 24ga=1.406 | 22ga=1.781 | 20ga=2.156 | 18ga=2.781';
@@ -4838,7 +4848,8 @@ async function saveCurrentPageData() {
     costGroup: m.costGroup || null,
     costOverride: m.costOverride || false,
     gauge: m.gauge || null,
-    systemSymbol: m.systemSymbol || null
+    systemSymbol: m.systemSymbol || null,
+    lined: m.lined || false
   }));
 
   const fittings = (pageFittings[pageNum] || []).map(f => ({
@@ -4851,7 +4862,8 @@ async function saveCurrentPageData() {
     costGroup: f.costGroup || null,
     costOverride: f.costOverride || false,
     gauge: f.gauge || null,
-    systemSymbol: f.systemSymbol || null
+    systemSymbol: f.systemSymbol || null,
+    lined: f.lined || false
   }));
 
   const stacks = (pageStacks[pageNum] || []).map(s => ({
@@ -6230,6 +6242,7 @@ function finishMeasurement() {
 
   if (ductDrawMode) {
     meas.duct = getDuctDrawConfig();
+    meas.lined = (meas.duct.liner > 0);
     const _dcd = getDuctCostDefaults(meas.duct);
     meas.phase = _dcd.phase;
     meas.materialCostPerFt = _dcd.materialCostPerFt;

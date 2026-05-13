@@ -378,6 +378,8 @@ export const DUCT_WEIGHT_PER_LF = {
 // ── Shop settings defaults ───────────────────────────────────────────
 export const SHOP_DEFAULTS = {
   sheetMetalPricePerLb: 0.90,
+  linerPricePerSF: 0,       // duct liner $/SF — user sets in Price Book shop settings
+  wrapInsulationPerSF: 0,   // external wrap insulation $/SF
 };
 
 // ── Labor categories ─────────────────────────────────────────────────

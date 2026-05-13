@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, SHOP_DEFAULTS } from './price-defaults.js';
+import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -116,6 +116,7 @@ const GROUP_DIMENSIONS = [
   { key: 'phase',     label: 'Phase',          icon: '🏷️', extract: r => r.phase || 'unassigned' },
   { key: 'costGroup', label: 'Cost Group',     icon: '💰', extract: r => r.costGroup || 'ungrouped' },
   { key: 'gauge',     label: 'Gauge',          icon: '🔩', extract: r => r.gauge || 'default' },
+  { key: 'lined',     label: 'Lined',          icon: '🧱', extract: r => r._lined ? 'Lined' : 'Unlined' },
   { key: 'laborCat',  label: 'Labor Category', icon: '👷', extract: r => r._laborCatLabel || 'unassigned' },
   { key: 'system',    label: 'System Tag',       icon: '⚙️', extract: r => r.systemSymbol || 'unassigned' },
   { key: 'page',      label: 'Page',           icon: '📄', extract: r => 'Pg ' + r._page },
@@ -300,9 +301,19 @@ function normalizeRows(allPageData, drawingNames) {
       const lengthFt = (m.distance ? m.distance.value || 0 : 0) + dropFt;
       const shape = m.duct.type || 'round';
       const matPerFt = m.materialCostPerFt || 0;
+      // Liner adder: if duct is lined, add liner $/SF × perimeter in feet per LF
+      let linerPerFt = 0;
+      if (m.lined && m.duct.liner > 0) {
+        const shop = getCompilerShopSettings();
+        const dims = (m.duct.dims || '').split('x');
+        let perimFt = 0;
+        if (dims.length === 2) { perimFt = (2 * (parseFloat(dims[0]) + parseFloat(dims[1]))) / 12; }
+        else if (dims.length === 1) { perimFt = (Math.PI * parseFloat(dims[0])) / 12; }
+        linerPerFt = perimFt * (shop.linerPricePerSF || 0);
+      }
       const rate = m.laborRate || labRate;
       const labHrsPerFt = m.laborHrsPerFt || 0;
-      const matCost = matPerFt * lengthFt;
+      const matCost = (matPerFt + linerPerFt) * lengthFt;
       const laborHrs = labHrsPerFt * lengthFt;
       const laborCost = laborHrs * rate;
 
@@ -340,6 +351,7 @@ function normalizeRows(allPageData, drawingNames) {
         phase: m.phase || null, costGroup: m.costGroup || null, gauge: m.gauge || null,
         systemSymbol: m.systemSymbol || null,
         _sourceType: 'measurement', _sourceId: m.id,
+        _lined: m.lined || false, _linerPerFt: linerPerFt,
       });
     }
 
