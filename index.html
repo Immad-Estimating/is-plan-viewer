@@ -3734,18 +3734,6 @@ function calcRectDuctRawPerLF(perimeterIn, gauge) {
   };
 }
 
-// Calculate rect duct liner/insulation adders per LF
-function calcRectDuctAddersPerLF(widthIn, heightIn) {
-  var shop = getShopSettings();
-  var perimeterFt = (2 * widthIn + 2 * heightIn) / 12;
-  return {
-    linerPerLF: perimeterFt * shop.linerPricePerSF,
-    wrapPerLF: perimeterFt * shop.wrapInsulationPerSF,
-    nosingPerLF: 0 // nosing is per opening, not per LF — applied at fitting level
-  };
-}
-
-
 // SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS — imported from price-defaults.js
 
 function getGaugesForSection(sectionId) {
@@ -8655,12 +8643,13 @@ window.selectFittingType = function(type) {
   });
   document.getElementById('fpPreview').textContent = FITTING_NAMES[type] || type;
   // Show/hide sizeB based on type
-  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap'].includes(type);
+  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap','plenum'].includes(type);
   document.getElementById('fpSizeB').style.display = needsB ? '' : 'none';
   document.getElementById('fpSizeBLabel').style.display = needsB ? '' : 'none';
   // Update B label based on fitting type
   const isReducerType = ['reducer','eccReducer'].includes(type);
-  document.getElementById('fpSizeBLabel').textContent = isReducerType ? 'Out:' : 'Br:';
+  const isPlenumType = type === 'plenum';
+  document.getElementById('fpSizeBLabel').textContent = isPlenumType ? 'L:' : (isReducerType ? 'Out:' : 'Br:');
   // Clear sizeB when switching to non-B fitting
   if (!needsB) document.getElementById('fpSizeB').value = '';
   updateConfigArea();
