@@ -8927,10 +8927,18 @@ window.setStackPaletteShape = function(shape) {
   const ductRectInputs = document.getElementById('spInputsDuctRect');
   const flexDuctInputs = document.getElementById('spInputsFlexDuct');
   const isFlex = shape === 'flex';
+  const isRect = (shape === 'rect' || shape === 'oval');
   if (fittingInputs) fittingInputs.style.display = isFlex ? 'none' : 'flex';
   if (ductRoundInputs) ductRoundInputs.style.display = 'none';
   if (ductRectInputs) ductRectInputs.style.display = 'none';
   if (flexDuctInputs) flexDuctInputs.style.display = 'none';
+  // Update sizeA default for shape change
+  const spA = document.getElementById('spSizeA');
+  if (spA) {
+    spA.placeholder = isRect ? '24x12' : '14';
+    if (isRect && !spA.value.includes('x')) spA.value = '24x12';
+    else if (!isRect && spA.value.includes('x')) spA.value = '14';
+  }
   renderStackPaletteGrid();
 };
 
@@ -8978,16 +8986,15 @@ window.selectStackPaletteType = function(type) {
     b.style.color = isActive ? '#e94560' : '#a0a0c0';
     b.style.background = isActive ? 'rgba(233,69,96,0.1)' : '#1a1a2e';
   });
-  // Toggle input panels: fitting inputs vs duct run inputs
   const fittingInputs = document.getElementById('spInputsFitting');
   const ductRoundInputs = document.getElementById('spInputsDuctRound');
   const ductRectInputs = document.getElementById('spInputsDuctRect');
   const flexDuctInputs = document.getElementById('spInputsFlexDuct');
   const isFlex = (type === 'flexrun');
+  const shape = window._stackPaletteShape || 'round';
   if (fittingInputs) fittingInputs.style.display = (type === 'ductrun' || isFlex) ? 'none' : 'flex';
   if (flexDuctInputs) flexDuctInputs.style.display = isFlex ? 'block' : 'none';
   if (ductRoundInputs && ductRectInputs) {
-    const shape = window._stackPaletteShape || 'round';
     if (type === 'ductrun' && shape === 'round') {
       ductRoundInputs.style.display = 'block';
       ductRectInputs.style.display = 'none';
@@ -8998,6 +9005,27 @@ window.selectStackPaletteType = function(type) {
       ductRoundInputs.style.display = 'none';
       ductRectInputs.style.display = 'none';
     }
+  }
+  // Update sizeA/B labels and defaults based on shape + fitting type
+  const spA = document.getElementById('spSizeA');
+  const spB = document.getElementById('spSizeB');
+  const spBLabel = fittingInputs ? fittingInputs.querySelector('label:nth-of-type(2)') : null;
+  const isRect = (shape === 'rect' || shape === 'oval');
+  const needsB = ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap','plenum','tap'].includes(type);
+  const isReducerType = ['reducer','eccReducer'].includes(type);
+  const isPlenumType = type === 'plenum';
+  if (spA) {
+    spA.placeholder = isRect ? '24x12' : '14';
+    if (isRect && !spA.value.includes('x')) spA.value = '24x12';
+    else if (!isRect && spA.value.includes('x')) spA.value = '14';
+  }
+  if (spB) {
+    spB.style.display = needsB ? '' : 'none';
+    spB.placeholder = isRect ? '18x10' : '10';
+  }
+  if (spBLabel) {
+    spBLabel.style.display = needsB ? '' : 'none';
+    spBLabel.textContent = isPlenumType ? 'L:' : (isReducerType ? 'Out:' : 'Br:');
   }
 };
 
