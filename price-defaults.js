@@ -331,6 +331,19 @@ export const RECT_ENDCAP_SHOP_DEFAULTS = {
   30: 26.25,
 };
 
+// ── Sq-to-round transition shop overhead defaults ($/EA by min-width class) ─
+// From Immad's pricing: Small(<33")=$40, Med(48-96")=$60, Lg(>96")=$80
+export const RECT_TRANSITION_SHOP_DEFAULTS = {
+  6:  37.18,   // Small
+  8:  37.18,   // Small
+  10: 45.42,   // Medium
+  12: 45.42,   // Medium
+  16: 45.42,   // Medium
+  20: 45.13,   // Large
+  24: 45.13,   // Large
+  30: 45.13,   // Large
+};
+
 // ── Rectangular flex connector defaults ($/EA by min-width class) ────
 // Flat vendor/shop pricing, no SA formula. Scaled from $25 avg at 11-12" class.
 export const RECT_FLEX_CONN_DEFAULTS = {
