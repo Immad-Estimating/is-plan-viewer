@@ -430,25 +430,35 @@ function normalizeRows(allPageData, drawingNames) {
                                          branchDims ? branchDims.H : undefined);
             const shop = getCompilerShopSettings();
             matCost = sa * getGaugeWeightPerSF(gauge) * (shop.sheetMetalPricePerLb || 0);
-            // Add liner for lined fittings
-            if (f.lined) {
-              const linerOpt = LINER_OPTIONS.find(o => o.thickness === (f.linerThickness || 1.5)) || LINER_OPTIONS[0];
-              const linerEntry = _priceBookCache ? _priceBookCache[linerOpt.key] : null;
-              const linerSF = (linerEntry && linerEntry.materialCost != null) ? linerEntry.materialCost : 0;
-              matCost += sa * linerSF;
+            // Add liner: if fitting is explicitly lined OR if a liner option has pricing in PB
+            const _linerOpt = (f.lined && f.linerThickness)
+              ? (LINER_OPTIONS.find(o => o.thickness === f.linerThickness) || LINER_OPTIONS[0])
+              : LINER_OPTIONS[LINER_OPTIONS.length - 1]; // default to largest (1.5")
+            const _linerEntry = _priceBookCache ? _priceBookCache[_linerOpt.key] : null;
+            const _linerSF = (_linerEntry && _linerEntry.materialCost != null) ? _linerEntry.materialCost : 0;
+            if (_linerSF > 0) {
+              matCost += sa * _linerSF;
             }
-            // Add fitting-specific shop overhead default
-            let _fittingShopDefault = null;
-            if ((baseKey === 'rect-reducer' || baseKey === 'rect-eccReducer') && RECT_REDUCER_SHOP_DEFAULTS[mwMax] != null) _fittingShopDefault = RECT_REDUCER_SHOP_DEFAULTS[mwMax];
-            else if (baseKey === 'rect-endcap' && RECT_ENDCAP_SHOP_DEFAULTS[mwMax] != null) _fittingShopDefault = RECT_ENDCAP_SHOP_DEFAULTS[mwMax];
-            else if (baseKey === 'rect-transition' && RECT_TRANSITION_SHOP_DEFAULTS[mwMax] != null) _fittingShopDefault = RECT_TRANSITION_SHOP_DEFAULTS[mwMax];
-            else if (baseKey === 'rectTap' && RECT_TAP_SHOP_DEFAULTS[mwMax] != null) _fittingShopDefault = RECT_TAP_SHOP_DEFAULTS[mwMax];
-            if (_fittingShopDefault != null) {
-              const shopKey = baseKey + '-mw' + mwMax + '-shop';
-              const shopEntry = _priceBookCache && _priceBookCache[shopKey];
-              const shopOH = (shopEntry && shopEntry.materialCost != null) ? shopEntry.materialCost : _fittingShopDefault;
-              matCost += shopOH;
+            // Add fitting-specific shop overhead (check PB override first, then defaults)
+            const _shopKey = baseKey + '-mw' + mwMax + '-shop';
+            const _shopEntry = _priceBookCache && _priceBookCache[_shopKey];
+            let _shopOH = (_shopEntry && _shopEntry.materialCost != null) ? _shopEntry.materialCost : null;
+            // Fitting-specific defaults
+            if (_shopOH == null) {
+              if ((baseKey === 'rect-reducer' || baseKey === 'rect-eccReducer') && RECT_REDUCER_SHOP_DEFAULTS[mwMax] != null) _shopOH = RECT_REDUCER_SHOP_DEFAULTS[mwMax];
+              else if (baseKey === 'rect-endcap' && RECT_ENDCAP_SHOP_DEFAULTS[mwMax] != null) _shopOH = RECT_ENDCAP_SHOP_DEFAULTS[mwMax];
+              else if (baseKey === 'rect-transition' && RECT_TRANSITION_SHOP_DEFAULTS[mwMax] != null) _shopOH = RECT_TRANSITION_SHOP_DEFAULTS[mwMax];
+              else if (baseKey === 'rectTap' && RECT_TAP_SHOP_DEFAULTS[mwMax] != null) _shopOH = RECT_TAP_SHOP_DEFAULTS[mwMax];
+              // Fallback: use duct shop overhead for fittings without specific defaults
+              // (elbows, tees, wyes, laterals, sq-wing) — uses the perim-class duct rate
+              else {
+                const perim = 2 * (mainDims.W + mainDims.H);
+                let pcMax = 168;
+                for (const pc of RECT_PERIM_CLASSES) { if (perim <= pc.maxPerim) { pcMax = pc.maxPerim; break; } }
+                if (RECT_DUCT_SHOP_DEFAULTS[pcMax] != null) _shopOH = RECT_DUCT_SHOP_DEFAULTS[pcMax];
+              }
             }
+            if (_shopOH != null && _shopOH > 0) matCost += _shopOH;
           }
         }
       }
