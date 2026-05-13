@@ -968,7 +968,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -4416,7 +4416,13 @@ function pbRow(item, sectionId) {
       var subMc = (subEntry && subEntry.materialCost != null) ? subEntry.materialCost : null;
       var subShopKey = subLhKey + '-shop';
       var subShopSaved = priceBookCache ? priceBookCache[subShopKey] : null;
-      var subShopAdder = subShopSaved ? subShopSaved.materialCost : null;
+      var subShopAdder = (subShopSaved && subShopSaved.materialCost != null) ? subShopSaved.materialCost : null;
+      // Reducer/eccReducer: auto-fill shop adder from defaults
+      var subShopIsDefault = false;
+      if (subShopAdder == null && (activeKey === 'rect-reducer' || activeKey === 'rect-eccReducer') && RECT_REDUCER_SHOP_DEFAULTS[mwMaxSub] != null) {
+        subShopAdder = RECT_REDUCER_SHOP_DEFAULTS[mwMaxSub];
+        subShopIsDefault = true;
+      }
       var subTotalLh = getTotalLaborHrs(subLhKey);
       var isActiveMW = (mi === (pbMinWidthClass[sectionId] || 0));
       var rowBg = isActiveMW ? 'background:rgba(233,69,96,0.12)' : 'background:rgba(15,52,96,0.15)';
@@ -4433,7 +4439,9 @@ function pbRow(item, sectionId) {
         html += pbInput(subMcKey, 'materialCost', subMc);
       }
       html += '</td>';
-      html += '<td style="padding:3px 2px"><input type="text" value="' + (subShopAdder != null ? subShopAdder : '') + '" placeholder="—" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:#ffaa00;padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" onchange="updatePBEntry(\'' + subShopKey + '\',\'materialCost\',this.value)"></td>';
+      var subShopColor = subShopIsDefault ? '#cc8800' : '#ffaa00';
+      var subShopStyle = subShopIsDefault ? 'font-style:italic' : '';
+      html += '<td style="padding:3px 2px"><input type="text" value="' + (subShopAdder != null ? subShopAdder.toFixed(2) : '') + '" placeholder="—" style="width:50px;background:#1a1a2e;border:1px solid #0f3460;color:' + subShopColor + ';padding:3px 4px;border-radius:3px;font-size:11px;text-align:right;' + subShopStyle + '" onchange="updatePBEntry(\'' + subShopKey + '\',\'materialCost\',this.value)" title="' + (subShopIsDefault ? 'Default from pricing log' : '') + '"></td>';
       html += '<td style="padding:3px 2px;text-align:center;cursor:pointer" onclick="event.stopPropagation();toggleRadarChart(\'' + subLhKey + '\',\'fitting\',\'\')">';
       html += '<span style="color:#ffaa00;font-size:11px">' + (subTotalLh > 0 ? subTotalLh.toFixed(2) + 'h' : '—') + '</span>';
       html += ' <span style="color:#555;font-size:9px">▼</span></td>';

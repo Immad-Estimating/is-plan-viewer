@@ -303,6 +303,20 @@ export const RECT_FITTING_REF = {
 // ── Plenum default pricing (flat $/EA, no size scaling) ─────────────
 export const RECT_PLENUM_DEFAULT = 125.00;
 
+// ── Rectangular reducer shop overhead defaults ($/EA by min-width class) ───
+// Back-calculated from Immad's total pricing (total - raw metal - liner)
+// His perim classes: Small(<33")=$35, Med-Sm(33-48")=$40, Med(48-96")=$50, Lg(>96")=$65
+export const RECT_REDUCER_SHOP_DEFAULTS = {
+  6:  31.90,   // Small
+  8:  31.90,   // Small
+  10: 33.33,   // Med-Small
+  12: 32.98,   // Medium
+  16: 32.98,   // Medium
+  20: 32.98,   // Medium
+  24: 25.11,   // Large
+  30: 25.11,   // Large
+};
+
 // ── Rectangular flex connector defaults ($/EA by min-width class) ────
 // Flat vendor/shop pricing, no SA formula. Scaled from $25 avg at 11-12" class.
 export const RECT_FLEX_CONN_DEFAULTS = {

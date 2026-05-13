@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT } from './price-defaults.js';
+import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -429,6 +429,20 @@ function normalizeRows(allPageData, drawingNames) {
                                          branchDims ? branchDims.H : undefined);
             const shop = getCompilerShopSettings();
             matCost = sa * getGaugeWeightPerSF(gauge) * (shop.sheetMetalPricePerLb || 0);
+            // Add liner for lined fittings
+            if (f.lined) {
+              const linerOpt = LINER_OPTIONS.find(o => o.thickness === (f.linerThickness || 1.5)) || LINER_OPTIONS[0];
+              const linerEntry = _priceBookCache ? _priceBookCache[linerOpt.key] : null;
+              const linerSF = (linerEntry && linerEntry.materialCost != null) ? linerEntry.materialCost : 0;
+              matCost += sa * linerSF;
+            }
+            // Add reducer shop overhead default if no Price Book shop override
+            if ((baseKey === 'rect-reducer' || baseKey === 'rect-eccReducer') && RECT_REDUCER_SHOP_DEFAULTS[mwMax] != null) {
+              const shopKey = baseKey + '-mw' + mwMax + '-shop';
+              const shopEntry = _priceBookCache && _priceBookCache[shopKey];
+              const shopOH = (shopEntry && shopEntry.materialCost != null) ? shopEntry.materialCost : RECT_REDUCER_SHOP_DEFAULTS[mwMax];
+              matCost += shopOH;
+            }
           }
         }
       }
