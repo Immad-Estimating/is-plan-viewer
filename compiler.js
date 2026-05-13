@@ -411,8 +411,6 @@ function normalizeRows(allPageData, drawingNames) {
           }
         }
       }
-        }
-      }
       // Rect fitting fallback: min-width-class price book override → SA-based auto-calc
       if (!matCost && shape === 'rect' && RECT_FITTING_SA[baseKey]) {
         const mainDims = parseRectDims(f.sizeA);
