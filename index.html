@@ -4315,7 +4315,6 @@ function pbRow(item, sectionId) {
     // Flex connector: flat pricing from defaults
     else if (activeKey === 'rect-flex-conn' && RECT_FLEX_CONN_DEFAULTS[mwMax] != null) {
       autoCalcMc = RECT_FLEX_CONN_DEFAULTS[mwMax];
-    }
     } else {
       autoCalcMc = calcRectFittingRawCost(activeKey, mwSampleW, mwSampleH, gauge || '26');
       // Add liner adder to fitting auto-calc when toggle active
@@ -4391,7 +4390,6 @@ function pbRow(item, sectionId) {
       // Flex connector: flat pricing from defaults
       if (activeKey === 'rect-flex-conn' && RECT_FLEX_CONN_DEFAULTS[mwMaxSub] != null) {
         subAutoMc = RECT_FLEX_CONN_DEFAULTS[mwMaxSub];
-      }
       } else {
         subAutoMc = calcRectFittingRawCost(activeKey, subW, subH, gauge || '26');
         // Add liner adder to sub-row auto-calc when toggle active
