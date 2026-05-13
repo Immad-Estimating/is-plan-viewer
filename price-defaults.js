@@ -357,6 +357,20 @@ export const RECT_TAP_SHOP_DEFAULTS = {
   30: 46.28,   // IKO Large
 };
 
+// ── Rect 45° Lateral flat pricing ($/EA by min-width class) ────────
+// Flat total price (metal+liner+shop all-in), no SA auto-calc
+// From Immad: Small=$40, Med=$57.50 (interpolated), Large=$75
+export const RECT_LATERAL_DEFAULTS = {
+  6:  40.00,   // Small
+  8:  40.00,   // Small
+  10: 44.50,   // Med (interpolated)
+  12: 48.75,   // Med
+  16: 57.50,   // Med
+  20: 62.50,   // Large (interpolated)
+  24: 67.50,   // Large
+  30: 75.00,   // Large
+};
+
 // ── Rectangular flex connector defaults ($/EA by min-width class) ────
 // Flat vendor/shop pricing, no SA formula. Scaled from $25 avg at 11-12" class.
 export const RECT_FLEX_CONN_DEFAULTS = {
