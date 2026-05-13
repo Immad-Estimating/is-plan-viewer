@@ -317,6 +317,20 @@ export const RECT_REDUCER_SHOP_DEFAULTS = {
   30: 25.11,   // Large
 };
 
+// ── Rectangular end cap shop overhead defaults ($/EA by min-width class) ──
+// Anchored at $25 total for 11-12" class (24x12), ±5% per class step
+// Total = SA metal + SA liner + shop OH
+export const RECT_ENDCAP_SHOP_DEFAULTS = {
+  6:  18.50,
+  8:  19.75,
+  10: 20.75,
+  12: 21.75,   // anchor ($25 total at 24x12)
+  16: 23.00,
+  20: 24.00,
+  24: 25.00,
+  30: 26.25,
+};
+
 // ── Rectangular flex connector defaults ($/EA by min-width class) ────
 // Flat vendor/shop pricing, no SA formula. Scaled from $25 avg at 11-12" class.
 export const RECT_FLEX_CONN_DEFAULTS = {
