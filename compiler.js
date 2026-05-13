@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS } from './price-defaults.js';
+import { SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -389,6 +389,21 @@ function normalizeRows(allPageData, drawingNames) {
       }
       if (!matCost && SNAPLOCK_TAP_DEFAULTS[sizeKey] && SNAPLOCK_TAP_DEFAULTS[sizeKey]['26'] != null) {
         matCost = SNAPLOCK_TAP_DEFAULTS[sizeKey]['26'];
+      }
+      // Rect flex connector fallback: flat pricing from defaults by min-width class
+      if (!matCost && shape === 'rect' && baseKey === 'rect-flex-conn') {
+        const mainDims = parseRectDims(f.sizeA);
+        if (mainDims) {
+          const mwMax = findMinWidthClass(mainDims.W, mainDims.H);
+          const mwKeyG = baseKey + '-mw' + mwMax + '-g' + (f.gauge || '26');
+          const mwKey  = baseKey + '-mw' + mwMax;
+          const mwEntry = _priceBookCache && (_priceBookCache[mwKeyG] || _priceBookCache[mwKey]);
+          if (mwEntry && mwEntry.materialCost != null) {
+            matCost = mwEntry.materialCost;
+          } else if (RECT_FLEX_CONN_DEFAULTS[mwMax] != null) {
+            matCost = RECT_FLEX_CONN_DEFAULTS[mwMax];
+          }
+        }
       }
       // Rect fitting fallback: min-width-class price book override → SA-based auto-calc
       if (!matCost && shape === 'rect' && RECT_FITTING_SA[baseKey]) {

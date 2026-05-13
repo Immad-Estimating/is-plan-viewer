@@ -299,6 +299,19 @@ export const RECT_FITTING_REF = {
   'rect-flex-conn':  { cuts: 0 },
 };
 
+// ── Rectangular flex connector defaults ($/EA by min-width class) ────
+// Flat vendor/shop pricing, no SA formula. Scaled from $25 avg at 11-12" class.
+export const RECT_FLEX_CONN_DEFAULTS = {
+  6:  12.50,
+  8:  16.75,
+  10: 20.75,
+  12: 25.00,
+  16: 32.00,
+  20: 39.00,
+  24: 45.75,
+  30: 54.25,
+};
+
 // ── Rectangular fitting surface area model ───────────────────────────
 // Per-fitting SA formula returning surface area in SF from W,H (and branch
 // W,H where relevant). SA × gauge_weight_per_SF × $/lb = raw material cost.

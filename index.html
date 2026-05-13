@@ -968,7 +968,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -4316,11 +4316,16 @@ function pbRow(item, sectionId) {
     mcKey = activeKey + '-mw' + mwMax + (gauge ? '-g' + gauge : '');
     lhKey = activeKey + '-mw' + mwMax;
     // Auto-calc raw material from SA × gauge weight × $/lb
-    autoCalcMc = calcRectFittingRawCost(activeKey, mwSampleW, mwSampleH, gauge || '26');
-    // Add liner adder to fitting auto-calc when toggle active
-    if (pbLinerActive && autoCalcMc != null) {
-      var fitLinerSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, mwSampleW, mwSampleH) : 0;
-      autoCalcMc += fitLinerSA * getActiveLinerPricePerSF();
+    // Flex connector: flat pricing from defaults, no SA calc
+    if (activeKey === 'rect-flex-conn' && RECT_FLEX_CONN_DEFAULTS[mwMax] != null) {
+      autoCalcMc = RECT_FLEX_CONN_DEFAULTS[mwMax];
+    } else {
+      autoCalcMc = calcRectFittingRawCost(activeKey, mwSampleW, mwSampleH, gauge || '26');
+      // Add liner adder to fitting auto-calc when toggle active
+      if (pbLinerActive && autoCalcMc != null) {
+        var fitLinerSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, mwSampleW, mwSampleH) : 0;
+        autoCalcMc += fitLinerSA * getActiveLinerPricePerSF();
+      }
     }
     mwSampleSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, mwSampleW, mwSampleH) : 0;
     // Check for user override
@@ -4385,11 +4390,17 @@ function pbRow(item, sectionId) {
       var subW = mwSub.repW;
       var subH = mwSub.repH;
       var subSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, subW, subH) : 0;
-      var subAutoMc = calcRectFittingRawCost(activeKey, subW, subH, gauge || '26');
-      // Add liner adder to sub-row auto-calc when toggle active
-      if (pbLinerActive && subAutoMc != null) {
-        var subLinerSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, subW, subH) : 0;
-        subAutoMc += subLinerSA * getActiveLinerPricePerSF();
+      var subAutoMc;
+      // Flex connector: flat pricing from defaults, no SA calc
+      if (activeKey === 'rect-flex-conn' && RECT_FLEX_CONN_DEFAULTS[mwMaxSub] != null) {
+        subAutoMc = RECT_FLEX_CONN_DEFAULTS[mwMaxSub];
+      } else {
+        subAutoMc = calcRectFittingRawCost(activeKey, subW, subH, gauge || '26');
+        // Add liner adder to sub-row auto-calc when toggle active
+        if (pbLinerActive && subAutoMc != null) {
+          var subLinerSA = RECT_FITTING_SA[activeKey] ? calcRectFittingSA(activeKey, subW, subH) : 0;
+          subAutoMc += subLinerSA * getActiveLinerPricePerSF();
+        }
       }
       var subMcKey = activeKey + '-mw' + mwMaxSub + (gauge ? '-g' + gauge : '');
       var subLhKey = activeKey + '-mw' + mwMaxSub;
