@@ -1,14 +1,9 @@
 {
   "_meta": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "lastUpdated": "2026-05-13",
     "description": "Global default labor hours for IS Plan Viewer. These are company-wide starting points. User overrides (per-project in IndexedDB, or company-wide in localStorage) always take priority. Keys match the compiler's item key convention exactly.",
-    "units": {
-      "duct": "hrs/LF",
-      "fittings": "hrs/EA",
-      "accessories": "hrs/EA",
-      "equipment": "hrs/EA"
-    },
+    "units": { "duct": "hrs/LF", "fittings": "hrs/EA", "accessories": "hrs/EA", "equipment": "hrs/EA" },
     "rateUnit": {"duct": "hrs/LF", "fittings": "hrs/EA", "accessories": "hrs/EA", "equipment": "hrs/EA"}
   },
 
@@ -78,7 +73,15 @@
     "flex-silver-18": { "rough": 0.11, "trim": 0.03 },
     "flex-silver-20": { "rough": 0.12, "trim": 0.04 },
     "duct-round-22": { "rough": 0.21, "stocking": 0.04 },
-    "duct-round-24": { "rough": 0.23, "stocking": 0.05 }
+    "duct-round-24": { "rough": 0.23, "stocking": 0.05 },
+    "duct-rect-p36": { "rough": 0.12, "trim": 0.03, "stocking": 0.02 },
+    "duct-rect-p48": { "rough": 0.16, "trim": 0.04, "stocking": 0.03 },
+    "duct-rect-p60": { "rough": 0.2, "trim": 0.05, "stocking": 0.03 },
+    "duct-rect-p72": { "rough": 0.24, "trim": 0.06, "stocking": 0.04 },
+    "duct-rect-p96": { "rough": 0.3, "trim": 0.07, "stocking": 0.04, "qc": 0.01 },
+    "duct-rect-p120": { "rough": 0.38, "trim": 0.09, "stocking": 0.05, "qc": 0.01 },
+    "duct-rect-p144": { "rough": 0.45, "trim": 0.1, "stocking": 0.06, "qc": 0.02 },
+    "duct-rect-p168": { "rough": 0.55, "trim": 0.12, "stocking": 0.07, "qc": 0.02 }
   },
 
   "fittings": {
@@ -285,7 +288,16 @@
     "control-damper": { "rough": 0.35, "trim": 0.05 },
     "backdraft-damper": { "rough": 0.15, "stocking": 0.02 },
     "rect-liner": { "rough": 0.05, "trim": 0.02 },
-    "rect-wrap": { "rough": 0.04, "trim": 0.02 }
+    "rect-wrap": { "rough": 0.04, "trim": 0.02 },
+    "rect-volume-damper": { "rough": 0.2, "stocking": 0.03 },
+    "rect-fire-damper": { "rough": 0.5, "trim": 0.08, "qc": 0.05 },
+    "rect-access-door": { "rough": 0.25, "stocking": 0.03 },
+    "rect-boot-12x12": { "rough": 0.2, "trim": 0.05, "stocking": 0.02 },
+    "rect-boot-14x14": { "rough": 0.22, "trim": 0.05, "stocking": 0.02 },
+    "rect-boot-15x15": { "rough": 0.24, "trim": 0.06, "stocking": 0.02 },
+    "rect-boot-18x18": { "rough": 0.28, "trim": 0.07, "stocking": 0.03 },
+    "rect-boot-20x20": { "rough": 0.3, "trim": 0.07, "stocking": 0.03 },
+    "rect-boot-30x20": { "rough": 0.35, "trim": 0.08, "stocking": 0.04 }
   },
 
   "equipment": {
