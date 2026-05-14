@@ -159,8 +159,11 @@ let _pinnedCats = { laborHrs: new Set(), laborCost: new Set() };
 let _lbrCollapsed = { laborHrs: false, laborCost: false };
 
 // Grand total adjustments — stored per-project in localStorage, not on items
-// { materialCost: 15000, laborHrs: 200 } means "I want the grand total to be this"
 let _grandAdj = {};
+
+// Compiler radar state
+let _radarTarget = null;   // null = scope totals, 'path|...' = specific group
+let _radarRows = null;     // cached rows for radar target
 
 // Filters: { dimensionKey: Set of allowed values } — null means no filter (all pass)
 let _filters = {};
@@ -275,6 +278,19 @@ const CSS = `
 /* Pinned category sub-columns */
 .cmp-table th.pinned-cat { font-size: 9px; text-transform: none; letter-spacing: 0; padding: 4px 5px; border-left: 2px solid var(--cat-color); }
 .cmp-table td.pinned-cat { font-size: 10px; padding: 3px 5px; border-left: 2px solid var(--cat-color); color: #a0a0c0; }
+
+/* Compiler radar */
+.cmp-radar { padding: 12px; border-top: 1px solid #0f3460; background: rgba(15,52,96,0.08); }
+.cmp-radar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cmp-radar-head span { font-size: 11px; color: #a0a0c0; font-weight: 600; }
+.cmp-radar-head button { background: none; border: none; color: #555; cursor: pointer; font-size: 11px; padding: 2px 6px; }
+.cmp-radar-head button:hover { color: #e94560; }
+.cmp-radar-body { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.cmp-radar-inputs { display: flex; flex-direction: column; gap: 3px; min-width: 160px; }
+.cmp-radar-cat { display: flex; align-items: center; gap: 4px; }
+.cmp-radar-cat input { width: 52px; background: #1a1a2e; border: 1px solid #0f3460; color: inherit; padding: 3px 4px; border-radius: 3px; font-size: 11px; text-align: right; }
+.cmp-radar-cat input:focus { outline: none; border-color: #e94560; }
+.cmp-radar-total { margin-top: 6px; padding-top: 6px; border-top: 1px solid #0f3460; display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; color: #e94560; }
 `;
 
 let _cssInjected = false;
