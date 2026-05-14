@@ -229,10 +229,20 @@ const CSS = `
 .cmp-cell-edit:focus { box-shadow: 0 0 6px rgba(233,69,96,0.4); }
 .cmp-editable { cursor: cell; position: relative; }
 .cmp-editable:hover { background: rgba(233,69,96,0.08); }
-.cmp-editable:hover::after { content: '✎'; position: absolute; right: 2px; top: 1px; font-size: 8px; color: #e94560; opacity: 0.6; }
-.cmp-override { color: #ffd43b; position: relative; }
+.cmp-editable:not(.cmp-override):hover::after { content: '✎'; position: absolute; right: 2px; top: 1px; font-size: 8px; color: #e94560; opacity: 0.6; }
+.cmp-override { color: #ffd43b; }
+.cmp-override .cmp-val-current { display: inline; }
+.cmp-override:hover .cmp-val-current { display: none; }
+.cmp-override::before { content: attr(data-orig); display: none; color: #555; font-style: italic; text-decoration: line-through; }
+.cmp-override:hover::before { display: inline; }
 .cmp-override::after { content: ''; position: absolute; top: -1px; right: -1px; width: 5px; height: 5px; background: #ffd43b; border-radius: 50%; }
 .cmp-ovr-dot { display: inline-block; width: 5px; height: 5px; background: #ffd43b; border-radius: 50%; margin-left: 3px; vertical-align: middle; cursor: help; }
+
+/* Grand total delta row */
+.cmp-delta-row td { font-size: 10px; color: #a0a0c0; border-top: none; padding-top: 0; }
+.cmp-delta-pos { color: #ff6b6b; }
+.cmp-delta-neg { color: #00ff88; }
+.cmp-delta-zero { color: #555; }
 
 /* Labor breakdown header — hover target */
 .cmp-lbr-th { position: relative; }
@@ -395,6 +405,11 @@ function normalizeRows(allPageData, drawingNames) {
       }
       const laborCost = laborHrs * rate;
 
+      // Store original calculated values before overrides
+      const origLaborHrs = laborHrs, origMatCost = matCost;
+      const origLaborCost = laborHrs * rate;
+      const origTotal = matCost + origLaborCost;
+
       // Apply manual overrides if present
       const mOvr = m._overrides || {};
       if (mOvr.laborHrs != null) { laborHrs = mOvr.laborHrs; }
@@ -411,6 +426,8 @@ function normalizeRows(allPageData, drawingNames) {
         _laborCost: finalLaborCost, _totalCost: finalTotal,
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
         _hasOverride: hasOverride, _overrides: mOvr,
+        _orig_laborHrs: origLaborHrs, _orig_materialCost: origMatCost,
+        _orig_laborCost: origLaborCost, _orig_totalCost: origTotal, _orig_lengthFt: lengthFt,
         phase: m.phase || null, costGroup: m.costGroup || null, gauge: m.gauge || null,
         systemSymbol: m.systemSymbol || null,
         _sourceType: 'measurement', _sourceId: m.id,
@@ -552,6 +569,11 @@ function normalizeRows(allPageData, drawingNames) {
           assignedCat = co ? co.label : capitalize(fb);
         }
       }
+      // Store originals before overrides
+      const origFLabHrs = laborHrs, origFMatCost = matCost;
+      const origFLabCost = laborHrs * rate;
+      const origFTotal = matCost + origFLabCost;
+
       // Apply manual overrides
       const fOvr = f._overrides || {};
       if (fOvr.laborHrs != null) laborHrs = fOvr.laborHrs;
@@ -568,6 +590,8 @@ function normalizeRows(allPageData, drawingNames) {
         _laborCost: laborCost, _totalCost: fTotal,
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
         _hasOverride: fHasOvr, _overrides: fOvr,
+        _orig_laborHrs: origFLabHrs, _orig_materialCost: origFMatCost,
+        _orig_laborCost: origFLabCost, _orig_totalCost: origFTotal, _orig_lengthFt: 0,
         phase: f.phase || null, costGroup: f.costGroup || null, gauge: f.gauge || null,
         systemSymbol: f.systemSymbol || null,
         _sourceType: 'fitting', _sourceId: f.id,
@@ -949,7 +973,30 @@ function renderCompiler() {
         html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
       }
     }
-    html += `</tr></tbody></table>`;
+    html += `</tr>`;
+
+    // Delta row: show base vs modified when overrides exist
+    const hasAnyOverride = filteredRows.some(r => r._hasOverride);
+    if (hasAnyOverride) {
+      html += `<tr class="cmp-delta-row"><td style="font-style:italic">Base (calculated)</td>`;
+      for (const c of cols) {
+        const origVal = _calcOriginal(filteredRows, c.key);
+        html += `<td class="num">${formatVal(origVal, c.type)}</td>`;
+      }
+      html += `</tr>`;
+      html += `<tr class="cmp-delta-row"><td style="font-style:italic">Δ Difference</td>`;
+      for (const c of cols) {
+        const currentVal = c.extract(filteredRows);
+        const origVal = _calcOriginal(filteredRows, c.key);
+        const delta = currentVal - origVal;
+        const deltaCls = Math.abs(delta) < 0.005 ? 'cmp-delta-zero' : (delta > 0 ? 'cmp-delta-pos' : 'cmp-delta-neg');
+        const sign = delta > 0 ? '+' : '';
+        html += `<td class="num ${deltaCls}">${Math.abs(delta) < 0.005 ? '\u2014' : sign + formatVal(delta, c.type)}</td>`;
+      }
+      html += `</tr>`;
+    }
+
+    html += `</tbody></table>`;
   }
   html += `</div>`;
 
@@ -975,9 +1022,19 @@ function renderTreeRows(node, cols, depth) {
       const editable = !c.alwaysOn && !c.isSub && (c.type === 'number' || c.type === 'currency') && child._rows.length > 0;
       if (editable) {
         const pathEnc = escapePath(path);
-        const ovrRows = child._rows.filter(r => r._hasOverride && r._overrides && r._overrides[_COL_TO_FIELD[c.key]] != null);
+        const fld = _COL_TO_FIELD[c.key];
+        const ovrRows = child._rows.filter(r => r._hasOverride && r._overrides && r._overrides[fld] != null);
         const isOvr = ovrRows.length > 0;
-        html += `<td class="${cls} cmp-editable${isOvr ? ' cmp-override' : ''}"${style} onclick="event.stopPropagation(); window._cmpEditCell(this,'${c.key}','${pathEnc}',${child._rows.length})" title="Click to edit${isOvr ? ' (overridden)' : ''}">${formatVal(val, c.type)}</td>`;
+        // Compute original (pre-override) value for hover preview
+        let origHtml = '';
+        if (isOvr) {
+          const rp = _COL_MAP[c.key] ? _COL_MAP[c.key].rowProp : null;
+          // Original = sum of non-overridden values from rows
+          // For overridden rows, subtract override and add back what calculator would give
+          // Simplification: store _origVal on rows during normalize
+          origHtml = ` data-orig="${formatVal(_calcOriginal(child._rows, c.key), c.type)}"`;
+        }
+        html += `<td class="${cls} cmp-editable${isOvr ? ' cmp-override' : ''}"${style}${origHtml} onclick="event.stopPropagation(); window._cmpEditCell(this,'${c.key}','${pathEnc}',${child._rows.length})">${isOvr ? '<span class="cmp-val-current">' + formatVal(val, c.type) + '</span>' : formatVal(val, c.type)}</td>`;
       } else {
         html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
       }
@@ -986,6 +1043,23 @@ function renderTreeRows(node, cols, depth) {
     if (!isCollapsed && child._children) html += renderTreeRows(child._children, cols, depth + 1);
   }
   return html;
+}
+
+// Calculate original (pre-override) aggregate for a set of rows
+function _calcOriginal(rows, colKey) {
+  const mapping = _COL_MAP[colKey];
+  if (!mapping) return 0;
+  const { field, rowProp } = mapping;
+  let total = 0;
+  for (const r of rows) {
+    if (r._hasOverride && r._overrides && r._overrides[field] != null) {
+      // Use the _orig value if we stored it, otherwise use calculated minus override
+      total += r['_orig_' + field] != null ? r['_orig_' + field] : (r[rowProp] || 0);
+    } else {
+      total += r[rowProp] || 0;
+    }
+  }
+  return total;
 }
 
 function formatVal(val, type) {
