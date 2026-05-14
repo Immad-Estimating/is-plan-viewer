@@ -1397,10 +1397,12 @@ async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
 }
 
 function _findRowsByPath(node, targetPath) {
-  if (!node || !node._children || !Array.isArray(node._children)) return null;
-  for (const child of node._children) {
+  // node can be either: { _rows, _children: [...] } from root/recursive
+  // or the tree root itself
+  const children = Array.isArray(node) ? node : (node && node._children ? node._children : null);
+  if (!children || !Array.isArray(children)) return null;
+  for (const child of children) {
     if (child.path === targetPath) return child._rows;
-    // child._children is a node object { _rows, _children: [...] }
     if (child._children) {
       const found = _findRowsByPath(child._children, targetPath);
       if (found) return found;
