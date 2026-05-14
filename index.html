@@ -968,7 +968,7 @@ import Compiler from './compiler.js';
 import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS, LABOR_RATES, LABOR_DEFAULT_RATE, loadLaborDefaults } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -4004,10 +4004,10 @@ function lhCatKey(baseKey, cat) {
 // Resolve labor default: check size-specific key first, then base key
 function _laborDefault(baseKey, catKey) {
   if (!LABOR_DEFAULTS) return 0;
-  // Try exact key (e.g. 'spiral-90el-12')
+  // Try exact key (e.g. 'spiral-90el-12', 'rect-90el-mw12')
   if (LABOR_DEFAULTS[baseKey] && LABOR_DEFAULTS[baseKey][catKey]) return LABOR_DEFAULTS[baseKey][catKey];
-  // Try base key without size (e.g. 'spiral-90el' from 'spiral-90el-12')
-  var baseOnly = baseKey.replace(/-\d+$/, '');
+  // Try base key without size or min-width suffix
+  var baseOnly = baseKey.replace(/-(mw)?\d+$/, '');
   if (baseOnly !== baseKey && LABOR_DEFAULTS[baseOnly] && LABOR_DEFAULTS[baseOnly][catKey]) return LABOR_DEFAULTS[baseOnly][catKey];
   return 0;
 }
@@ -10293,6 +10293,7 @@ function drawBoot(D, D2) {
 // =====================================================
 async function init() {
   await openDB();
+  await loadLaborDefaults();
   await loadPriceBook();
   await loadQuickbaseProjects();
   await HVACLibrary.init();

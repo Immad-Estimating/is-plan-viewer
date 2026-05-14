@@ -487,36 +487,31 @@ export const LABOR_CATEGORIES = [
 //
 // Add entries as you estimate — this grows over time.
 // Empty = no defaults yet (user enters via Price Book radar chart, saved to IndexedDB).
-export const LABOR_DEFAULTS = {
-  // ── Spiral fittings (hours per fitting) ──
-  // 'spiral-90el':     { rough: 0, stocking: 0, qc: 0 },
-  // 'spiral-45el':     { rough: 0, stocking: 0, qc: 0 },
-  // 'spiral-tee':      { rough: 0, stocking: 0, qc: 0 },
-  // 'spiral-wye':      { rough: 0, stocking: 0, qc: 0 },
-  // 'spiral-reducer':  { rough: 0, stocking: 0, qc: 0 },
-  // 'spiral-endcap':   { rough: 0, stocking: 0, qc: 0 },
+// Labor defaults loaded from labor-defaults.json at startup.
+// Flattened from duct/fittings/accessories/equipment sections into one lookup.
+// User overrides in IndexedDB (per-project) or localStorage (company-wide) always win.
+let _laborLoaded = false;
+export const LABOR_DEFAULTS = {};
+export const LABOR_RATES = {};
+export let LABOR_DEFAULT_RATE = 45;
 
-  // ── Snaplock fittings ──
-  // 'snaplock-90el':   { rough: 0, trim: 0, stocking: 0, qc: 0 },
-
-  // ── Spiral duct (hours per linear foot) ──
-  // 'duct-spiral':     { rough: 0, stocking: 0, qc: 0 },
-
-  // ── Rectangular fittings (hours per fitting, per perimeter class) ──
-  // 'rect-90el':       { rough: 0, trim: 0, stocking: 0, qc: 0 },
-  // 'rect-90el-p36':   { rough: 0, trim: 0, stocking: 0, qc: 0 },
-  // 'rect-90el-p48':   { rough: 0, trim: 0, stocking: 0, qc: 0 },
-
-  // ── Rectangular duct (hours per LF, per perimeter class) ──
-  // 'duct-rect-p36':   { rough: 0, stocking: 0, qc: 0 },
-  // 'duct-rect-p48':   { rough: 0, stocking: 0, qc: 0 },
-
-  // ── Accessories ──
-  // 'rect-liner':      { rough: 0, trim: 0 },
-  // 'rect-wrap':       { rough: 0, trim: 0 },
-  // 'rect-volume-damper': { rough: 0 },
-  // 'rect-fire-damper':   { rough: 0 },
-};
+export async function loadLaborDefaults() {
+  if (_laborLoaded) return;
+  try {
+    const resp = await fetch('./labor-defaults.json');
+    if (!resp.ok) return;
+    const lj = await resp.json();
+    for (const sec of ['duct','fittings','accessories','equipment']) {
+      const data = lj[sec] || {};
+      for (const k in data) { if (k !== '_note') LABOR_DEFAULTS[k] = data[k]; }
+    }
+    if (lj.rates) {
+      if (lj.rates.categoryRates) Object.assign(LABOR_RATES, lj.rates.categoryRates);
+      if (lj.rates.defaultRate) LABOR_DEFAULT_RATE = lj.rates.defaultRate;
+    }
+    _laborLoaded = true;
+  } catch (e) { console.warn('Could not load labor-defaults.json:', e); }
+}
 
 // ── Spiral Saddle Tap pricing (exposed, $/EA by branch×main) ─────────
 // Key format: spiral-tap-{main}x{branch} (matches Price Book pair key pattern)
