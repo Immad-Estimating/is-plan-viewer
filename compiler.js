@@ -158,6 +158,10 @@ let _projectRateTable = null;
 let _pinnedCats = { laborHrs: new Set(), laborCost: new Set() };
 let _lbrCollapsed = { laborHrs: false, laborCost: false };
 
+// Grand total adjustments — stored per-project in localStorage, not on items
+// { materialCost: 15000, laborHrs: 200 } means "I want the grand total to be this"
+let _grandAdj = {};
+
 // Filters: { dimensionKey: Set of allowed values } — null means no filter (all pass)
 let _filters = {};
 
@@ -967,24 +971,20 @@ function renderCompiler() {
       const cls = c.isSub ? 'num pinned-cat' : 'num';
       const style = c.isSub ? ` style="--cat-color:${c.color}"` : '';
       const gtEditable = !c.alwaysOn && !c.isSub && (c.type === 'number' || c.type === 'currency') && filteredRows.length > 0;
-      if (gtEditable) {
-        html += `<td class="${cls} cmp-editable"${style} onclick="event.stopPropagation(); window._cmpEditCell(this,'${c.key}','__GRAND__',${filteredRows.length})" title="Click to edit grand total">${formatVal(val, c.type)}</td>`;
-      } else {
-        html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
-      }
+      html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
     }
     html += `</tr>`;
 
-    // Delta row: show base vs modified when overrides exist
-    const hasAnyOverride = filteredRows.some(r => r._hasOverride);
-    if (hasAnyOverride) {
+    // Item-level override delta (when individual items have been changed)
+    const hasItemOverride = filteredRows.some(r => r._hasOverride);
+    if (hasItemOverride) {
       html += `<tr class="cmp-delta-row"><td style="font-style:italic">Base (calculated)</td>`;
       for (const c of cols) {
         const origVal = _calcOriginal(filteredRows, c.key);
         html += `<td class="num">${formatVal(origVal, c.type)}</td>`;
       }
       html += `</tr>`;
-      html += `<tr class="cmp-delta-row"><td style="font-style:italic">Δ Difference</td>`;
+      html += `<tr class="cmp-delta-row"><td style="font-style:italic">Δ Item Adjustments</td>`;
       for (const c of cols) {
         const currentVal = c.extract(filteredRows);
         const origVal = _calcOriginal(filteredRows, c.key);
@@ -995,6 +995,34 @@ function renderCompiler() {
       }
       html += `</tr>`;
     }
+
+    // Grand total contingency row — editable, stored separately from items
+    const hasGrandAdj = Object.values(_grandAdj).some(v => v != null);
+    html += `<tr class="cmp-delta-row" style="border-top:1px solid #0f3460"><td style="font-style:italic;color:#ffa94d">± Contingency ${hasGrandAdj ? '<span style="font-size:9px;color:#ff6b6b;cursor:pointer" onclick="event.stopPropagation();window._cmpClearGrandAdj()" title="Clear all contingencies">↩</span>' : ''}</td>`;
+    for (const c of cols) {
+      const adj = _grandAdj[c.key] || 0;
+      const gtEditable = !c.alwaysOn && !c.isSub && (c.type === 'number' || c.type === 'currency');
+      if (gtEditable) {
+        const sign = adj > 0 ? '+' : '';
+        const adjCls = Math.abs(adj) < 0.005 ? 'cmp-delta-zero' : (adj > 0 ? 'cmp-delta-pos' : 'cmp-delta-neg');
+        html += `<td class="num cmp-editable ${adjCls}" onclick="event.stopPropagation(); window._cmpEditGrandAdj(this,'${c.key}')" title="Click to set contingency">${Math.abs(adj) < 0.005 ? '\u2014' : sign + formatVal(adj, c.type)}</td>`;
+      } else {
+        html += `<td class="num">\u2014</td>`;
+      }
+    }
+    html += `</tr>`;
+
+    // Adjusted grand total
+    html += `<tr class="grand-total"><td>Adjusted Total ${hasGrandAdj ? '<span style="font-size:9px;color:#ffa94d">●</span>' : ''}</td>`;
+    for (const c of cols) {
+      const base = c.extract(filteredRows);
+      const adj = _grandAdj[c.key] || 0;
+      const total = base + adj;
+      const cls2 = c.isSub ? 'num pinned-cat' : 'num';
+      const style2 = c.isSub ? ` style="--cat-color:${c.color}"` : '';
+      html += `<td class="${cls2}"${style2}>${formatVal(total, c.type)}</td>`;
+    }
+    html += `</tr>`;
 
     html += `</tbody></table>`;
   }
@@ -1074,10 +1102,22 @@ function escapePath(s) { return s.replace(/'/g, "\\'").replace(/\\/g, "\\\\"); }
 
 // ── Data loading ──────────────────────────────────────────────────────
 
+function _loadGrandAdj() {
+  try { _grandAdj = JSON.parse(localStorage.getItem('isplan_grand_adj_' + _projectId) || '{}'); }
+  catch (e) { _grandAdj = {}; }
+}
+function _saveGrandAdj() {
+  if (!_projectId) return;
+  const hasVals = Object.values(_grandAdj).some(v => v != null);
+  if (hasVals) localStorage.setItem('isplan_grand_adj_' + _projectId, JSON.stringify(_grandAdj));
+  else localStorage.removeItem('isplan_grand_adj_' + _projectId);
+}
+
 async function loadCompilerData() {
   if (!_projectId) { _rows = []; return; }
   await loadPriceBook();
   await loadProjectRate(_projectId);
+  _loadGrandAdj();
 
   const drawings = await cGetByIndex('drawings', 'projectId', _projectId);
   _drawingNames = {};
@@ -1220,13 +1260,8 @@ const _COL_TO_FIELD = { totalLF: 'lengthFt', materialCost: 'materialCost', labor
 async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
   // Find the rows matching this group path
   const filteredRows = applyFilters(_rows);
-  let targetRows;
-  if (groupPath === '__GRAND__') {
-    targetRows = filteredRows;
-  } else {
-    const tree = buildGroupTree(filteredRows, _activeGroups);
-    targetRows = _findRowsByPath(tree, groupPath);
-  }
+  const tree = buildGroupTree(filteredRows, _activeGroups);
+  const targetRows = _findRowsByPath(tree, groupPath);
   if (!targetRows || targetRows.length === 0) { renderCompiler(); return; }
 
   const mapping = _COL_MAP[colKey];
@@ -1336,6 +1371,46 @@ window._cmpClearOverrides = async function(groupPath) {
     await _writeOverrideToSource(row);
   }
   await loadCompilerData();
+  renderCompiler();
+};
+
+// ── Grand total contingency editing ────────────────────────────────────
+window._cmpEditGrandAdj = function(td, colKey) {
+  const current = _grandAdj[colKey] || 0;
+  const input = document.createElement('input');
+  input.className = 'cmp-cell-edit';
+  input.type = 'text';
+  input.value = current || '';
+  input.placeholder = '+/- amount';
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const save = () => {
+    if (done) return;
+    done = true;
+    const val = parseFloat(input.value);
+    if (isNaN(val) || val === 0) { delete _grandAdj[colKey]; }
+    else { _grandAdj[colKey] = val; }
+    // Cascade: contingency on laborHrs also adjusts laborCost
+    if (colKey === 'laborHrs' && _grandAdj.laborHrs) {
+      _grandAdj.laborCost = _grandAdj.laborHrs * getLaborRate();
+    }
+    _saveGrandAdj();
+    renderCompiler();
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { e.preventDefault(); done = true; renderCompiler(); }
+  });
+};
+
+window._cmpClearGrandAdj = function() {
+  _grandAdj = {};
+  _saveGrandAdj();
   renderCompiler();
 };
 
