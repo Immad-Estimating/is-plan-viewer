@@ -1050,6 +1050,14 @@ function renderCompiler() {
 
     html += `</tbody></table>`;
   }
+
+  // Radar chart below table
+  if (filteredRows && filteredRows.length > 0) {
+    var rRows = _radarRows || filteredRows;
+    var rLabel = _radarTarget ? _radarTarget.split('|').pop() : (_scope === 'selection' ? 'Selection' : 'Entire Project');
+    html += renderCompilerRadar(rRows, rLabel);
+  }
+
   html += `</div>`;
 
   _container.innerHTML = html;
