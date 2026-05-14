@@ -966,13 +966,12 @@ function renderCompiler() {
     html += `</tr></thead><tbody>`;
     html += renderTreeRows(tree, cols, 0);
 
-    // Grand total
-    html += `<tr class="grand-total"><td>Grand Total</td>`;
+    // Item subtotal (sum of all items)
+    html += `<tr class="grand-total"><td>Item Subtotal</td>`;
     for (const c of cols) {
       const val = c.extract(filteredRows);
       const cls = c.isSub ? 'num pinned-cat' : 'num';
       const style = c.isSub ? ` style="--cat-color:${c.color}"` : '';
-      const gtEditable = !c.alwaysOn && !c.isSub && (c.type === 'number' || c.type === 'currency') && filteredRows.length > 0;
       html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
     }
     html += `</tr>`;
@@ -982,14 +981,14 @@ function renderCompiler() {
     if (hasItemOverride) {
       html += `<tr class="cmp-delta-row"><td style="font-style:italic">Base (calculated)</td>`;
       for (const c of cols) {
-        const origVal = _calcOriginal(filteredRows, c.key);
+        const origVal = _calcOriginal(filteredRows, c.key, c.isSub ? c.catKey : null);
         html += `<td class="num">${formatVal(origVal, c.type)}</td>`;
       }
       html += `</tr>`;
       html += `<tr class="cmp-delta-row"><td style="font-style:italic">Δ Item Adjustments</td>`;
       for (const c of cols) {
         const currentVal = c.extract(filteredRows);
-        const origVal = _calcOriginal(filteredRows, c.key);
+        const origVal = _calcOriginal(filteredRows, c.key, c.isSub ? c.catKey : null);
         const delta = currentVal - origVal;
         const deltaCls = Math.abs(delta) < 0.005 ? 'cmp-delta-zero' : (delta > 0 ? 'cmp-delta-pos' : 'cmp-delta-neg');
         const sign = delta > 0 ? '+' : '';
@@ -998,25 +997,22 @@ function renderCompiler() {
       html += `</tr>`;
     }
 
-    // Grand total contingency row — editable, stored separately from items
+    // Auto-calculated contingency row (derived from Grand Total - Subtotal)
     const hasGrandAdj = Object.values(_grandAdj).some(v => v != null);
-    html += `<tr class="cmp-delta-row" style="border-top:1px solid #0f3460"><td style="font-style:italic;color:#ffa94d">± Contingency ${hasGrandAdj ? '<span style="font-size:9px;color:#ff6b6b;cursor:pointer" onclick="event.stopPropagation();window._cmpClearGrandAdj()" title="Clear all contingencies">↩</span>' : ''}</td>`;
-    for (const c of cols) {
-      const adjKey = c.isSub ? c.parentKey + ':' + c.catKey : c.key;
-      const adj = _grandAdj[adjKey] || 0;
-      const gtEditable = !c.alwaysOn && (c.type === 'number' || c.type === 'currency');
-      if (gtEditable) {
+    if (hasGrandAdj) {
+      html += `<tr class="cmp-delta-row" style="border-top:1px solid #0f3460"><td style="font-style:italic;color:#ffa94d">± Contingency <span style="font-size:9px;color:#ff6b6b;cursor:pointer" onclick="event.stopPropagation();window._cmpClearGrandAdj()" title="Reset grand total to item subtotal">↩</span></td>`;
+      for (const c of cols) {
+        const adjKey = c.isSub ? c.parentKey + ':' + c.catKey : c.key;
+        const adj = _grandAdj[adjKey] || 0;
         const sign = adj > 0 ? '+' : '';
         const adjCls = Math.abs(adj) < 0.005 ? 'cmp-delta-zero' : (adj > 0 ? 'cmp-delta-pos' : 'cmp-delta-neg');
-        html += `<td class="num cmp-editable ${adjCls}" onclick="event.stopPropagation(); window._cmpEditGrandAdj(this,'${adjKey}')" title="Click to set contingency">${Math.abs(adj) < 0.005 ? '\u2014' : sign + formatVal(adj, c.type)}</td>`;
-      } else {
-        html += `<td class="num">\u2014</td>`;
+        html += `<td class="num ${adjCls}">${Math.abs(adj) < 0.005 ? '\u2014' : sign + formatVal(adj, c.type)}</td>`;
       }
+      html += `</tr>`;
     }
-    html += `</tr>`;
 
-    // Adjusted grand total
-    html += `<tr class="grand-total"><td>Adjusted Total ${hasGrandAdj ? '<span style="font-size:9px;color:#ffa94d">●</span>' : ''}</td>`;
+    // Grand Total — editable. User types desired total, contingency auto-derives.
+    html += `<tr class="grand-total"><td>Grand Total ${hasGrandAdj ? '<span style="font-size:9px;color:#ffa94d">●</span>' : ''}</td>`;
     for (const c of cols) {
       const base = c.extract(filteredRows);
       const adjKey = c.isSub ? c.parentKey + ':' + c.catKey : c.key;
@@ -1024,7 +1020,12 @@ function renderCompiler() {
       const total = base + adj;
       const cls2 = c.isSub ? 'num pinned-cat' : 'num';
       const style2 = c.isSub ? ` style="--cat-color:${c.color}"` : '';
-      html += `<td class="${cls2}"${style2}>${formatVal(total, c.type)}</td>`;
+      const gtEditable = !c.alwaysOn && (c.type === 'number' || c.type === 'currency') && filteredRows.length > 0;
+      if (gtEditable) {
+        html += `<td class="${cls2} cmp-editable"${style2} onclick="event.stopPropagation(); window._cmpEditGrandTotal(this,'${adjKey}',${base})" title="Click to set desired total — contingency auto-calculates">${formatVal(total, c.type)}</td>`;
+      } else {
+        html += `<td class="${cls2}"${style2}>${formatVal(total, c.type)}</td>`;
+      }
     }
     html += `</tr>`;
 
@@ -1450,13 +1451,15 @@ window._cmpClearOverrides = async function(groupPath) {
 };
 
 // ── Grand total contingency editing ────────────────────────────────────
-window._cmpEditGrandAdj = function(td, colKey) {
-  const current = _grandAdj[colKey] || 0;
+// Grand total editing: user types desired total, contingency = desired - subtotal
+window._cmpEditGrandTotal = function(td, adjKey, subtotal) {
+  const currentAdj = _grandAdj[adjKey] || 0;
+  const currentTotal = subtotal + currentAdj;
   const input = document.createElement('input');
   input.className = 'cmp-cell-edit';
   input.type = 'text';
-  input.value = current || '';
-  input.placeholder = '+/- amount';
+  input.value = currentTotal ? currentTotal.toFixed(2) : '';
+  input.placeholder = 'Desired total';
   td.textContent = '';
   td.appendChild(input);
   input.focus();
@@ -1466,29 +1469,41 @@ window._cmpEditGrandAdj = function(td, colKey) {
   const save = () => {
     if (done) return;
     done = true;
-    const val = parseFloat(input.value);
-    if (isNaN(val) || val === 0) { delete _grandAdj[colKey]; }
-    else { _grandAdj[colKey] = val; }
-    // Cascade: contingency on laborHrs also adjusts laborCost
-    if (colKey === 'laborHrs' && _grandAdj.laborHrs) {
-      _grandAdj.laborCost = _grandAdj.laborHrs * getLaborRate();
+    const desiredTotal = parseFloat(input.value);
+    if (isNaN(desiredTotal)) { renderCompiler(); return; }
+
+    const contingency = desiredTotal - subtotal;
+    if (Math.abs(contingency) < 0.005) { delete _grandAdj[adjKey]; }
+    else { _grandAdj[adjKey] = parseFloat(contingency.toFixed(4)); }
+
+    const rate = getLaborRate();
+    // Cascade: if editing a labor hrs column (main or category), auto-set labor cost contingency
+    if (adjKey === 'laborHrs') {
+      if (_grandAdj.laborHrs) _grandAdj.laborCost = parseFloat((_grandAdj.laborHrs * rate).toFixed(2));
+      else delete _grandAdj.laborCost;
     }
-    // Cascade: category hrs contingency → category cost + totals
-    if (colKey.indexOf(':') !== -1) {
-      const parts = colKey.split(':');
-      const pCol = parts[0];
-      if (pCol === 'laborHrs') {
-        // Also set the corresponding laborCost category contingency
-        const costKey = 'laborCost:' + parts[1];
-        if (val && val !== 0) _grandAdj[costKey] = val * getLaborRate();
+    if (adjKey === 'laborCost') {
+      if (_grandAdj.laborCost) _grandAdj.laborHrs = parseFloat((_grandAdj.laborCost / rate).toFixed(4));
+      else delete _grandAdj.laborHrs;
+    }
+    // Category sub-column cascade
+    if (adjKey.indexOf(':') !== -1) {
+      const parts = adjKey.split(':');
+      const catKey = parts[1];
+      if (parts[0] === 'laborHrs') {
+        const costKey = 'laborCost:' + catKey;
+        if (_grandAdj[adjKey]) _grandAdj[costKey] = parseFloat((_grandAdj[adjKey] * rate).toFixed(2));
         else delete _grandAdj[costKey];
-      } else if (pCol === 'laborCost') {
-        // Back-calc hours from cost contingency
-        const hrsKey = 'laborHrs:' + parts[1];
-        if (val && val !== 0) _grandAdj[hrsKey] = val / getLaborRate();
+        // Also update main laborHrs contingency = sum of all category contingencies
+        _syncGrandLaborTotals();
+      } else if (parts[0] === 'laborCost') {
+        const hrsKey = 'laborHrs:' + catKey;
+        if (_grandAdj[adjKey]) _grandAdj[hrsKey] = parseFloat((_grandAdj[adjKey] / rate).toFixed(4));
         else delete _grandAdj[hrsKey];
+        _syncGrandLaborTotals();
       }
     }
+
     _saveGrandAdj();
     renderCompiler();
   };
@@ -1498,6 +1513,22 @@ window._cmpEditGrandAdj = function(td, colKey) {
     if (e.key === 'Escape') { e.preventDefault(); done = true; renderCompiler(); }
   });
 };
+
+// Sync main laborHrs/laborCost contingencies from sum of category contingencies
+function _syncGrandLaborTotals() {
+  const rate = getLaborRate();
+  let totalHrsAdj = 0;
+  for (const cat of LABOR_CATEGORIES) {
+    totalHrsAdj += _grandAdj['laborHrs:' + cat.key] || 0;
+  }
+  if (Math.abs(totalHrsAdj) > 0.001) {
+    _grandAdj.laborHrs = parseFloat(totalHrsAdj.toFixed(4));
+    _grandAdj.laborCost = parseFloat((totalHrsAdj * rate).toFixed(2));
+  } else {
+    delete _grandAdj.laborHrs;
+    delete _grandAdj.laborCost;
+  }
+}
 
 window._cmpClearGrandAdj = function() {
   _grandAdj = {};
