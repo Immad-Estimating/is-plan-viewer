@@ -159,8 +159,11 @@ let _pinnedCats = { laborHrs: new Set(), laborCost: new Set() };
 let _lbrCollapsed = { laborHrs: false, laborCost: false };
 
 // Grand total adjustments — stored per-project in localStorage, not on items
-// { materialCost: 15000, laborHrs: 200 } means "I want the grand total to be this"
 let _grandAdj = {};
+
+// Compiler radar chart state
+let _radarTarget = null;   // null = show totals for current scope, 'path|...' = specific group
+let _radarRows = null;     // cached rows for current radar target
 
 // Filters: { dimensionKey: Set of allowed values } — null means no filter (all pass)
 let _filters = {};
@@ -247,6 +250,21 @@ const CSS = `
 .cmp-delta-pos { color: #ff6b6b; }
 .cmp-delta-neg { color: #00ff88; }
 .cmp-delta-zero { color: #555; }
+
+/* Compiler radar chart */
+.cmp-radar { padding: 12px; border-top: 1px solid #0f3460; background: rgba(15,52,96,0.1); }
+.cmp-radar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cmp-radar-title { font-size: 11px; color: #a0a0c0; font-weight: 600; }
+.cmp-radar-close { background: none; border: none; color: #555; cursor: pointer; font-size: 12px; padding: 2px 6px; }
+.cmp-radar-close:hover { color: #e94560; }
+.cmp-radar-body { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.cmp-radar-bars { flex: 1; min-width: 200px; }
+.cmp-radar-bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.cmp-radar-bar-label { font-size: 10px; font-weight: 700; width: 24px; text-align: right; flex-shrink: 0; }
+.cmp-radar-bar-track { flex: 1; height: 14px; background: #0d1117; border-radius: 3px; overflow: hidden; position: relative; }
+.cmp-radar-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; min-width: 1px; }
+.cmp-radar-bar-val { font-size: 10px; width: 50px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.cmp-radar-bar-pct { font-size: 9px; position: absolute; right: 3px; top: 1px; color: rgba(255,255,255,0.6); }
 
 /* Labor breakdown header — hover target */
 .cmp-lbr-th { position: relative; }
@@ -1031,10 +1049,88 @@ function renderCompiler() {
 
     html += `</tbody></table>`;
   }
+
+  // Compiler radar chart
+  const radarRows = _radarRows || filteredRows;
+  const radarLabel = _radarTarget ? _radarTarget.split('|').pop() : (_scope === 'selection' ? 'Selection' : 'Entire Project');
+  html += renderCompilerRadar(radarRows, radarLabel);
+
   html += `</div>`;
 
   _container.innerHTML = html;
 }
+
+function renderCompilerRadar(rows, label) {
+  if (!rows || rows.length === 0) return '';
+  const rate = getLaborRate();
+  const totalHrs = rows.reduce((s, r) => s + (r._laborHrs || 0), 0);
+  if (totalHrs === 0) return '';
+
+  // Build category breakdown
+  const cats = [];
+  let maxHrs = 0;
+  for (const cat of LABOR_CATEGORIES) {
+    const hrs = rows.reduce((s, r) => s + ((r._laborCatHrs && r._laborCatHrs[cat.key]) || 0), 0);
+    const cost = hrs * rate;
+    cats.push({ ...cat, hrs, cost });
+    if (hrs > maxHrs) maxHrs = hrs;
+  }
+  // Only show categories that have hours
+  const activeCats = cats.filter(c => c.hrs > 0);
+  if (activeCats.length === 0) return '';
+
+  // Auto-scale: find a nice max for the bar chart
+  const barMax = maxHrs > 0 ? Math.ceil(maxHrs * 1.15) : 1;
+
+  let html = `<div class="cmp-radar">`;
+  html += `<div class="cmp-radar-header">`;
+  html += `<span class="cmp-radar-title">📊 Labor Breakdown — ${escHtml(label)} (${totalHrs.toFixed(1)} hrs / ${formatVal(totalHrs * rate, 'currency')})</span>`;
+  if (_radarTarget) {
+    html += `<button class="cmp-radar-close" onclick="window._cmpResetRadar()" title="Back to ${_scope === 'selection' ? 'selection' : 'project'} totals">✕ Reset</button>`;
+  }
+  html += `</div>`;
+  html += `<div class="cmp-radar-body">`;
+
+  // Horizontal bar chart
+  html += `<div class="cmp-radar-bars">`;
+  for (const c of activeCats) {
+    const pct = barMax > 0 ? (c.hrs / barMax * 100) : 0;
+    const pctOfTotal = totalHrs > 0 ? (c.hrs / totalHrs * 100) : 0;
+    html += `<div class="cmp-radar-bar-row">`;
+    html += `<span class="cmp-radar-bar-label" style="color:${c.color}">${c.short}</span>`;
+    html += `<div class="cmp-radar-bar-track">`;
+    html += `<div class="cmp-radar-bar-fill" style="width:${pct.toFixed(1)}%;background:${c.color}"></div>`;
+    html += `<span class="cmp-radar-bar-pct">${pctOfTotal.toFixed(0)}%</span>`;
+    html += `</div>`;
+    html += `<span class="cmp-radar-bar-val" style="color:${c.color}">${c.hrs.toFixed(1)}h</span>`;
+    html += `<span class="cmp-radar-bar-val" style="color:#a0a0c0">${formatVal(c.cost, 'currency')}</span>`;
+    html += `</div>`;
+  }
+  html += `</div>`;
+  html += `</div></div>`;
+  return html;
+}
+
+// Click a group row's labor cell to focus radar on that group
+window._cmpFocusRadar = function(groupPath) {
+  const filteredRows = applyFilters(_rows);
+  const tree = buildGroupTree(filteredRows, _activeGroups);
+  const targetRows = _findRowsByPath(tree, groupPath);
+  if (targetRows && targetRows.length > 0) {
+    _radarTarget = groupPath;
+    _radarRows = targetRows;
+  } else {
+    _radarTarget = null;
+    _radarRows = null;
+  }
+  renderCompiler();
+};
+
+window._cmpResetRadar = function() {
+  _radarTarget = null;
+  _radarRows = null;
+  renderCompiler();
+};
 
 function renderTreeRows(node, cols, depth) {
   if (!node._children || node._children.length === 0) return '';
@@ -1047,7 +1143,11 @@ function renderTreeRows(node, cols, depth) {
 
     const grpHasOverride = child._rows.some(r => r._hasOverride);
     html += `<tr class="group-header depth-${depth}" onclick="window._cmpToggleCollapse('${escapePath(path)}')">`;
-    html += `<td>${toggle} ${escHtml(child.label)}${grpHasOverride ? '<span class="cmp-ovr-dot" title="Contains overridden values"></span> <span style="font-size:9px;color:#ff6b6b;cursor:pointer;font-weight:400" onclick="event.stopPropagation();window._cmpClearOverrides(\'' + escapePath(path) + '\')" title="Clear all overrides in this group">↩</span>' : ''}</td>`;
+    const isRadarTarget = _radarTarget === path;
+    html += `<td>${toggle} ${escHtml(child.label)}`;
+    html += ` <span style="font-size:9px;cursor:pointer;color:${isRadarTarget ? '#e94560' : '#555'}" onclick="event.stopPropagation();window._cmpFocusRadar('${escapePath(path)}')" title="Show labor breakdown for this group">📊</span>`;
+    if (grpHasOverride) html += `<span class="cmp-ovr-dot" title="Contains overridden values"></span> <span style="font-size:9px;color:#ff6b6b;cursor:pointer;font-weight:400" onclick="event.stopPropagation();window._cmpClearOverrides('${escapePath(path)}')" title="Clear all overrides in this group">↩</span>`;
+    html += `</td>`;
     for (const c of cols) {
       const val = c.extract(child._rows);
       const cls = c.isSub ? 'num pinned-cat' : 'num';
@@ -1221,7 +1321,7 @@ const Compiler = {
 
 // ── Global handlers ───────────────────────────────────────────────────
 
-window._cmpSetScope = function(scope) { _scope = scope; Compiler.refresh(); };
+window._cmpSetScope = function(scope) { _scope = scope; _radarTarget = null; _radarRows = null; Compiler.refresh(); };
 
 window._cmpAddGroup = function(key) {
   if (!_activeGroups.includes(key)) { _activeGroups.push(key); _collapsed = {}; renderCompiler(); }
