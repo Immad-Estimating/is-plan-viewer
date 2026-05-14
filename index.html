@@ -4031,11 +4031,17 @@ function lhCatKey(baseKey, cat) {
 
 // Resolve labor default: check size-specific key first, then base key
 function _laborDefault(baseKey, catKey) {
+  // 1. Company-wide defaults (localStorage) — user's saved overrides for all projects
+  var cd = _loadCompanyDefaults();
+  var cdKey = baseKey + '-lc-' + catKey;
+  if (cd[cdKey] && cd[cdKey].laborHrs) return cd[cdKey].laborHrs;
+  // Try base key fallback in company defaults
+  var cdBase = baseKey.replace(/-(mw)?\d+(x\d+)?$/, '') + '-lc-' + catKey;
+  if (cdBase !== cdKey && cd[cdBase] && cd[cdBase].laborHrs) return cd[cdBase].laborHrs;
+  // 2. JSON defaults (labor-defaults.json) — seeded starting values
   if (!LABOR_DEFAULTS) return 0;
-  // Try exact key (e.g. 'spiral-90el-12', 'rect-90el-mw12')
   if (LABOR_DEFAULTS[baseKey] && LABOR_DEFAULTS[baseKey][catKey]) return LABOR_DEFAULTS[baseKey][catKey];
-  // Try base key without size or min-width suffix
-  var baseOnly = baseKey.replace(/-(mw)?\d+$/, '');
+  var baseOnly = baseKey.replace(/-(mw)?\d+(x\d+)?$/, '');
   if (baseOnly !== baseKey && LABOR_DEFAULTS[baseOnly] && LABOR_DEFAULTS[baseOnly][catKey]) return LABOR_DEFAULTS[baseOnly][catKey];
   return 0;
 }
@@ -4207,6 +4213,13 @@ function renderRadarChart(baseKey, itemType, subType) {
   }
   html += '</div>';
 
+  // Save as Company Default button
+  html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #0f3460;display:flex;align-items:center;gap:8px">';
+  html += '<button onclick="event.stopPropagation();saveAsCompanyDefault(\'' + baseKey + '\')" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:10px;white-space:nowrap" title="Save current labor hours as company-wide default for all future projects">🏢 Save as Company Default</button>';
+  var hasGlobal = _hasCompanyDefault(baseKey);
+  if (hasGlobal) html += '<span style="color:#00ff88;font-size:9px">✓ Company default set</span>';
+  html += '</div>';
+
   html += '</div>'; // end flex row
   return html;
 }
@@ -4262,6 +4275,38 @@ window.updateRadarHrs = async function(catKey, value) {
   var existing = (priceBookCache && priceBookCache[catKey]) || { key: catKey };
   existing.laborHrs = value === '' ? null : parseFloat(value) || null;
   await savePriceBookEntry(catKey, existing);
+  renderPriceBook();
+};
+
+// ── Company-wide labor defaults (localStorage) ──────────────────────
+var _companyDefaults = null;
+function _loadCompanyDefaults() {
+  if (_companyDefaults) return _companyDefaults;
+  try { _companyDefaults = JSON.parse(localStorage.getItem('isplan_labor_company') || '{}'); }
+  catch (e) { _companyDefaults = {}; }
+  return _companyDefaults;
+}
+
+function _hasCompanyDefault(baseKey) {
+  var cd = _loadCompanyDefaults();
+  for (var i = 0; i < LABOR_CATEGORIES.length; i++) {
+    if (cd[baseKey + '-lc-' + LABOR_CATEGORIES[i].key]) return true;
+  }
+  return false;
+}
+
+window.saveAsCompanyDefault = function(baseKey) {
+  var cd = _loadCompanyDefaults();
+  var saved = 0;
+  for (var i = 0; i < LABOR_CATEGORIES.length; i++) {
+    var catKey = baseKey + '-lc-' + LABOR_CATEGORIES[i].key;
+    var entry = priceBookCache ? priceBookCache[catKey] : null;
+    var hrs = (entry && entry.laborHrs) ? entry.laborHrs : _laborDefault(baseKey, LABOR_CATEGORIES[i].key);
+    if (hrs > 0) { cd[catKey] = { laborHrs: hrs }; saved++; }
+  }
+  localStorage.setItem('isplan_labor_company', JSON.stringify(cd));
+  _companyDefaults = cd;
+  showToast('Saved ' + saved + ' labor values as company default for ' + baseKey, 2500);
   renderPriceBook();
 };
 

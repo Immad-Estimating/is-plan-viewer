@@ -273,7 +273,22 @@ function getLaborRate() {
   return (_projectRateTable && _projectRateTable.laborRatePerHr) || 45;
 }
 
+let _companyDefaultsCache = null;
+function _getCompanyDefaults() {
+  if (_companyDefaultsCache) return _companyDefaultsCache;
+  try { _companyDefaultsCache = JSON.parse(localStorage.getItem('isplan_labor_company') || '{}'); }
+  catch (e) { _companyDefaultsCache = {}; }
+  return _companyDefaultsCache;
+}
+
 function _laborDefaultFallback(baseKey, catKey) {
+  // 1. Company-wide defaults (localStorage)
+  const cd = _getCompanyDefaults();
+  const cdKey = baseKey + '-lc-' + catKey;
+  if (cd[cdKey] && cd[cdKey].laborHrs) return cd[cdKey].laborHrs;
+  const cdBase = baseKey.replace(/-(mw)?\d+(x\d+)?$/, '') + '-lc-' + catKey;
+  if (cdBase !== cdKey && cd[cdBase] && cd[cdBase].laborHrs) return cd[cdBase].laborHrs;
+  // 2. JSON defaults
   if (!LABOR_DEFAULTS) return 0;
   if (LABOR_DEFAULTS[baseKey] && LABOR_DEFAULTS[baseKey][catKey]) return LABOR_DEFAULTS[baseKey][catKey];
   const baseOnly = baseKey.replace(/-(mw)?\d+(x\d+)?$/, '');
