@@ -1112,23 +1112,36 @@ window._cmpEditCell = function(td, colKey, groupPath, rowCount) {
   input.focus();
   input.select();
 
-  const commit = () => {
+  let committed = false;
+  const commit = async () => {
+    if (committed) return;
+    committed = true;
     const newVal = parseFloat(input.value);
     if (isNaN(newVal) || newVal === currentVal) { renderCompiler(); return; }
-    _cmpApplyOverride(colKey, groupPath, newVal, currentVal);
+    try {
+      await _cmpApplyOverride(colKey, groupPath, newVal, currentVal);
+    } catch (e) {
+      console.error('Override apply failed:', e);
+      renderCompiler();
+    }
   };
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    if (e.key === 'Escape') { e.preventDefault(); renderCompiler(); }
+    if (e.key === 'Escape') { e.preventDefault(); committed = true; renderCompiler(); }
   });
 };
 
-// Map column key to the override field on source items
-const _COL_TO_FIELD = {
-  totalLF: 'lengthFt', materialCost: 'materialCost',
-  laborHrs: 'laborHrs', laborCost: 'laborCost', totalCost: 'totalCost'
+// Map column key to: override field name, and row property to read current value
+const _COL_MAP = {
+  totalLF:      { field: 'lengthFt',     rowProp: '_lengthFt' },
+  materialCost: { field: 'materialCost', rowProp: '_matCost' },
+  laborHrs:     { field: 'laborHrs',     rowProp: '_laborHrs' },
+  laborCost:    { field: 'laborCost',    rowProp: '_laborCost' },
+  totalCost:    { field: 'totalCost',    rowProp: '_totalCost' },
 };
+// Keep _COL_TO_FIELD for override indicator check
+const _COL_TO_FIELD = { totalLF: 'lengthFt', materialCost: 'materialCost', laborHrs: 'laborHrs', laborCost: 'laborCost', totalCost: 'totalCost' };
 
 async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
   // Find the rows matching this group path
@@ -1142,25 +1155,32 @@ async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
   }
   if (!targetRows || targetRows.length === 0) { renderCompiler(); return; }
 
-  const field = _COL_TO_FIELD[colKey];
-  if (!field) { renderCompiler(); return; }
+  const mapping = _COL_MAP[colKey];
+  if (!mapping) { renderCompiler(); return; }
+  const { field, rowProp } = mapping;
 
   // Distribute new value proportionally across items
   const ratio = oldVal > 0 ? newVal / oldVal : 0;
   const even = newVal / targetRows.length;
 
   for (const row of targetRows) {
-    const oldItemVal = row['_' + field] || row[field] || 0;
+    const oldItemVal = row[rowProp] || 0;
     const newItemVal = oldVal > 0 ? oldItemVal * ratio : even;
 
     // Build override object
     if (!row._overrides) row._overrides = {};
     row._overrides[field] = parseFloat(newItemVal.toFixed(4));
+    row._hasOverride = true;
 
-    // Cascade: if laborHrs changed, recalc laborCost
+    // Cascade: if laborHrs changed, recalc laborCost and totalCost
     if (field === 'laborHrs') {
       const rate = getLaborRate();
       row._overrides.laborCost = parseFloat((newItemVal * rate).toFixed(2));
+      row._overrides.totalCost = parseFloat(((row._matCost || 0) + newItemVal * rate).toFixed(2));
+    }
+    // Cascade: if materialCost changed, recalc totalCost
+    if (field === 'materialCost') {
+      row._overrides.totalCost = parseFloat((newItemVal + (row._laborCost || 0)).toFixed(2));
     }
 
     // Write back to IndexedDB source item
@@ -1173,11 +1193,14 @@ async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
 }
 
 function _findRowsByPath(node, targetPath) {
-  if (!node._children) return null;
+  if (!node || !node._children || !Array.isArray(node._children)) return null;
   for (const child of node._children) {
     if (child.path === targetPath) return child._rows;
-    const found = _findRowsByPath(child._children || {}, targetPath);
-    if (found) return found;
+    // child._children is a node object { _rows, _children: [...] }
+    if (child._children) {
+      const found = _findRowsByPath(child._children, targetPath);
+      if (found) return found;
+    }
   }
   return null;
 }
@@ -1187,6 +1210,9 @@ async function _writeOverrideToSource(row) {
   const drawingId = row._drawingId;
   if (!drawingId) return;
 
+  const ovr = row._overrides || {};
+  const isEmpty = Object.keys(ovr).length === 0;
+
   // Load the pageData for this drawing
   const allPD = await cGetByIndex('pageData', 'drawingId', drawingId);
   for (const pd of allPD) {
@@ -1194,14 +1220,14 @@ async function _writeOverrideToSource(row) {
     if (row._sourceType === 'measurement') {
       for (const m of (pd.measurements || [])) {
         if (m.id === row._sourceId) {
-          m._overrides = { ...m._overrides, ...row._overrides };
+          m._overrides = isEmpty ? undefined : { ...ovr };
           changed = true; break;
         }
       }
     } else if (row._sourceType === 'fitting') {
       for (const f of (pd.fittings || [])) {
         if (f.id === row._sourceId) {
-          f._overrides = { ...f._overrides, ...row._overrides };
+          f._overrides = isEmpty ? undefined : { ...ovr };
           changed = true; break;
         }
       }
@@ -1209,7 +1235,7 @@ async function _writeOverrideToSource(row) {
       for (const s of (pd.stacks || [])) {
         for (const it of (s.items || [])) {
           if (it.id === row._sourceId) {
-            it._overrides = { ...it._overrides, ...row._overrides };
+            it._overrides = isEmpty ? undefined : { ...ovr };
             changed = true; break;
           }
         }
