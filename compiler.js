@@ -227,6 +227,9 @@ const CSS = `
 /* Inline cell editing */
 .cmp-cell-edit { background: #0d1117; border: 1px solid #e94560; color: #ffd43b; padding: 2px 4px; border-radius: 3px; font-size: 11px; text-align: right; width: 70px; font-variant-numeric: tabular-nums; outline: none; }
 .cmp-cell-edit:focus { box-shadow: 0 0 6px rgba(233,69,96,0.4); }
+.cmp-editable { cursor: cell; position: relative; }
+.cmp-editable:hover { background: rgba(233,69,96,0.08); }
+.cmp-editable:hover::after { content: '✎'; position: absolute; right: 2px; top: 1px; font-size: 8px; color: #e94560; opacity: 0.6; }
 .cmp-override { color: #ffd43b; position: relative; }
 .cmp-override::after { content: ''; position: absolute; top: -1px; right: -1px; width: 5px; height: 5px; background: #ffd43b; border-radius: 50%; }
 .cmp-ovr-dot { display: inline-block; width: 5px; height: 5px; background: #ffd43b; border-radius: 50%; margin-left: 3px; vertical-align: middle; cursor: help; }
@@ -939,7 +942,12 @@ function renderCompiler() {
       const val = c.extract(filteredRows);
       const cls = c.isSub ? 'num pinned-cat' : 'num';
       const style = c.isSub ? ` style="--cat-color:${c.color}"` : '';
-      html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
+      const gtEditable = !c.alwaysOn && !c.isSub && (c.type === 'number' || c.type === 'currency') && filteredRows.length > 0;
+      if (gtEditable) {
+        html += `<td class="${cls} cmp-editable"${style} onclick="event.stopPropagation(); window._cmpEditCell(this,'${c.key}','__GRAND__',${filteredRows.length})" title="Click to edit grand total">${formatVal(val, c.type)}</td>`;
+      } else {
+        html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
+      }
     }
     html += `</tr></tbody></table>`;
   }
@@ -967,7 +975,9 @@ function renderTreeRows(node, cols, depth) {
       const editable = !c.alwaysOn && !c.isSub && (c.type === 'number' || c.type === 'currency') && child._rows.length > 0;
       if (editable) {
         const pathEnc = escapePath(path);
-        html += `<td class="${cls}"${style} ondblclick="event.stopPropagation(); window._cmpEditCell(this,'${c.key}','${pathEnc}',${child._rows.length})" style="cursor:cell" title="Double-click to edit">${formatVal(val, c.type)}</td>`;
+        const ovrRows = child._rows.filter(r => r._hasOverride && r._overrides && r._overrides[_COL_TO_FIELD[c.key]] != null);
+        const isOvr = ovrRows.length > 0;
+        html += `<td class="${cls} cmp-editable${isOvr ? ' cmp-override' : ''}"${style} onclick="event.stopPropagation(); window._cmpEditCell(this,'${c.key}','${pathEnc}',${child._rows.length})" title="Click to edit${isOvr ? ' (overridden)' : ''}">${formatVal(val, c.type)}</td>`;
       } else {
         html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
       }
@@ -1123,8 +1133,13 @@ const _COL_TO_FIELD = {
 async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
   // Find the rows matching this group path
   const filteredRows = applyFilters(_rows);
-  const tree = buildGroupTree(filteredRows, _activeGroups);
-  const targetRows = _findRowsByPath(tree, groupPath);
+  let targetRows;
+  if (groupPath === '__GRAND__') {
+    targetRows = filteredRows;
+  } else {
+    const tree = buildGroupTree(filteredRows, _activeGroups);
+    targetRows = _findRowsByPath(tree, groupPath);
+  }
   if (!targetRows || targetRows.length === 0) { renderCompiler(); return; }
 
   const field = _COL_TO_FIELD[colKey];
