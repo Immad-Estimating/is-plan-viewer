@@ -257,14 +257,6 @@ const CSS = `
 .cmp-radar-title { font-size: 11px; color: #a0a0c0; font-weight: 600; }
 .cmp-radar-close { background: none; border: none; color: #555; cursor: pointer; font-size: 12px; padding: 2px 6px; }
 .cmp-radar-close:hover { color: #e94560; }
-.cmp-radar-body { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
-.cmp-radar-bars { flex: 1; min-width: 200px; }
-.cmp-radar-bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.cmp-radar-bar-label { font-size: 10px; font-weight: 700; width: 24px; text-align: right; flex-shrink: 0; }
-.cmp-radar-bar-track { flex: 1; height: 14px; background: #0d1117; border-radius: 3px; overflow: hidden; position: relative; }
-.cmp-radar-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; min-width: 1px; }
-.cmp-radar-bar-val { font-size: 10px; width: 50px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.cmp-radar-bar-pct { font-size: 9px; position: absolute; right: 3px; top: 1px; color: rgba(255,255,255,0.6); }
 
 /* Labor breakdown header — hover target */
 .cmp-lbr-th { position: relative; }
@@ -1066,48 +1058,85 @@ function renderCompilerRadar(rows, label) {
   const totalHrs = rows.reduce((s, r) => s + (r._laborHrs || 0), 0);
   if (totalHrs === 0) return '';
 
-  // Build category breakdown
-  const cats = [];
-  let maxHrs = 0;
+  const n = LABOR_CATEGORIES.length;
+  const breakdown = [];
+  let maxVal = 2;
   for (const cat of LABOR_CATEGORIES) {
     const hrs = rows.reduce((s, r) => s + ((r._laborCatHrs && r._laborCatHrs[cat.key]) || 0), 0);
-    const cost = hrs * rate;
-    cats.push({ ...cat, hrs, cost });
-    if (hrs > maxHrs) maxHrs = hrs;
+    breakdown.push({ cat, hrs });
+    if (hrs > maxVal) maxVal = Math.ceil(hrs);
   }
-  // Only show categories that have hours
-  const activeCats = cats.filter(c => c.hrs > 0);
-  if (activeCats.length === 0) return '';
 
-  // Auto-scale: find a nice max for the bar chart
-  const barMax = maxHrs > 0 ? Math.ceil(maxHrs * 1.15) : 1;
+  const cx = 100, cy = 100, r2 = 80;
 
   let html = `<div class="cmp-radar">`;
   html += `<div class="cmp-radar-header">`;
-  html += `<span class="cmp-radar-title">📊 Labor Breakdown — ${escHtml(label)} (${totalHrs.toFixed(1)} hrs / ${formatVal(totalHrs * rate, 'currency')})</span>`;
-  if (_radarTarget) {
-    html += `<button class="cmp-radar-close" onclick="window._cmpResetRadar()" title="Back to ${_scope === 'selection' ? 'selection' : 'project'} totals">✕ Reset</button>`;
-  }
+  html += `<span class="cmp-radar-title">\ud83d\udcca ${escHtml(label)} \u2014 ${totalHrs.toFixed(1)} hrs / ${formatVal(totalHrs * rate, 'currency')}</span>`;
+  if (_radarTarget) html += `<button class="cmp-radar-close" onclick="window._cmpResetRadar()" title="Reset to scope totals">\u2715 Reset</button>`;
   html += `</div>`;
-  html += `<div class="cmp-radar-body">`;
 
-  // Horizontal bar chart
-  html += `<div class="cmp-radar-bars">`;
-  for (const c of activeCats) {
-    const pct = barMax > 0 ? (c.hrs / barMax * 100) : 0;
-    const pctOfTotal = totalHrs > 0 ? (c.hrs / totalHrs * 100) : 0;
-    html += `<div class="cmp-radar-bar-row">`;
-    html += `<span class="cmp-radar-bar-label" style="color:${c.color}">${c.short}</span>`;
-    html += `<div class="cmp-radar-bar-track">`;
-    html += `<div class="cmp-radar-bar-fill" style="width:${pct.toFixed(1)}%;background:${c.color}"></div>`;
-    html += `<span class="cmp-radar-bar-pct">${pctOfTotal.toFixed(0)}%</span>`;
-    html += `</div>`;
-    html += `<span class="cmp-radar-bar-val" style="color:${c.color}">${c.hrs.toFixed(1)}h</span>`;
-    html += `<span class="cmp-radar-bar-val" style="color:#a0a0c0">${formatVal(c.cost, 'currency')}</span>`;
+  html += `<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">`;
+
+  // SVG radar polygon
+  html += `<div style="flex-shrink:0"><svg width="220" height="220" viewBox="0 0 220 220">`;
+  for (let ring = 1; ring <= 4; ring++) {
+    const rr = r2 * ring / 4;
+    let pts = '';
+    for (let j = 0; j < n; j++) {
+      const a = -Math.PI / 2 + (2 * Math.PI * j / n);
+      pts += `${(cx + rr * Math.cos(a)).toFixed(1)},${(cy + rr * Math.sin(a)).toFixed(1)} `;
+    }
+    html += `<polygon points="${pts}" fill="none" stroke="#0f3460" stroke-width="0.5"/>`;
+  }
+  for (let j = 0; j < n; j++) {
+    const cat = LABOR_CATEGORIES[j];
+    const a = -Math.PI / 2 + (2 * Math.PI * j / n);
+    const ex = cx + r2 * Math.cos(a), ey = cy + r2 * Math.sin(a);
+    const hasHrs = breakdown[j].hrs > 0;
+    html += `<line x1="${cx}" y1="${cy}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${hasHrs ? '#0f3460' : '#0a1a30'}" stroke-width="0.5"/>`;
+    const lx = cx + (r2 + 18) * Math.cos(a), ly = cy + (r2 + 18) * Math.sin(a);
+    const anchor = Math.abs(Math.cos(a)) < 0.1 ? 'middle' : (Math.cos(a) > 0 ? 'start' : 'end');
+    html += `<text x="${lx.toFixed(1)}" y="${(ly + 4).toFixed(1)}" fill="${hasHrs ? cat.color : '#333'}" font-size="11" text-anchor="${anchor}" font-weight="700">${cat.short}</text>`;
+  }
+  let dataPts = '';
+  for (let j = 0; j < n; j++) {
+    const a = -Math.PI / 2 + (2 * Math.PI * j / n);
+    let v = breakdown[j].hrs / maxVal; if (v > 1) v = 1;
+    dataPts += `${(cx + r2 * v * Math.cos(a)).toFixed(1)},${(cy + r2 * v * Math.sin(a)).toFixed(1)} `;
+  }
+  html += `<polygon points="${dataPts}" fill="rgba(233,69,96,0.2)" stroke="#e94560" stroke-width="1.5"/>`;
+  for (let j = 0; j < n; j++) {
+    const cat = LABOR_CATEGORIES[j];
+    const a = -Math.PI / 2 + (2 * Math.PI * j / n);
+    let v = breakdown[j].hrs / maxVal; if (v > 1) v = 1;
+    const dx = cx + r2 * v * Math.cos(a), dy = cy + r2 * v * Math.sin(a);
+    html += `<circle cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="4.5" fill="${breakdown[j].hrs > 0 ? cat.color : '#333'}" stroke="${breakdown[j].hrs > 0 ? '#fff' : '#222'}" stroke-width="1"/>`;
+  }
+  html += `</svg></div>`;
+
+  // Category inputs (editable)
+  html += `<div style="display:flex;flex-direction:column;gap:4px;min-width:160px">`;
+  html += `<div style="display:flex;gap:6px;font-size:9px;color:#555;margin-bottom:2px"><span>Category</span><span style="margin-left:auto">Hours</span><span style="width:55px;text-align:right">Cost</span></div>`;
+  for (let j = 0; j < n; j++) {
+    const cat = LABOR_CATEGORIES[j];
+    const hrs = breakdown[j].hrs;
+    const cost = hrs * rate;
+    const hasHrs = hrs > 0;
+    const pct = totalHrs > 0 ? (hrs / totalHrs * 100).toFixed(0) : '0';
+    html += `<div style="display:flex;align-items:center;gap:4px;opacity:${hasHrs ? '1' : '0.3'}">`;
+    html += `<span style="color:${cat.color};font-size:11px;font-weight:700;width:24px">${cat.short}</span>`;
+    html += `<input type="text" value="${hasHrs ? hrs.toFixed(2) : ''}" placeholder="0" style="width:50px;background:#1a1a2e;border:1px solid ${hasHrs ? '#0f3460' : '#0a1a30'};color:${hasHrs ? cat.color : '#333'};padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" `;
+    html += `onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onchange="window._cmpRadarEditCat('${cat.key}',this.value)">`;
+    html += `<span style="color:#555;font-size:9px;width:24px;text-align:right">${pct}%</span>`;
+    html += `<span style="color:#a0a0c0;font-size:10px;width:55px;text-align:right">${hasHrs ? formatVal(cost, 'currency') : '\u2014'}</span>`;
     html += `</div>`;
   }
+  html += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #0f3460;display:flex;justify-content:space-between;font-size:10px">`;
+  html += `<span style="color:#e94560;font-weight:700">Total</span>`;
+  html += `<span style="color:#e94560;font-weight:700">${totalHrs.toFixed(2)}h</span>`;
+  html += `<span style="color:#e94560;font-weight:700">${formatVal(totalHrs * rate, 'currency')}</span>`;
   html += `</div>`;
-  html += `</div></div>`;
+  html += `</div></div></div>`;
   return html;
 }
 
@@ -1129,6 +1158,38 @@ window._cmpFocusRadar = function(groupPath) {
 window._cmpResetRadar = function() {
   _radarTarget = null;
   _radarRows = null;
+  renderCompiler();
+};
+
+// Edit a labor category from the compiler radar — distributes proportionally to source rows
+window._cmpRadarEditCat = async function(catKey, value) {
+  const newTotal = parseFloat(value);
+  if (isNaN(newTotal)) { renderCompiler(); return; }
+  const rows = _radarRows || applyFilters(_rows);
+  if (!rows || rows.length === 0) return;
+
+  const rate = getLaborRate();
+  const oldTotal = rows.reduce((s, r) => s + ((r._laborCatHrs && r._laborCatHrs[catKey]) || 0), 0);
+  const ratio = oldTotal > 0 ? newTotal / oldTotal : 0;
+  const even = newTotal / rows.length;
+
+  for (const row of rows) {
+    const oldCatVal = (row._laborCatHrs && row._laborCatHrs[catKey]) || 0;
+    const newCatVal = oldTotal > 0 ? oldCatVal * ratio : even;
+    if (!row._overrides) row._overrides = {};
+    row._hasOverride = true;
+    row._overrides['laborCat_' + catKey] = parseFloat(newCatVal.toFixed(4));
+    // Recalc total labor hours = sum of all categories
+    const totalHrs = LABOR_CATEGORIES.reduce((s, cat) => {
+      if (cat.key === catKey) return s + newCatVal;
+      return s + ((row._laborCatHrs && row._laborCatHrs[cat.key]) || 0);
+    }, 0);
+    row._overrides.laborHrs = parseFloat(totalHrs.toFixed(4));
+    row._overrides.laborCost = parseFloat((totalHrs * rate).toFixed(2));
+    row._overrides.totalCost = parseFloat(((row._matCost || 0) + totalHrs * rate).toFixed(2));
+    await _writeOverrideToSource(row);
+  }
+  await loadCompilerData();
   renderCompiler();
 };
 
