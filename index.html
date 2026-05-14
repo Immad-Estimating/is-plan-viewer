@@ -4230,9 +4230,10 @@ function renderRadarChart(baseKey, itemType, subType) {
   }
   html += '</div>';
 
-  // Save as Company Default button
-  html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #0f3460;display:flex;align-items:center;gap:8px">';
+  // Save as Company Default + Revert to Platform Default buttons
+  html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #0f3460;display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
   html += '<button onclick="event.stopPropagation();saveAsCompanyDefault(\'' + baseKey + '\')" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:10px;white-space:nowrap" title="Save current labor hours as company-wide default for all future projects">🏢 Save as Company Default</button>';
+  html += '<button onclick="event.stopPropagation();revertToPlatformDefault(\'' + baseKey + '\')" style="background:#1a1a2e;color:#ff6b6b;border:1px solid #3d0a0a;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:10px;white-space:nowrap" title="Remove all project and company overrides — revert to platform seed defaults">↩ Revert to Default</button>';
   var hasGlobal = _hasCompanyDefault(baseKey);
   if (hasGlobal) html += '<span style="color:#00ff88;font-size:9px">✓ Company default set</span>';
   html += '</div>';
@@ -4324,6 +4325,32 @@ window.saveAsCompanyDefault = function(baseKey) {
   localStorage.setItem('isplan_labor_company', JSON.stringify(cd));
   _companyDefaults = cd;
   showToast('Saved ' + saved + ' labor values as company default for ' + baseKey, 2500);
+  renderPriceBook();
+};
+
+window.revertToPlatformDefault = async function(baseKey) {
+  var removed = 0;
+  // 1. Remove project overrides from IndexedDB
+  for (var i = 0; i < LABOR_CATEGORIES.length; i++) {
+    var catKey = baseKey + '-lc-' + LABOR_CATEGORIES[i].key;
+    if (priceBookCache && priceBookCache[catKey] && priceBookCache[catKey].laborHrs != null) {
+      delete priceBookCache[catKey].laborHrs;
+      await savePriceBookEntry(catKey, priceBookCache[catKey]);
+      removed++;
+    }
+  }
+  // 2. Remove company defaults from localStorage
+  var cd = _loadCompanyDefaults();
+  var cdRemoved = 0;
+  for (var i = 0; i < LABOR_CATEGORIES.length; i++) {
+    var catKey = baseKey + '-lc-' + LABOR_CATEGORIES[i].key;
+    if (cd[catKey]) { delete cd[catKey]; cdRemoved++; }
+  }
+  if (cdRemoved > 0) {
+    localStorage.setItem('isplan_labor_company', JSON.stringify(cd));
+    _companyDefaults = cd;
+  }
+  showToast('Reverted ' + baseKey + ' to platform defaults (' + removed + ' project + ' + cdRemoved + ' company overrides cleared)', 3000);
   renderPriceBook();
 };
 
