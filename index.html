@@ -3495,10 +3495,38 @@ function getPriceBookEntry(type, sizeA) {
 }
 
 async function savePriceBookEntry(key, data) {
+  // Audit log: record what changed before overwriting
+  var prev = priceBookCache ? priceBookCache[key] : null;
+  if (prev) {
+    var changes = [];
+    for (var p in data) {
+      if (p === 'key') continue;
+      var oldVal = prev[p] != null ? prev[p] : null;
+      var newVal = data[p] != null ? data[p] : null;
+      if (oldVal !== newVal) changes.push({ prop: p, old: oldVal, new: newVal });
+    }
+    if (changes.length > 0) _logPBOverride(key, changes);
+  } else if (data.laborHrs != null || data.materialCost != null) {
+    // New entry — log as first set
+    var props = [];
+    if (data.laborHrs != null) props.push({ prop: 'laborHrs', old: null, new: data.laborHrs });
+    if (data.materialCost != null) props.push({ prop: 'materialCost', old: null, new: data.materialCost });
+    if (props.length > 0) _logPBOverride(key, props);
+  }
   const entry = { key, ...data };
   await idbPut('priceBook', entry);
   if (!priceBookCache) priceBookCache = {};
   priceBookCache[key] = entry;
+}
+
+function _logPBOverride(key, changes) {
+  try {
+    var log = JSON.parse(localStorage.getItem('isplan_pb_audit_log') || '[]');
+    log.push({ ts: Date.now(), key: key, changes: changes });
+    // Keep last 500 entries to avoid unbounded growth
+    if (log.length > 500) log = log.slice(-500);
+    localStorage.setItem('isplan_pb_audit_log', JSON.stringify(log));
+  } catch (e) { /* silent — audit log is non-critical */ }
 }
 
 // Price Book UI
