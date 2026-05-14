@@ -1002,7 +1002,7 @@ function renderCompiler() {
         const delta = currentVal - origVal;
         const deltaCls = Math.abs(delta) < 0.005 ? 'cmp-delta-zero' : (delta > 0 ? 'cmp-delta-pos' : 'cmp-delta-neg');
         const sign = delta > 0 ? '+' : '';
-        html += `<td class="num ${deltaCls}">${Math.abs(delta) < 0.005 ? '\u2014' : sign + formatVal(delta, c.type)}</td>`;
+        html += `<td class="num ${deltaCls}">${Math.abs(delta) < 0.005 ? '—' : sign + formatVal(delta, c.type)}</td>`;
       }
       html += `</tr>`;
     }
@@ -1016,7 +1016,7 @@ function renderCompiler() {
         const adj = _grandAdj[adjKey] || 0;
         const sign = adj > 0 ? '+' : '';
         const adjCls = Math.abs(adj) < 0.005 ? 'cmp-delta-zero' : (adj > 0 ? 'cmp-delta-pos' : 'cmp-delta-neg');
-        html += `<td class="num ${adjCls}">${Math.abs(adj) < 0.005 ? '\u2014' : sign + formatVal(adj, c.type)}</td>`;
+        html += `<td class="num ${adjCls}">${Math.abs(adj) < 0.005 ? '—' : sign + formatVal(adj, c.type)}</td>`;
       }
       html += `</tr>`;
     }
@@ -1071,8 +1071,8 @@ function renderCompilerRadar(rows, label) {
 
   let html = `<div class="cmp-radar">`;
   html += `<div class="cmp-radar-header">`;
-  html += `<span class="cmp-radar-title">\ud83d\udcca ${escHtml(label)} \u2014 ${totalHrs.toFixed(1)} hrs / ${formatVal(totalHrs * rate, 'currency')}</span>`;
-  if (_radarTarget) html += `<button class="cmp-radar-close" onclick="window._cmpResetRadar()" title="Reset to scope totals">\u2715 Reset</button>`;
+  html += `<span class="cmp-radar-title">📊 ${escHtml(label)} — ${totalHrs.toFixed(1)} hrs / ${formatVal(totalHrs * rate, 'currency')}</span>`;
+  if (_radarTarget) html += `<button class="cmp-radar-close" onclick="window._cmpResetRadar()" title="Reset to scope totals">✕ Reset</button>`;
   html += `</div>`;
 
   html += `<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">`;
@@ -1128,7 +1128,7 @@ function renderCompilerRadar(rows, label) {
     html += `<input type="text" value="${hasHrs ? hrs.toFixed(2) : ''}" placeholder="0" style="width:50px;background:#1a1a2e;border:1px solid ${hasHrs ? '#0f3460' : '#0a1a30'};color:${hasHrs ? cat.color : '#333'};padding:3px 4px;border-radius:3px;font-size:11px;text-align:right" `;
     html += `onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onchange="window._cmpRadarEditCat('${cat.key}',this.value)">`;
     html += `<span style="color:#555;font-size:9px;width:24px;text-align:right">${pct}%</span>`;
-    html += `<span style="color:#a0a0c0;font-size:10px;width:55px;text-align:right">${hasHrs ? formatVal(cost, 'currency') : '\u2014'}</span>`;
+    html += `<span style="color:#a0a0c0;font-size:10px;width:55px;text-align:right">${hasHrs ? formatVal(cost, 'currency') : '—'}</span>`;
     html += `</div>`;
   }
   html += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #0f3460;display:flex;justify-content:space-between;font-size:10px">`;
