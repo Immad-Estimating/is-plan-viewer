@@ -4152,16 +4152,33 @@ function renderRadarChart(baseKey, itemType, subType) {
   html += '</svg>';
   // Category inputs below chart
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px">';
+  // Source legend
+  html += '<div style="display:flex;gap:8px;margin-bottom:4px;font-size:9px">';
+  html += '<span style="color:#e94560">● Project</span>';
+  html += '<span style="color:#00ff88">● Company</span>';
+  html += '<span style="color:#555">● Default</span>';
+  html += '</div>';
   for (var j = 0; j < n; j++) {
     var cat = allCats[j];
     var enabled = isCatEnabled(cat);
     var catKey = lhCatKey(baseKey, cat.key);
+    // Determine source of this value
+    var pbEntry = priceBookCache ? priceBookCache[catKey] : null;
+    var hasProjVal = pbEntry && pbEntry.laborHrs != null;
+    var cd = _loadCompanyDefaults();
+    var hasCo = cd[catKey] && cd[catKey].laborHrs;
+    var hasJson = _laborDefault(baseKey, cat.key) > 0;
+    var srcDot = '', srcTitle = '';
+    if (hasProjVal) { srcDot = '#e94560'; srcTitle = 'Project override'; }
+    else if (hasCo) { srcDot = '#00ff88'; srcTitle = 'Company default'; }
+    else if (hasJson && breakdown[j].hrs > 0) { srcDot = '#555'; srcTitle = 'JSON seed default'; }
     html += '<div style="display:flex;align-items:center;gap:4px;opacity:' + (enabled ? '1' : '0.3') + '">';
     html += '<span style="color:' + cat.color + ';font-size:11px;font-weight:700;width:24px">' + cat.short + '</span>';
     html += '<input type="text" value="' + (breakdown[j].hrs || '') + '" placeholder="0" ';
     html += (enabled ? '' : 'disabled ') + 'style="width:44px;background:#1a1a2e;border:1px solid ' + (enabled ? '#0f3460' : '#0a1a30') + ';color:' + (enabled ? cat.color : '#333') + ';padding:3px 4px;border-radius:3px;font-size:12px;text-align:right" ';
     html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onchange="updateRadarHrs(\'' + catKey + '\',this.value)">';
-    html += '<span style="color:#555;font-size:10px">h</span>';
+    if (srcDot) html += '<span style="color:' + srcDot + ';font-size:8px" title="' + srcTitle + '">●</span>';
+    else html += '<span style="width:8px"></span>';
     html += '</div>';
   }
   html += '</div>';
