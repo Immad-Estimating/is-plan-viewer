@@ -78,6 +78,15 @@ async function cGetByIndex(store, idx, val) {
     r.onerror = () => rej(r.error);
   });
 }
+async function cPut(store, data) {
+  const db = await cOpenDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    const r = tx.objectStore(store).put(data);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
 async function cGet(store, key) {
   const db = await cOpenDB();
   return new Promise((res, rej) => {
@@ -149,6 +158,10 @@ let _projectRateTable = null;
 let _pinnedCats = { laborHrs: new Set(), laborCost: new Set() };
 let _lbrCollapsed = { laborHrs: false, laborCost: false };
 
+// Grand total adjustments — stored per-project in localStorage, not on items
+// { materialCost: 15000, laborHrs: 200 } means "I want the grand total to be this"
+let _grandAdj = {};
+
 // Filters: { dimensionKey: Set of allowed values } — null means no filter (all pass)
 let _filters = {};
 
@@ -215,6 +228,26 @@ const CSS = `
 .cmp-empty { text-align: center; color: #555; padding: 40px 20px; }
 .cmp-empty-icon { font-size: 32px; margin-bottom: 8px; }
 
+/* Inline cell editing */
+.cmp-cell-edit { background: #0d1117; border: 1px solid #e94560; color: #ffd43b; padding: 2px 4px; border-radius: 3px; font-size: 11px; text-align: right; width: 70px; font-variant-numeric: tabular-nums; outline: none; }
+.cmp-cell-edit:focus { box-shadow: 0 0 6px rgba(233,69,96,0.4); }
+.cmp-editable { cursor: cell; position: relative; }
+.cmp-editable:hover { background: rgba(233,69,96,0.08); }
+.cmp-editable:not(.cmp-override):hover::after { content: '✎'; position: absolute; right: 2px; top: 1px; font-size: 8px; color: #e94560; opacity: 0.6; }
+.cmp-override { color: #ffd43b; }
+.cmp-override .cmp-val-current { display: inline; }
+.cmp-override:hover .cmp-val-current { display: none; }
+.cmp-override::before { content: attr(data-orig); display: none; color: #555; font-style: italic; text-decoration: line-through; }
+.cmp-override:hover::before { display: inline; }
+.cmp-override::after { content: ''; position: absolute; top: -1px; right: -1px; width: 5px; height: 5px; background: #ffd43b; border-radius: 50%; }
+.cmp-ovr-dot { display: inline-block; width: 5px; height: 5px; background: #ffd43b; border-radius: 50%; margin-left: 3px; vertical-align: middle; cursor: help; }
+
+/* Grand total delta row */
+.cmp-delta-row td { font-size: 10px; color: #a0a0c0; border-top: none; padding-top: 0; }
+.cmp-delta-pos { color: #ff6b6b; }
+.cmp-delta-neg { color: #00ff88; }
+.cmp-delta-zero { color: #555; }
+
 /* Labor breakdown header — hover target */
 .cmp-lbr-th { position: relative; }
 .cmp-lbr-th:hover { color: #e94560; }
@@ -273,7 +306,22 @@ function getLaborRate() {
   return (_projectRateTable && _projectRateTable.laborRatePerHr) || 45;
 }
 
+let _companyDefaultsCache = null;
+function _getCompanyDefaults() {
+  if (_companyDefaultsCache) return _companyDefaultsCache;
+  try { _companyDefaultsCache = JSON.parse(localStorage.getItem('isplan_labor_company') || '{}'); }
+  catch (e) { _companyDefaultsCache = {}; }
+  return _companyDefaultsCache;
+}
+
 function _laborDefaultFallback(baseKey, catKey) {
+  // 1. Company-wide defaults (localStorage)
+  const cd = _getCompanyDefaults();
+  const cdKey = baseKey + '-lc-' + catKey;
+  if (cd[cdKey] && cd[cdKey].laborHrs) return cd[cdKey].laborHrs;
+  const cdBase = baseKey.replace(/-(mw)?\d+(x\d+)?$/, '') + '-lc-' + catKey;
+  if (cdBase !== cdKey && cd[cdBase] && cd[cdBase].laborHrs) return cd[cdBase].laborHrs;
+  // 2. JSON defaults
   if (!LABOR_DEFAULTS) return 0;
   if (LABOR_DEFAULTS[baseKey] && LABOR_DEFAULTS[baseKey][catKey]) return LABOR_DEFAULTS[baseKey][catKey];
   const baseOnly = baseKey.replace(/-(mw)?\d+(x\d+)?$/, '');
@@ -361,13 +409,30 @@ function normalizeRows(allPageData, drawingNames) {
       }
       const laborCost = laborHrs * rate;
 
+      // Store original calculated values before overrides
+      const origLaborHrs = laborHrs, origMatCost = matCost;
+      const origLaborCost = laborHrs * rate;
+      const origTotal = matCost + origLaborCost;
+
+      // Apply manual overrides if present
+      const mOvr = m._overrides || {};
+      if (mOvr.laborHrs != null) { laborHrs = mOvr.laborHrs; }
+      if (mOvr.materialCost != null) { matCost = mOvr.materialCost; }
+      const finalLaborCost = laborHrs * rate;
+      const finalTotal = (mOvr.totalCost != null) ? mOvr.totalCost : (matCost + finalLaborCost);
+      const hasOverride = Object.keys(mOvr).length > 0;
+
       const flexLabel = isFlex ? ('Flex ' + capitalize(m.duct.flexColor || 'black')) : null;
       rows.push({
         _itemType: isFlex ? 'Flex Duct' : 'Duct Run', _size: m.duct.dims || '?', _shape: flexLabel || capitalize(shape),
         _page: page, _drawingId: drawingId, _drawingName: drawingName,
         _lengthFt: lengthFt, _matCost: matCost, _laborHrs: laborHrs,
-        _laborCost: laborCost, _totalCost: matCost + laborCost,
+        _laborCost: finalLaborCost, _totalCost: finalTotal,
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
+        _hasOverride: hasOverride, _overrides: mOvr,
+        _orig_laborHrs: origLaborHrs, _orig_materialCost: origMatCost,
+        _orig_laborCost: origLaborCost, _orig_totalCost: origTotal, _orig_lengthFt: lengthFt,
+        _orig_laborCatHrs: { ...laborCatHrs },
         phase: m.phase || null, costGroup: m.costGroup || null, gauge: m.gauge || null,
         systemSymbol: m.systemSymbol || null,
         _sourceType: 'measurement', _sourceId: m.id,
@@ -509,15 +574,30 @@ function normalizeRows(allPageData, drawingNames) {
           assignedCat = co ? co.label : capitalize(fb);
         }
       }
+      // Store originals before overrides
+      const origFLabHrs = laborHrs, origFMatCost = matCost;
+      const origFLabCost = laborHrs * rate;
+      const origFTotal = matCost + origFLabCost;
+
+      // Apply manual overrides
+      const fOvr = f._overrides || {};
+      if (fOvr.laborHrs != null) laborHrs = fOvr.laborHrs;
+      if (fOvr.materialCost != null) matCost = fOvr.materialCost;
       const laborCost = laborHrs * rate;
+      const fTotal = (fOvr.totalCost != null) ? fOvr.totalCost : (matCost + laborCost);
+      const fHasOvr = Object.keys(fOvr).length > 0;
 
       rows.push({
         _itemType: FITTING_NAMES[f.type] || f.type,
         _size: f.sizeA + (f.sizeB ? '×' + f.sizeB : ''), _shape: capitalize(shape),
         _page: page, _drawingId: drawingId, _drawingName: drawingName,
         _lengthFt: 0, _matCost: matCost, _laborHrs: laborHrs,
-        _laborCost: laborCost, _totalCost: matCost + laborCost,
+        _laborCost: laborCost, _totalCost: fTotal,
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
+        _hasOverride: fHasOvr, _overrides: fOvr,
+        _orig_laborHrs: origFLabHrs, _orig_materialCost: origFMatCost,
+        _orig_laborCost: origFLabCost, _orig_totalCost: origFTotal, _orig_lengthFt: 0,
+        _orig_laborCatHrs: { ...laborCatHrs },
         phase: f.phase || null, costGroup: f.costGroup || null, gauge: f.gauge || null,
         systemSymbol: f.systemSymbol || null,
         _sourceType: 'fitting', _sourceId: f.id,
@@ -886,15 +966,70 @@ function renderCompiler() {
     html += `</tr></thead><tbody>`;
     html += renderTreeRows(tree, cols, 0);
 
-    // Grand total
-    html += `<tr class="grand-total"><td>Grand Total</td>`;
+    // Item subtotal (sum of all items)
+    html += `<tr class="grand-total"><td>Item Subtotal</td>`;
     for (const c of cols) {
       const val = c.extract(filteredRows);
       const cls = c.isSub ? 'num pinned-cat' : 'num';
       const style = c.isSub ? ` style="--cat-color:${c.color}"` : '';
       html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
     }
-    html += `</tr></tbody></table>`;
+    html += `</tr>`;
+
+    // Item-level override delta (when individual items have been changed)
+    const hasItemOverride = filteredRows.some(r => r._hasOverride);
+    if (hasItemOverride) {
+      html += `<tr class="cmp-delta-row"><td style="font-style:italic">Base (calculated)</td>`;
+      for (const c of cols) {
+        const origVal = _calcOriginal(filteredRows, c.key, c.isSub ? c.catKey : null);
+        html += `<td class="num">${formatVal(origVal, c.type)}</td>`;
+      }
+      html += `</tr>`;
+      html += `<tr class="cmp-delta-row"><td style="font-style:italic">Δ Item Adjustments</td>`;
+      for (const c of cols) {
+        const currentVal = c.extract(filteredRows);
+        const origVal = _calcOriginal(filteredRows, c.key, c.isSub ? c.catKey : null);
+        const delta = currentVal - origVal;
+        const deltaCls = Math.abs(delta) < 0.005 ? 'cmp-delta-zero' : (delta > 0 ? 'cmp-delta-pos' : 'cmp-delta-neg');
+        const sign = delta > 0 ? '+' : '';
+        html += `<td class="num ${deltaCls}">${Math.abs(delta) < 0.005 ? '—' : sign + formatVal(delta, c.type)}</td>`;
+      }
+      html += `</tr>`;
+    }
+
+    // Auto-calculated contingency row (derived from Grand Total - Subtotal)
+    const hasGrandAdj = Object.values(_grandAdj).some(v => v != null);
+    if (hasGrandAdj) {
+      html += `<tr class="cmp-delta-row" style="border-top:1px solid #0f3460"><td style="font-style:italic;color:#ffa94d">± Contingency <span style="font-size:9px;color:#ff6b6b;cursor:pointer" onclick="event.stopPropagation();window._cmpClearGrandAdj()" title="Reset grand total to item subtotal">↩</span></td>`;
+      for (const c of cols) {
+        const adjKey = c.isSub ? c.parentKey + ':' + c.catKey : c.key;
+        const adj = _grandAdj[adjKey] || 0;
+        const sign = adj > 0 ? '+' : '';
+        const adjCls = Math.abs(adj) < 0.005 ? 'cmp-delta-zero' : (adj > 0 ? 'cmp-delta-pos' : 'cmp-delta-neg');
+        html += `<td class="num ${adjCls}">${Math.abs(adj) < 0.005 ? '—' : sign + formatVal(adj, c.type)}</td>`;
+      }
+      html += `</tr>`;
+    }
+
+    // Grand Total — editable. User types desired total, contingency auto-derives.
+    html += `<tr class="grand-total"><td>Grand Total ${hasGrandAdj ? '<span style="font-size:9px;color:#ffa94d">●</span>' : ''}</td>`;
+    for (const c of cols) {
+      const base = c.extract(filteredRows);
+      const adjKey = c.isSub ? c.parentKey + ':' + c.catKey : c.key;
+      const adj = _grandAdj[adjKey] || 0;
+      const total = base + adj;
+      const cls2 = c.isSub ? 'num pinned-cat' : 'num';
+      const style2 = c.isSub ? ` style="--cat-color:${c.color}"` : '';
+      const gtEditable = !c.alwaysOn && (c.type === 'number' || c.type === 'currency') && filteredRows.length > 0;
+      if (gtEditable) {
+        html += `<td class="${cls2} cmp-editable"${style2} onclick="event.stopPropagation(); window._cmpEditGrandTotal(this,'${adjKey}',${base})" title="Click to set desired total — contingency auto-calculates">${formatVal(total, c.type)}</td>`;
+      } else {
+        html += `<td class="${cls2}"${style2}>${formatVal(total, c.type)}</td>`;
+      }
+    }
+    html += `</tr>`;
+
+    html += `</tbody></table>`;
   }
   html += `</div>`;
 
@@ -910,18 +1045,84 @@ function renderTreeRows(node, cols, depth) {
     const hasKids = child._children && child._children._children && child._children._children.length > 0;
     const toggle = hasKids ? `<span class="cmp-toggle">${isCollapsed ? '▶' : '▼'}</span>` : `<span class="cmp-toggle"></span>`;
 
+    const grpHasOverride = child._rows.some(r => r._hasOverride);
     html += `<tr class="group-header depth-${depth}" onclick="window._cmpToggleCollapse('${escapePath(path)}')">`;
-    html += `<td>${toggle} ${escHtml(child.label)}</td>`;
+    html += `<td>${toggle} ${escHtml(child.label)}${grpHasOverride ? '<span class="cmp-ovr-dot" title="Contains overridden values"></span> <span style="font-size:9px;color:#ff6b6b;cursor:pointer;font-weight:400" onclick="event.stopPropagation();window._cmpClearOverrides(\'' + escapePath(path) + '\')" title="Clear all overrides in this group">↩</span>' : ''}</td>`;
     for (const c of cols) {
       const val = c.extract(child._rows);
       const cls = c.isSub ? 'num pinned-cat' : 'num';
       const style = c.isSub ? ` style="--cat-color:${c.color}"` : '';
-      html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
+      const editable = !c.alwaysOn && (c.type === 'number' || c.type === 'currency') && child._rows.length > 0;
+      if (editable) {
+        const pathEnc = escapePath(path);
+        const editKey = c.isSub ? c.parentKey + ':' + c.catKey : c.key;
+        // Check for overrides
+        let isOvr = false;
+        if (c.isSub) {
+          isOvr = child._rows.some(r => r._hasOverride && r._overrides && r._overrides['laborCat_' + c.catKey] != null);
+        } else {
+          const fld = _COL_TO_FIELD[c.key];
+          if (fld) isOvr = child._rows.some(r => r._hasOverride && r._overrides && r._overrides[fld] != null);
+        }
+        let origHtml = '';
+        if (isOvr) {
+          origHtml = ` data-orig="${formatVal(_calcOriginal(child._rows, c.key, c.isSub ? c.catKey : null), c.type)}"`;
+        }
+        html += `<td class="${cls} cmp-editable${isOvr ? ' cmp-override' : ''}"${style}${origHtml} onclick="event.stopPropagation(); window._cmpEditCell(this,'${editKey}','${pathEnc}',${child._rows.length})">${isOvr ? '<span class="cmp-val-current">' + formatVal(val, c.type) + '</span>' : formatVal(val, c.type)}</td>`;
+      } else {
+        html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
+      }
     }
     html += `</tr>`;
     if (!isCollapsed && child._children) html += renderTreeRows(child._children, cols, depth + 1);
   }
   return html;
+}
+
+// Calculate original (pre-override) aggregate for a set of rows
+function _calcOriginal(rows, colKey, catKey) {
+  // If catKey is provided, calculate original for a specific labor category sub-column
+  if (catKey) {
+    const isHrs = colKey.indexOf('laborHrs') !== -1 || colKey.indexOf('_') !== -1 && colKey.startsWith('laborHrs');
+    let total = 0;
+    for (const r of rows) {
+      if (r._hasOverride && r._overrides && r._overrides['laborCat_' + catKey] != null) {
+        // Original = stored _orig category value
+        total += (r._orig_laborCatHrs && r._orig_laborCatHrs[catKey]) || 0;
+        if (!isHrs) total = 0; // recalc below
+      } else {
+        const src = isHrs ? r._laborCatHrs : r._laborCatCost;
+        total += (src && src[catKey]) || 0;
+      }
+    }
+    // For cost sub-columns, recalculate from original hours
+    if (!isHrs) {
+      total = 0;
+      const rate = getLaborRate();
+      for (const r of rows) {
+        if (r._hasOverride && r._overrides && r._overrides['laborCat_' + catKey] != null) {
+          total += ((r._orig_laborCatHrs && r._orig_laborCatHrs[catKey]) || 0) * rate;
+        } else {
+          total += (r._laborCatCost && r._laborCatCost[catKey]) || 0;
+        }
+      }
+    }
+    return total;
+  }
+
+  // Main column original calculation
+  const mapping = _COL_MAP[colKey];
+  if (!mapping) return 0;
+  const { field, rowProp } = mapping;
+  let total = 0;
+  for (const r of rows) {
+    if (r._hasOverride && r._overrides && r._overrides[field] != null) {
+      total += r['_orig_' + field] != null ? r['_orig_' + field] : (r[rowProp] || 0);
+    } else {
+      total += r[rowProp] || 0;
+    }
+  }
+  return total;
 }
 
 function formatVal(val, type) {
@@ -936,10 +1137,22 @@ function escapePath(s) { return s.replace(/'/g, "\\'").replace(/\\/g, "\\\\"); }
 
 // ── Data loading ──────────────────────────────────────────────────────
 
+function _loadGrandAdj() {
+  try { _grandAdj = JSON.parse(localStorage.getItem('isplan_grand_adj_' + _projectId) || '{}'); }
+  catch (e) { _grandAdj = {}; }
+}
+function _saveGrandAdj() {
+  if (!_projectId) return;
+  const hasVals = Object.values(_grandAdj).some(v => v != null);
+  if (hasVals) localStorage.setItem('isplan_grand_adj_' + _projectId, JSON.stringify(_grandAdj));
+  else localStorage.removeItem('isplan_grand_adj_' + _projectId);
+}
+
 async function loadCompilerData() {
   if (!_projectId) { _rows = []; return; }
   await loadPriceBook();
   await loadProjectRate(_projectId);
+  _loadGrandAdj();
 
   const drawings = await cGetByIndex('drawings', 'projectId', _projectId);
   _drawingNames = {};
@@ -1029,6 +1242,299 @@ window._cmpToggleCol = function(key) {
 };
 
 window._cmpToggleCollapse = function(path) { _collapsed[path] = !_collapsed[path]; renderCompiler(); };
+
+// ── Inline cell editing ───────────────────────────────────────────────
+
+window._cmpEditCell = function(td, colKey, groupPath, rowCount) {
+  const currentText = td.textContent.replace(/[,$]/g, '').replace('—', '').trim();
+  const currentVal = parseFloat(currentText) || 0;
+  const input = document.createElement('input');
+  input.className = 'cmp-cell-edit';
+  input.type = 'text';
+  input.value = currentVal || '';
+  input.setAttribute('data-col', colKey);
+  input.setAttribute('data-path', groupPath);
+  input.setAttribute('data-rows', rowCount);
+  input.setAttribute('data-original', currentVal);
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  let committed = false;
+  const commit = async () => {
+    if (committed) return;
+    committed = true;
+    const newVal = parseFloat(input.value);
+    if (isNaN(newVal) || newVal === currentVal) { renderCompiler(); return; }
+    try {
+      await _cmpApplyOverride(colKey, groupPath, newVal, currentVal);
+    } catch (e) {
+      console.error('Override apply failed:', e);
+      renderCompiler();
+    }
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); committed = true; renderCompiler(); }
+  });
+};
+
+// Map column key to: override field name, and row property to read current value
+const _COL_MAP = {
+  totalLF:      { field: 'lengthFt',     rowProp: '_lengthFt' },
+  materialCost: { field: 'materialCost', rowProp: '_matCost' },
+  laborHrs:     { field: 'laborHrs',     rowProp: '_laborHrs' },
+  laborCost:    { field: 'laborCost',    rowProp: '_laborCost' },
+  totalCost:    { field: 'totalCost',    rowProp: '_totalCost' },
+};
+// Keep _COL_TO_FIELD for override indicator check
+const _COL_TO_FIELD = { totalLF: 'lengthFt', materialCost: 'materialCost', laborHrs: 'laborHrs', laborCost: 'laborCost', totalCost: 'totalCost' };
+
+async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
+  // Find the rows matching this group path
+  const filteredRows = applyFilters(_rows);
+  const tree = buildGroupTree(filteredRows, _activeGroups);
+  const targetRows = _findRowsByPath(tree, groupPath);
+  if (!targetRows || targetRows.length === 0) { renderCompiler(); return; }
+
+  // Check if this is a labor category sub-column edit (format: "laborHrs:rough")
+  const catSplit = colKey.split(':');
+  const isCatEdit = catSplit.length === 2;
+  const parentCol = isCatEdit ? catSplit[0] : colKey;
+  const catKey = isCatEdit ? catSplit[1] : null;
+
+  const rate = getLaborRate();
+  const ratio = oldVal > 0 ? newVal / oldVal : 0;
+  const even = newVal / targetRows.length;
+
+  if (isCatEdit) {
+    // Category sub-column edit: change specific labor category on each row
+    const isHrs = parentCol === 'laborHrs';
+    for (const row of targetRows) {
+      const catSrc = isHrs ? row._laborCatHrs : row._laborCatCost;
+      const oldCatVal = (catSrc && catSrc[catKey]) || 0;
+      const newCatVal = oldVal > 0 ? oldCatVal * ratio : even;
+
+      if (!row._overrides) row._overrides = {};
+      row._hasOverride = true;
+
+      if (isHrs) {
+        // Store the category hours override
+        row._overrides['laborCat_' + catKey] = parseFloat(newCatVal.toFixed(4));
+        // Recalc total laborHrs = sum of all categories
+        const totalHrs = LABOR_CATEGORIES.reduce((s, cat) => {
+          if (cat.key === catKey) return s + newCatVal;
+          return s + ((row._laborCatHrs && row._laborCatHrs[cat.key]) || 0);
+        }, 0);
+        row._overrides.laborHrs = parseFloat(totalHrs.toFixed(4));
+        row._overrides.laborCost = parseFloat((totalHrs * rate).toFixed(2));
+        row._overrides.totalCost = parseFloat(((row._matCost || 0) + totalHrs * rate).toFixed(2));
+      } else {
+        // laborCost category: back-calc hours from cost
+        const newCatHrs = parseFloat((newCatVal / rate).toFixed(4));
+        row._overrides['laborCat_' + catKey] = newCatHrs;
+        const totalHrs = LABOR_CATEGORIES.reduce((s, cat) => {
+          if (cat.key === catKey) return s + newCatHrs;
+          return s + ((row._laborCatHrs && row._laborCatHrs[cat.key]) || 0);
+        }, 0);
+        row._overrides.laborHrs = parseFloat(totalHrs.toFixed(4));
+        row._overrides.laborCost = parseFloat((totalHrs * rate).toFixed(2));
+        row._overrides.totalCost = parseFloat(((row._matCost || 0) + totalHrs * rate).toFixed(2));
+      }
+      await _writeOverrideToSource(row);
+    }
+  } else {
+    // Main column edit
+    const mapping = _COL_MAP[colKey];
+    if (!mapping) { renderCompiler(); return; }
+    const { field, rowProp } = mapping;
+
+    for (const row of targetRows) {
+      const oldItemVal = row[rowProp] || 0;
+      const newItemVal = oldVal > 0 ? oldItemVal * ratio : even;
+
+      if (!row._overrides) row._overrides = {};
+      row._overrides[field] = parseFloat(newItemVal.toFixed(4));
+      row._hasOverride = true;
+
+      // Cascade: if laborHrs changed, recalc laborCost and totalCost
+      if (field === 'laborHrs') {
+        row._overrides.laborCost = parseFloat((newItemVal * rate).toFixed(2));
+        row._overrides.totalCost = parseFloat(((row._matCost || 0) + newItemVal * rate).toFixed(2));
+      }
+      // Cascade: if materialCost changed, recalc totalCost
+      if (field === 'materialCost') {
+        row._overrides.totalCost = parseFloat((newItemVal + (row._laborCost || 0)).toFixed(2));
+      }
+      await _writeOverrideToSource(row);
+    }
+  }
+
+  // Reload and re-render
+  await loadCompilerData();
+  renderCompiler();
+}
+
+function _findRowsByPath(node, targetPath) {
+  if (!node || !node._children || !Array.isArray(node._children)) return null;
+  for (const child of node._children) {
+    if (child.path === targetPath) return child._rows;
+    // child._children is a node object { _rows, _children: [...] }
+    if (child._children) {
+      const found = _findRowsByPath(child._children, targetPath);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+async function _writeOverrideToSource(row) {
+  if (!row._sourceType || !row._sourceId) return;
+  const drawingId = row._drawingId;
+  if (!drawingId) return;
+
+  const ovr = row._overrides || {};
+  const isEmpty = Object.keys(ovr).length === 0;
+
+  // Load the pageData for this drawing
+  const allPD = await cGetByIndex('pageData', 'drawingId', drawingId);
+  for (const pd of allPD) {
+    let changed = false;
+    if (row._sourceType === 'measurement') {
+      for (const m of (pd.measurements || [])) {
+        if (m.id === row._sourceId) {
+          m._overrides = isEmpty ? undefined : { ...ovr };
+          changed = true; break;
+        }
+      }
+    } else if (row._sourceType === 'fitting') {
+      for (const f of (pd.fittings || [])) {
+        if (f.id === row._sourceId) {
+          f._overrides = isEmpty ? undefined : { ...ovr };
+          changed = true; break;
+        }
+      }
+    } else if (row._sourceType === 'stack') {
+      for (const s of (pd.stacks || [])) {
+        for (const it of (s.items || [])) {
+          if (it.id === row._sourceId) {
+            it._overrides = isEmpty ? undefined : { ...ovr };
+            changed = true; break;
+          }
+        }
+        if (changed) break;
+      }
+    }
+    if (changed) {
+      await cPut('pageData', pd);
+      break;
+    }
+  }
+}
+
+// ── Clear overrides ───────────────────────────────────────────────────
+window._cmpClearOverrides = async function(groupPath) {
+  const filteredRows = applyFilters(_rows);
+  const tree = buildGroupTree(filteredRows, _activeGroups);
+  const targetRows = _findRowsByPath(tree, groupPath);
+  if (!targetRows) return;
+
+  for (const row of targetRows) {
+    row._overrides = {};
+    row._hasOverride = false;
+    await _writeOverrideToSource(row);
+  }
+  await loadCompilerData();
+  renderCompiler();
+};
+
+// ── Grand total contingency editing ────────────────────────────────────
+// Grand total editing: user types desired total, contingency = desired - subtotal
+window._cmpEditGrandTotal = function(td, adjKey, subtotal) {
+  const currentAdj = _grandAdj[adjKey] || 0;
+  const currentTotal = subtotal + currentAdj;
+  const input = document.createElement('input');
+  input.className = 'cmp-cell-edit';
+  input.type = 'text';
+  input.value = currentTotal ? currentTotal.toFixed(2) : '';
+  input.placeholder = 'Desired total';
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  const save = () => {
+    if (done) return;
+    done = true;
+    const desiredTotal = parseFloat(input.value);
+    if (isNaN(desiredTotal)) { renderCompiler(); return; }
+
+    const contingency = desiredTotal - subtotal;
+    if (Math.abs(contingency) < 0.005) { delete _grandAdj[adjKey]; }
+    else { _grandAdj[adjKey] = parseFloat(contingency.toFixed(4)); }
+
+    const rate = getLaborRate();
+    // Cascade: if editing a labor hrs column (main or category), auto-set labor cost contingency
+    if (adjKey === 'laborHrs') {
+      if (_grandAdj.laborHrs) _grandAdj.laborCost = parseFloat((_grandAdj.laborHrs * rate).toFixed(2));
+      else delete _grandAdj.laborCost;
+    }
+    if (adjKey === 'laborCost') {
+      if (_grandAdj.laborCost) _grandAdj.laborHrs = parseFloat((_grandAdj.laborCost / rate).toFixed(4));
+      else delete _grandAdj.laborHrs;
+    }
+    // Category sub-column cascade
+    if (adjKey.indexOf(':') !== -1) {
+      const parts = adjKey.split(':');
+      const catKey = parts[1];
+      if (parts[0] === 'laborHrs') {
+        const costKey = 'laborCost:' + catKey;
+        if (_grandAdj[adjKey]) _grandAdj[costKey] = parseFloat((_grandAdj[adjKey] * rate).toFixed(2));
+        else delete _grandAdj[costKey];
+        // Also update main laborHrs contingency = sum of all category contingencies
+        _syncGrandLaborTotals();
+      } else if (parts[0] === 'laborCost') {
+        const hrsKey = 'laborHrs:' + catKey;
+        if (_grandAdj[adjKey]) _grandAdj[hrsKey] = parseFloat((_grandAdj[adjKey] / rate).toFixed(4));
+        else delete _grandAdj[hrsKey];
+        _syncGrandLaborTotals();
+      }
+    }
+
+    _saveGrandAdj();
+    renderCompiler();
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); save(); }
+    if (e.key === 'Escape') { e.preventDefault(); done = true; renderCompiler(); }
+  });
+};
+
+// Sync main laborHrs/laborCost contingencies from sum of category contingencies
+function _syncGrandLaborTotals() {
+  const rate = getLaborRate();
+  let totalHrsAdj = 0;
+  for (const cat of LABOR_CATEGORIES) {
+    totalHrsAdj += _grandAdj['laborHrs:' + cat.key] || 0;
+  }
+  if (Math.abs(totalHrsAdj) > 0.001) {
+    _grandAdj.laborHrs = parseFloat(totalHrsAdj.toFixed(4));
+    _grandAdj.laborCost = parseFloat((totalHrsAdj * rate).toFixed(2));
+  } else {
+    delete _grandAdj.laborHrs;
+    delete _grandAdj.laborCost;
+  }
+}
+
+window._cmpClearGrandAdj = function() {
+  _grandAdj = {};
+  _saveGrandAdj();
+  renderCompiler();
+};
 
 // Filter popover state
 let _openFilterPop = null;
