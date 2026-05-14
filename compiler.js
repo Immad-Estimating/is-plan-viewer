@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_DEFAULTS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -273,12 +273,25 @@ function getLaborRate() {
   return (_projectRateTable && _projectRateTable.laborRatePerHr) || 45;
 }
 
+function _laborDefaultFallback(baseKey, catKey) {
+  if (!LABOR_DEFAULTS) return 0;
+  if (LABOR_DEFAULTS[baseKey] && LABOR_DEFAULTS[baseKey][catKey]) return LABOR_DEFAULTS[baseKey][catKey];
+  const baseOnly = baseKey.replace(/-(mw)?\d+(x\d+)?$/, '');
+  if (baseOnly !== baseKey && LABOR_DEFAULTS[baseOnly] && LABOR_DEFAULTS[baseOnly][catKey]) return LABOR_DEFAULTS[baseOnly][catKey];
+  return 0;
+}
+
 function getPriceBookLaborBreakdown(baseKey) {
   const result = {};
   for (const cat of LABOR_CATEGORIES) {
     const k = baseKey + '-lc-' + cat.key;
     const entry = _priceBookCache ? _priceBookCache[k] : null;
-    if (entry && entry.laborHrs) result[cat.key] = entry.laborHrs;
+    if (entry && entry.laborHrs) {
+      result[cat.key] = entry.laborHrs;
+    } else {
+      const def = _laborDefaultFallback(baseKey, cat.key);
+      if (def > 0) result[cat.key] = def;
+    }
   }
   return result;
 }
@@ -316,10 +329,7 @@ function normalizeRows(allPageData, drawingNames) {
         linerPerFt = perimFt * linerSF;
       }
       const rate = m.laborRate || labRate;
-      const labHrsPerFt = m.laborHrsPerFt || 0;
       const matCost = (matPerFt + linerPerFt) * lengthFt;
-      const laborHrs = labHrsPerFt * lengthFt;
-      const laborCost = laborHrs * rate;
 
       const ductKey = isFlex
         ? 'flex-' + (m.duct.flexColor || 'black')
@@ -336,14 +346,20 @@ function normalizeRows(allPageData, drawingNames) {
         laborCatCost[cat.key] = catHrs * rate;
         if (catHrs > 0 && assignedCat === 'unassigned') assignedCat = cat.label;
       }
-      const totalBdHrs = Object.values(laborCatHrs).reduce((s, v) => s + v, 0);
-      if (totalBdHrs === 0 && laborHrs > 0) {
-        const fb = m.phase || 'rough';
-        laborCatHrs[fb] = laborHrs;
-        laborCatCost[fb] = laborCost;
-        const co = LABOR_CATEGORIES.find(c => c.key === fb);
-        assignedCat = co ? co.label : capitalize(fb);
+      // Total labor from breakdown; fall back to stored labHrsPerFt if breakdown is empty
+      let laborHrs = Object.values(laborCatHrs).reduce((s, v) => s + v, 0);
+      if (laborHrs === 0) {
+        const labHrsPerFt = m.laborHrsPerFt || 0;
+        laborHrs = labHrsPerFt * lengthFt;
+        if (laborHrs > 0) {
+          const fb = m.phase || 'rough';
+          laborCatHrs[fb] = laborHrs;
+          laborCatCost[fb] = laborHrs * rate;
+          const co = LABOR_CATEGORIES.find(c => c.key === fb);
+          assignedCat = co ? co.label : capitalize(fb);
+        }
       }
+      const laborCost = laborHrs * rate;
 
       const flexLabel = isFlex ? ('Flex ' + capitalize(m.duct.flexColor || 'black')) : null;
       rows.push({
@@ -360,9 +376,7 @@ function normalizeRows(allPageData, drawingNames) {
     }
 
     for (const f of (pd.fittings || [])) {
-      const laborHrs = f.laborHrs || 0;
       const rate = f.laborRate || labRate;
-      const laborCost = laborHrs * rate;
       const shape = inferFittingShape(f);
 
       const prefix = shape === 'rect' ? 'rect' : 'spiral';
@@ -463,8 +477,16 @@ function normalizeRows(allPageData, drawingNames) {
           }
         }
       }
+      // Labor: try size-specific key, then base key, then mw-class key for rect
       let bd = getPriceBookLaborBreakdown(sizeKey);
       if (Object.keys(bd).length === 0) bd = getPriceBookLaborBreakdown(baseKey);
+      if (Object.keys(bd).length === 0 && shape === 'rect') {
+        const mainDims = parseRectDims(f.sizeA);
+        if (mainDims) {
+          const mwMax = findMinWidthClass(mainDims.W, mainDims.H);
+          bd = getPriceBookLaborBreakdown(baseKey + '-mw' + mwMax);
+        }
+      }
 
       const laborCatHrs = {};
       const laborCatCost = {};
@@ -475,14 +497,19 @@ function normalizeRows(allPageData, drawingNames) {
         laborCatCost[cat.key] = ch * rate;
         if (ch > 0 && assignedCat === 'unassigned') assignedCat = cat.label;
       }
-      const totalBdHrs = Object.values(laborCatHrs).reduce((s, v) => s + v, 0);
-      if (totalBdHrs === 0 && laborHrs > 0) {
-        const fb = f.phase || 'rough';
-        laborCatHrs[fb] = laborHrs;
-        laborCatCost[fb] = laborCost;
-        const co = LABOR_CATEGORIES.find(c => c.key === fb);
-        assignedCat = co ? co.label : capitalize(fb);
+      // Total labor from breakdown; fall back to stored f.laborHrs if breakdown empty
+      let laborHrs = Object.values(laborCatHrs).reduce((s, v) => s + v, 0);
+      if (laborHrs === 0) {
+        laborHrs = f.laborHrs || 0;
+        if (laborHrs > 0) {
+          const fb = f.phase || 'rough';
+          laborCatHrs[fb] = laborHrs;
+          laborCatCost[fb] = laborHrs * rate;
+          const co = LABOR_CATEGORIES.find(c => c.key === fb);
+          assignedCat = co ? co.label : capitalize(fb);
+        }
       }
+      const laborCost = laborHrs * rate;
 
       rows.push({
         _itemType: FITTING_NAMES[f.type] || f.type,
@@ -589,12 +616,38 @@ function normalizeRows(allPageData, drawingNames) {
           }
         }
 
+        // Stack item labor: same lookup chain as canvas items
+        const stSizeKey = (it.type === 'boot' && it.sizeA && it.sizeB)
+          ? stBaseKey + '-' + it.sizeA + 'x' + it.sizeB
+          : stBaseKey + '-' + (it.sizeA || '');
+        let stBd = getPriceBookLaborBreakdown(stSizeKey);
+        if (Object.keys(stBd).length === 0) stBd = getPriceBookLaborBreakdown(stBaseKey);
+        if (Object.keys(stBd).length === 0 && shape === 'rect') {
+          const stMainDims = parseRectDims(it.sizeA);
+          if (stMainDims) {
+            const stMw = findMinWidthClass(stMainDims.W, stMainDims.H);
+            stBd = getPriceBookLaborBreakdown(stBaseKey + '-mw' + stMw);
+          }
+        }
+        const stLabCatHrs = {};
+        const stLabCatCost = {};
+        let stLabCat = 'unassigned';
+        for (const cat of LABOR_CATEGORIES) {
+          const ch = stBd[cat.key] || 0;
+          const mult = (it.type === 'ductrun' || it.type === 'flexrun') ? stLengthFt : 1;
+          stLabCatHrs[cat.key] = ch * mult;
+          stLabCatCost[cat.key] = ch * mult * labRate;
+          if (ch > 0 && stLabCat === 'unassigned') stLabCat = cat.label;
+        }
+        const stLabHrs = Object.values(stLabCatHrs).reduce((s, v) => s + v, 0);
+        const stLabCost = stLabHrs * labRate;
+
         rows.push({
           _itemType: it.type === 'ductrun' ? 'Vert. Duct' : (it.type === 'flexrun' ? 'Vert. Flex' : (FITTING_NAMES[it.type] || it.type)),
           _size: it.sizeA + (it.sizeB ? '×' + it.sizeB : ''), _shape: capitalize(shape),
           _page: page, _drawingId: drawingId, _drawingName: drawingName,
-          _lengthFt: stLengthFt, _matCost: stMatCost, _laborHrs: 0, _laborCost: 0, _totalCost: stMatCost,
-          _laborCatHrs: { ...ec }, _laborCatCost: { ...ec }, _laborCatLabel: 'unassigned',
+          _lengthFt: stLengthFt, _matCost: stMatCost, _laborHrs: stLabHrs, _laborCost: stLabCost, _totalCost: stMatCost + stLabCost,
+          _laborCatHrs: stLabCatHrs, _laborCatCost: stLabCatCost, _laborCatLabel: stLabCat,
           phase: null, costGroup: null, gauge: stGauge,
           systemSymbol: null,
           _sourceType: 'stack', _sourceId: it.id, _sourceStackId: s.id,
