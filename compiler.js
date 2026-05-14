@@ -1081,7 +1081,7 @@ function renderCompilerRadar(rows, label) {
   let html = '<div class="cmp-radar">';
   html += '<div class="cmp-radar-head">';
   html += '<span>' + escHtml(label) + ' \u2014 ' + totalHrs.toFixed(1) + 'h / ' + formatVal(totalHrs * rate, 'currency') + '</span>';
-  if (_radarTarget) html += '<button onclick="window._cmpResetRadar()">\u2715 Reset</button>';
+  if (_radarTarget) html += '<button onclick="window._cmpResetRadar()">✕ Reset</button>';
   html += '</div>';
   html += '<div class="cmp-radar-body">';
   // SVG polygon
@@ -1154,7 +1154,11 @@ function renderTreeRows(node, cols, depth) {
 
     const grpHasOverride = child._rows.some(r => r._hasOverride);
     html += `<tr class="group-header depth-${depth}" onclick="window._cmpToggleCollapse('${escapePath(path)}')">`;
-    html += `<td>${toggle} ${escHtml(child.label)}${grpHasOverride ? '<span class="cmp-ovr-dot" title="Contains overridden values"></span> <span style="font-size:9px;color:#ff6b6b;cursor:pointer;font-weight:400" onclick="event.stopPropagation();window._cmpClearOverrides(\'' + escapePath(path) + '\')" title="Clear all overrides in this group">↩</span>' : ''}</td>`;
+    var isRadarFocus = _radarTarget === path;
+    html += '<td>' + toggle + ' ' + escHtml(child.label);
+    html += ' <span style="font-size:9px;cursor:pointer;color:' + (isRadarFocus ? '#e94560' : '#555') + '" onclick="event.stopPropagation();window._cmpFocusRadar(\'' + escapePath(path) + '\')" title="Show radar for this group">📊</span>';
+    if (grpHasOverride) html += '<span class="cmp-ovr-dot" title="Contains overridden values"></span> <span style="font-size:9px;color:#ff6b6b;cursor:pointer;font-weight:400" onclick="event.stopPropagation();window._cmpClearOverrides(\'' + escapePath(path) + '\')" title="Clear all overrides in this group">↩</span>';
+    html += '</td>';
     for (const c of cols) {
       const val = c.extract(child._rows);
       const cls = c.isSub ? 'num pinned-cat' : 'num';
@@ -1553,6 +1557,55 @@ window._cmpClearOverrides = async function(groupPath) {
   for (const row of targetRows) {
     row._overrides = {};
     row._hasOverride = false;
+    await _writeOverrideToSource(row);
+  }
+  await loadCompilerData();
+  renderCompiler();
+};
+
+// ── Compiler radar interactions ──────────────────────────────────────
+
+window._cmpFocusRadar = function(groupPath) {
+  var filteredRows = applyFilters(_rows);
+  var tree = buildGroupTree(filteredRows, _activeGroups);
+  var targetRows = _findRowsByPath(tree, groupPath);
+  if (targetRows && targetRows.length > 0) {
+    _radarTarget = groupPath;
+    _radarRows = targetRows;
+  }
+  renderCompiler();
+};
+
+window._cmpResetRadar = function() {
+  _radarTarget = null;
+  _radarRows = null;
+  renderCompiler();
+};
+
+window._cmpRadarEditCat = async function(catKey, value) {
+  var newTotal = parseFloat(value);
+  if (isNaN(newTotal)) { renderCompiler(); return; }
+  var rows = _radarRows || applyFilters(_rows);
+  if (!rows || rows.length === 0) return;
+  var rate = getLaborRate();
+  var oldTotal = rows.reduce(function(s, r) { return s + ((r._laborCatHrs && r._laborCatHrs[catKey]) || 0); }, 0);
+  var ratio = oldTotal > 0 ? newTotal / oldTotal : 0;
+  var even = newTotal / rows.length;
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var oldCatVal = (row._laborCatHrs && row._laborCatHrs[catKey]) || 0;
+    var newCatVal = oldTotal > 0 ? oldCatVal * ratio : even;
+    if (!row._overrides) row._overrides = {};
+    row._hasOverride = true;
+    row._overrides['laborCat_' + catKey] = parseFloat(newCatVal.toFixed(4));
+    var totalHrs = 0;
+    for (var c = 0; c < LABOR_CATEGORIES.length; c++) {
+      if (LABOR_CATEGORIES[c].key === catKey) totalHrs += newCatVal;
+      else totalHrs += (row._laborCatHrs && row._laborCatHrs[LABOR_CATEGORIES[c].key]) || 0;
+    }
+    row._overrides.laborHrs = parseFloat(totalHrs.toFixed(4));
+    row._overrides.laborCost = parseFloat((totalHrs * rate).toFixed(2));
+    row._overrides.totalCost = parseFloat(((row._matCost || 0) + totalHrs * rate).toFixed(2));
     await _writeOverrideToSource(row);
   }
   await loadCompilerData();
