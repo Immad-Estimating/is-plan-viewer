@@ -1055,6 +1055,86 @@ function renderCompiler() {
   _container.innerHTML = html;
 }
 
+function renderCompilerRadar(rows, label) {
+  if (!rows || rows.length === 0) return '';
+  const rate = getLaborRate();
+  const totalHrs = rows.reduce((s, r) => s + (r._laborHrs || 0), 0);
+  if (totalHrs === 0) return '';
+  const n = LABOR_CATEGORIES.length;
+  const bd = [];
+  let maxVal = 0.5;
+  for (const cat of LABOR_CATEGORIES) {
+    const hrs = rows.reduce((s, r) => s + ((r._laborCatHrs && r._laborCatHrs[cat.key]) || 0), 0);
+    bd.push({ cat, hrs });
+    if (hrs > maxVal) maxVal = hrs;
+  }
+  maxVal = Math.ceil(maxVal * 1.15) || 1;
+  const cx = 100, cy = 100, R = 80;
+  let html = '<div class="cmp-radar">';
+  html += '<div class="cmp-radar-head">';
+  html += '<span>' + escHtml(label) + ' \u2014 ' + totalHrs.toFixed(1) + 'h / ' + formatVal(totalHrs * rate, 'currency') + '</span>';
+  if (_radarTarget) html += '<button onclick="window._cmpResetRadar()">\u2715 Reset</button>';
+  html += '</div>';
+  html += '<div class="cmp-radar-body">';
+  // SVG polygon
+  html += '<div style="flex-shrink:0"><svg width="220" height="220" viewBox="0 0 220 220">';
+  for (let ring = 1; ring <= 4; ring++) {
+    const rr = R * ring / 4;
+    let pts = '';
+    for (let j = 0; j < n; j++) {
+      const a = -Math.PI / 2 + (2 * Math.PI * j / n);
+      pts += (cx + rr * Math.cos(a)).toFixed(1) + ',' + (cy + rr * Math.sin(a)).toFixed(1) + ' ';
+    }
+    html += '<polygon points="' + pts + '" fill="none" stroke="#0f3460" stroke-width="0.5"/>';
+  }
+  for (let j = 0; j < n; j++) {
+    const cat = LABOR_CATEGORIES[j];
+    const a = -Math.PI / 2 + (2 * Math.PI * j / n);
+    const ex = cx + R * Math.cos(a), ey = cy + R * Math.sin(a);
+    const has = bd[j].hrs > 0;
+    html += '<line x1="' + cx + '" y1="' + cy + '" x2="' + ex.toFixed(1) + '" y2="' + ey.toFixed(1) + '" stroke="' + (has ? '#0f3460' : '#0a1a30') + '" stroke-width="0.5"/>';
+    const lx = cx + (R + 18) * Math.cos(a), ly = cy + (R + 18) * Math.sin(a);
+    const anchor = Math.abs(Math.cos(a)) < 0.1 ? 'middle' : (Math.cos(a) > 0 ? 'start' : 'end');
+    html += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 4).toFixed(1) + '" fill="' + (has ? cat.color : '#333') + '" font-size="11" text-anchor="' + anchor + '" font-weight="700">' + cat.short + '</text>';
+  }
+  let dataPts = '';
+  for (let j = 0; j < n; j++) {
+    const a = -Math.PI / 2 + (2 * Math.PI * j / n);
+    let v = bd[j].hrs / maxVal; if (v > 1) v = 1;
+    dataPts += (cx + R * v * Math.cos(a)).toFixed(1) + ',' + (cy + R * v * Math.sin(a)).toFixed(1) + ' ';
+  }
+  html += '<polygon points="' + dataPts + '" fill="rgba(233,69,96,0.2)" stroke="#e94560" stroke-width="1.5"/>';
+  for (let j = 0; j < n; j++) {
+    const a = -Math.PI / 2 + (2 * Math.PI * j / n);
+    let v = bd[j].hrs / maxVal; if (v > 1) v = 1;
+    const dx = cx + R * v * Math.cos(a), dy = cy + R * v * Math.sin(a);
+    html += '<circle cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="4.5" fill="' + (bd[j].hrs > 0 ? LABOR_CATEGORIES[j].color : '#333') + '" stroke="' + (bd[j].hrs > 0 ? '#fff' : '#222') + '" stroke-width="1"/>';
+  }
+  html += '</svg></div>';
+  // Editable inputs
+  html += '<div class="cmp-radar-inputs">';
+  html += '<div style="display:flex;gap:6px;font-size:9px;color:#555;margin-bottom:2px"><span>Category</span><span style="margin-left:auto">Hours</span><span style="width:28px;text-align:right">%</span><span style="width:55px;text-align:right">Cost</span></div>';
+  for (let j = 0; j < n; j++) {
+    const cat = LABOR_CATEGORIES[j];
+    const hrs = bd[j].hrs;
+    const cost = hrs * rate;
+    const has = hrs > 0;
+    const pct = totalHrs > 0 ? (hrs / totalHrs * 100).toFixed(0) : '0';
+    html += '<div class="cmp-radar-cat" style="opacity:' + (has ? '1' : '0.3') + '">';
+    html += '<span style="color:' + cat.color + ';font-size:11px;font-weight:700;width:24px">' + cat.short + '</span>';
+    html += '<input type="text" value="' + (has ? hrs.toFixed(2) : '') + '" placeholder="0" style="color:' + (has ? cat.color : '#333') + '" ';
+    html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+    html += 'onchange="window._cmpRadarEditCat(\'' + cat.key + '\',this.value)">';
+    html += '<span style="color:#555;font-size:9px;width:28px;text-align:right">' + pct + '%</span>';
+    html += '<span style="color:#a0a0c0;font-size:10px;width:55px;text-align:right">' + (has ? formatVal(cost, 'currency') : '\u2014') + '</span>';
+    html += '</div>';
+  }
+  html += '<div class="cmp-radar-total">';
+  html += '<span>Total</span><span>' + totalHrs.toFixed(2) + 'h</span><span>' + formatVal(totalHrs * rate, 'currency') + '</span>';
+  html += '</div></div></div></div>';
+  return html;
+}
+
 function renderTreeRows(node, cols, depth) {
   if (!node._children || node._children.length === 0) return '';
   let html = '';
