@@ -432,6 +432,7 @@ function normalizeRows(allPageData, drawingNames) {
         _hasOverride: hasOverride, _overrides: mOvr,
         _orig_laborHrs: origLaborHrs, _orig_materialCost: origMatCost,
         _orig_laborCost: origLaborCost, _orig_totalCost: origTotal, _orig_lengthFt: lengthFt,
+        _orig_laborCatHrs: { ...laborCatHrs },
         phase: m.phase || null, costGroup: m.costGroup || null, gauge: m.gauge || null,
         systemSymbol: m.systemSymbol || null,
         _sourceType: 'measurement', _sourceId: m.id,
@@ -596,6 +597,7 @@ function normalizeRows(allPageData, drawingNames) {
         _hasOverride: fHasOvr, _overrides: fOvr,
         _orig_laborHrs: origFLabHrs, _orig_materialCost: origFMatCost,
         _orig_laborCost: origFLabCost, _orig_totalCost: origFTotal, _orig_lengthFt: 0,
+        _orig_laborCatHrs: { ...laborCatHrs },
         phase: f.phase || null, costGroup: f.costGroup || null, gauge: f.gauge || null,
         systemSymbol: f.systemSymbol || null,
         _sourceType: 'fitting', _sourceId: f.id,
@@ -1000,12 +1002,13 @@ function renderCompiler() {
     const hasGrandAdj = Object.values(_grandAdj).some(v => v != null);
     html += `<tr class="cmp-delta-row" style="border-top:1px solid #0f3460"><td style="font-style:italic;color:#ffa94d">± Contingency ${hasGrandAdj ? '<span style="font-size:9px;color:#ff6b6b;cursor:pointer" onclick="event.stopPropagation();window._cmpClearGrandAdj()" title="Clear all contingencies">↩</span>' : ''}</td>`;
     for (const c of cols) {
-      const adj = _grandAdj[c.key] || 0;
-      const gtEditable = !c.alwaysOn && !c.isSub && (c.type === 'number' || c.type === 'currency');
+      const adjKey = c.isSub ? c.parentKey + ':' + c.catKey : c.key;
+      const adj = _grandAdj[adjKey] || 0;
+      const gtEditable = !c.alwaysOn && (c.type === 'number' || c.type === 'currency');
       if (gtEditable) {
         const sign = adj > 0 ? '+' : '';
         const adjCls = Math.abs(adj) < 0.005 ? 'cmp-delta-zero' : (adj > 0 ? 'cmp-delta-pos' : 'cmp-delta-neg');
-        html += `<td class="num cmp-editable ${adjCls}" onclick="event.stopPropagation(); window._cmpEditGrandAdj(this,'${c.key}')" title="Click to set contingency">${Math.abs(adj) < 0.005 ? '\u2014' : sign + formatVal(adj, c.type)}</td>`;
+        html += `<td class="num cmp-editable ${adjCls}" onclick="event.stopPropagation(); window._cmpEditGrandAdj(this,'${adjKey}')" title="Click to set contingency">${Math.abs(adj) < 0.005 ? '\u2014' : sign + formatVal(adj, c.type)}</td>`;
       } else {
         html += `<td class="num">\u2014</td>`;
       }
@@ -1016,7 +1019,8 @@ function renderCompiler() {
     html += `<tr class="grand-total"><td>Adjusted Total ${hasGrandAdj ? '<span style="font-size:9px;color:#ffa94d">●</span>' : ''}</td>`;
     for (const c of cols) {
       const base = c.extract(filteredRows);
-      const adj = _grandAdj[c.key] || 0;
+      const adjKey = c.isSub ? c.parentKey + ':' + c.catKey : c.key;
+      const adj = _grandAdj[adjKey] || 0;
       const total = base + adj;
       const cls2 = c.isSub ? 'num pinned-cat' : 'num';
       const style2 = c.isSub ? ` style="--cat-color:${c.color}"` : '';
@@ -1047,22 +1051,23 @@ function renderTreeRows(node, cols, depth) {
       const val = c.extract(child._rows);
       const cls = c.isSub ? 'num pinned-cat' : 'num';
       const style = c.isSub ? ` style="--cat-color:${c.color}"` : '';
-      const editable = !c.alwaysOn && !c.isSub && (c.type === 'number' || c.type === 'currency') && child._rows.length > 0;
+      const editable = !c.alwaysOn && (c.type === 'number' || c.type === 'currency') && child._rows.length > 0;
       if (editable) {
         const pathEnc = escapePath(path);
-        const fld = _COL_TO_FIELD[c.key];
-        const ovrRows = child._rows.filter(r => r._hasOverride && r._overrides && r._overrides[fld] != null);
-        const isOvr = ovrRows.length > 0;
-        // Compute original (pre-override) value for hover preview
+        const editKey = c.isSub ? c.parentKey + ':' + c.catKey : c.key;
+        // Check for overrides
+        let isOvr = false;
+        if (c.isSub) {
+          isOvr = child._rows.some(r => r._hasOverride && r._overrides && r._overrides['laborCat_' + c.catKey] != null);
+        } else {
+          const fld = _COL_TO_FIELD[c.key];
+          if (fld) isOvr = child._rows.some(r => r._hasOverride && r._overrides && r._overrides[fld] != null);
+        }
         let origHtml = '';
         if (isOvr) {
-          const rp = _COL_MAP[c.key] ? _COL_MAP[c.key].rowProp : null;
-          // Original = sum of non-overridden values from rows
-          // For overridden rows, subtract override and add back what calculator would give
-          // Simplification: store _origVal on rows during normalize
-          origHtml = ` data-orig="${formatVal(_calcOriginal(child._rows, c.key), c.type)}"`;
+          origHtml = ` data-orig="${formatVal(_calcOriginal(child._rows, c.key, c.isSub ? c.catKey : null), c.type)}"`;
         }
-        html += `<td class="${cls} cmp-editable${isOvr ? ' cmp-override' : ''}"${style}${origHtml} onclick="event.stopPropagation(); window._cmpEditCell(this,'${c.key}','${pathEnc}',${child._rows.length})">${isOvr ? '<span class="cmp-val-current">' + formatVal(val, c.type) + '</span>' : formatVal(val, c.type)}</td>`;
+        html += `<td class="${cls} cmp-editable${isOvr ? ' cmp-override' : ''}"${style}${origHtml} onclick="event.stopPropagation(); window._cmpEditCell(this,'${editKey}','${pathEnc}',${child._rows.length})">${isOvr ? '<span class="cmp-val-current">' + formatVal(val, c.type) + '</span>' : formatVal(val, c.type)}</td>`;
       } else {
         html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
       }
@@ -1074,14 +1079,43 @@ function renderTreeRows(node, cols, depth) {
 }
 
 // Calculate original (pre-override) aggregate for a set of rows
-function _calcOriginal(rows, colKey) {
+function _calcOriginal(rows, colKey, catKey) {
+  // If catKey is provided, calculate original for a specific labor category sub-column
+  if (catKey) {
+    const isHrs = colKey.indexOf('laborHrs') !== -1 || colKey.indexOf('_') !== -1 && colKey.startsWith('laborHrs');
+    let total = 0;
+    for (const r of rows) {
+      if (r._hasOverride && r._overrides && r._overrides['laborCat_' + catKey] != null) {
+        // Original = stored _orig category value
+        total += (r._orig_laborCatHrs && r._orig_laborCatHrs[catKey]) || 0;
+        if (!isHrs) total = 0; // recalc below
+      } else {
+        const src = isHrs ? r._laborCatHrs : r._laborCatCost;
+        total += (src && src[catKey]) || 0;
+      }
+    }
+    // For cost sub-columns, recalculate from original hours
+    if (!isHrs) {
+      total = 0;
+      const rate = getLaborRate();
+      for (const r of rows) {
+        if (r._hasOverride && r._overrides && r._overrides['laborCat_' + catKey] != null) {
+          total += ((r._orig_laborCatHrs && r._orig_laborCatHrs[catKey]) || 0) * rate;
+        } else {
+          total += (r._laborCatCost && r._laborCatCost[catKey]) || 0;
+        }
+      }
+    }
+    return total;
+  }
+
+  // Main column original calculation
   const mapping = _COL_MAP[colKey];
   if (!mapping) return 0;
   const { field, rowProp } = mapping;
   let total = 0;
   for (const r of rows) {
     if (r._hasOverride && r._overrides && r._overrides[field] != null) {
-      // Use the _orig value if we stored it, otherwise use calculated minus override
       total += r['_orig_' + field] != null ? r['_orig_' + field] : (r[rowProp] || 0);
     } else {
       total += r[rowProp] || 0;
@@ -1264,36 +1298,77 @@ async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
   const targetRows = _findRowsByPath(tree, groupPath);
   if (!targetRows || targetRows.length === 0) { renderCompiler(); return; }
 
-  const mapping = _COL_MAP[colKey];
-  if (!mapping) { renderCompiler(); return; }
-  const { field, rowProp } = mapping;
+  // Check if this is a labor category sub-column edit (format: "laborHrs:rough")
+  const catSplit = colKey.split(':');
+  const isCatEdit = catSplit.length === 2;
+  const parentCol = isCatEdit ? catSplit[0] : colKey;
+  const catKey = isCatEdit ? catSplit[1] : null;
 
-  // Distribute new value proportionally across items
+  const rate = getLaborRate();
   const ratio = oldVal > 0 ? newVal / oldVal : 0;
   const even = newVal / targetRows.length;
 
-  for (const row of targetRows) {
-    const oldItemVal = row[rowProp] || 0;
-    const newItemVal = oldVal > 0 ? oldItemVal * ratio : even;
+  if (isCatEdit) {
+    // Category sub-column edit: change specific labor category on each row
+    const isHrs = parentCol === 'laborHrs';
+    for (const row of targetRows) {
+      const catSrc = isHrs ? row._laborCatHrs : row._laborCatCost;
+      const oldCatVal = (catSrc && catSrc[catKey]) || 0;
+      const newCatVal = oldVal > 0 ? oldCatVal * ratio : even;
 
-    // Build override object
-    if (!row._overrides) row._overrides = {};
-    row._overrides[field] = parseFloat(newItemVal.toFixed(4));
-    row._hasOverride = true;
+      if (!row._overrides) row._overrides = {};
+      row._hasOverride = true;
 
-    // Cascade: if laborHrs changed, recalc laborCost and totalCost
-    if (field === 'laborHrs') {
-      const rate = getLaborRate();
-      row._overrides.laborCost = parseFloat((newItemVal * rate).toFixed(2));
-      row._overrides.totalCost = parseFloat(((row._matCost || 0) + newItemVal * rate).toFixed(2));
+      if (isHrs) {
+        // Store the category hours override
+        row._overrides['laborCat_' + catKey] = parseFloat(newCatVal.toFixed(4));
+        // Recalc total laborHrs = sum of all categories
+        const totalHrs = LABOR_CATEGORIES.reduce((s, cat) => {
+          if (cat.key === catKey) return s + newCatVal;
+          return s + ((row._laborCatHrs && row._laborCatHrs[cat.key]) || 0);
+        }, 0);
+        row._overrides.laborHrs = parseFloat(totalHrs.toFixed(4));
+        row._overrides.laborCost = parseFloat((totalHrs * rate).toFixed(2));
+        row._overrides.totalCost = parseFloat(((row._matCost || 0) + totalHrs * rate).toFixed(2));
+      } else {
+        // laborCost category: back-calc hours from cost
+        const newCatHrs = parseFloat((newCatVal / rate).toFixed(4));
+        row._overrides['laborCat_' + catKey] = newCatHrs;
+        const totalHrs = LABOR_CATEGORIES.reduce((s, cat) => {
+          if (cat.key === catKey) return s + newCatHrs;
+          return s + ((row._laborCatHrs && row._laborCatHrs[cat.key]) || 0);
+        }, 0);
+        row._overrides.laborHrs = parseFloat(totalHrs.toFixed(4));
+        row._overrides.laborCost = parseFloat((totalHrs * rate).toFixed(2));
+        row._overrides.totalCost = parseFloat(((row._matCost || 0) + totalHrs * rate).toFixed(2));
+      }
+      await _writeOverrideToSource(row);
     }
-    // Cascade: if materialCost changed, recalc totalCost
-    if (field === 'materialCost') {
-      row._overrides.totalCost = parseFloat((newItemVal + (row._laborCost || 0)).toFixed(2));
-    }
+  } else {
+    // Main column edit
+    const mapping = _COL_MAP[colKey];
+    if (!mapping) { renderCompiler(); return; }
+    const { field, rowProp } = mapping;
 
-    // Write back to IndexedDB source item
-    await _writeOverrideToSource(row);
+    for (const row of targetRows) {
+      const oldItemVal = row[rowProp] || 0;
+      const newItemVal = oldVal > 0 ? oldItemVal * ratio : even;
+
+      if (!row._overrides) row._overrides = {};
+      row._overrides[field] = parseFloat(newItemVal.toFixed(4));
+      row._hasOverride = true;
+
+      // Cascade: if laborHrs changed, recalc laborCost and totalCost
+      if (field === 'laborHrs') {
+        row._overrides.laborCost = parseFloat((newItemVal * rate).toFixed(2));
+        row._overrides.totalCost = parseFloat(((row._matCost || 0) + newItemVal * rate).toFixed(2));
+      }
+      // Cascade: if materialCost changed, recalc totalCost
+      if (field === 'materialCost') {
+        row._overrides.totalCost = parseFloat((newItemVal + (row._laborCost || 0)).toFixed(2));
+      }
+      await _writeOverrideToSource(row);
+    }
   }
 
   // Reload and re-render
@@ -1397,6 +1472,22 @@ window._cmpEditGrandAdj = function(td, colKey) {
     // Cascade: contingency on laborHrs also adjusts laborCost
     if (colKey === 'laborHrs' && _grandAdj.laborHrs) {
       _grandAdj.laborCost = _grandAdj.laborHrs * getLaborRate();
+    }
+    // Cascade: category hrs contingency → category cost + totals
+    if (colKey.indexOf(':') !== -1) {
+      const parts = colKey.split(':');
+      const pCol = parts[0];
+      if (pCol === 'laborHrs') {
+        // Also set the corresponding laborCost category contingency
+        const costKey = 'laborCost:' + parts[1];
+        if (val && val !== 0) _grandAdj[costKey] = val * getLaborRate();
+        else delete _grandAdj[costKey];
+      } else if (pCol === 'laborCost') {
+        // Back-calc hours from cost contingency
+        const hrsKey = 'laborHrs:' + parts[1];
+        if (val && val !== 0) _grandAdj[hrsKey] = val / getLaborRate();
+        else delete _grandAdj[hrsKey];
+      }
     }
     _saveGrandAdj();
     renderCompiler();
