@@ -696,17 +696,20 @@ function normalizeRows(allPageData, drawingNames) {
           }
         }
 
-        // Stack item labor: same lookup chain as canvas items
+        // Stack item labor: build key for all item types
+        const stLabBaseKey = (it.type === 'ductrun' || it.type === 'flexrun')
+          ? (it.type === 'flexrun' ? 'flex-' + (it.flexColor || 'black') : (shape === 'rect' ? 'duct-rect' : 'duct-spiral'))
+          : (it.type === 'rectTap' ? 'rectTap' : (shape === 'rect' ? 'rect' : 'spiral') + '-' + it.type);
         const stSizeKey = (it.type === 'boot' && it.sizeA && it.sizeB)
-          ? stBaseKey + '-' + it.sizeA + 'x' + it.sizeB
-          : stBaseKey + '-' + (it.sizeA || '');
+          ? stLabBaseKey + '-' + it.sizeA + 'x' + it.sizeB
+          : stLabBaseKey + '-' + (it.sizeA || '');
         let stBd = getPriceBookLaborBreakdown(stSizeKey);
-        if (Object.keys(stBd).length === 0) stBd = getPriceBookLaborBreakdown(stBaseKey);
+        if (Object.keys(stBd).length === 0) stBd = getPriceBookLaborBreakdown(stLabBaseKey);
         if (Object.keys(stBd).length === 0 && shape === 'rect') {
           const stMainDims = parseRectDims(it.sizeA);
           if (stMainDims) {
             const stMw = findMinWidthClass(stMainDims.W, stMainDims.H);
-            stBd = getPriceBookLaborBreakdown(stBaseKey + '-mw' + stMw);
+            stBd = getPriceBookLaborBreakdown(stLabBaseKey + '-mw' + stMw);
           }
         }
         const stLabCatHrs = {};
