@@ -393,7 +393,7 @@ function normalizeRows(allPageData, drawingNames) {
         linerPerFt = perimFt * linerSF;
       }
       const rate = m.laborRate || labRate;
-      const matCost = (matPerFt + linerPerFt) * lengthFt;
+      let matCost = (matPerFt + linerPerFt) * lengthFt;
 
       const ductKey = isFlex
         ? 'flex-' + (m.duct.flexColor || 'black')
