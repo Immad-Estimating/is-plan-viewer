@@ -78,6 +78,15 @@ async function cGetByIndex(store, idx, val) {
     r.onerror = () => rej(r.error);
   });
 }
+async function cPut(store, data) {
+  const db = await cOpenDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    const r = tx.objectStore(store).put(data);
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
 async function cGet(store, key) {
   const db = await cOpenDB();
   return new Promise((res, rej) => {
@@ -214,6 +223,13 @@ const CSS = `
 .cmp-toggle { display: inline-block; width: 14px; font-size: 10px; color: #555; }
 .cmp-empty { text-align: center; color: #555; padding: 40px 20px; }
 .cmp-empty-icon { font-size: 32px; margin-bottom: 8px; }
+
+/* Inline cell editing */
+.cmp-cell-edit { background: #0d1117; border: 1px solid #e94560; color: #ffd43b; padding: 2px 4px; border-radius: 3px; font-size: 11px; text-align: right; width: 70px; font-variant-numeric: tabular-nums; outline: none; }
+.cmp-cell-edit:focus { box-shadow: 0 0 6px rgba(233,69,96,0.4); }
+.cmp-override { color: #ffd43b; position: relative; }
+.cmp-override::after { content: ''; position: absolute; top: -1px; right: -1px; width: 5px; height: 5px; background: #ffd43b; border-radius: 50%; }
+.cmp-ovr-dot { display: inline-block; width: 5px; height: 5px; background: #ffd43b; border-radius: 50%; margin-left: 3px; vertical-align: middle; cursor: help; }
 
 /* Labor breakdown header — hover target */
 .cmp-lbr-th { position: relative; }
@@ -376,13 +392,22 @@ function normalizeRows(allPageData, drawingNames) {
       }
       const laborCost = laborHrs * rate;
 
+      // Apply manual overrides if present
+      const mOvr = m._overrides || {};
+      if (mOvr.laborHrs != null) { laborHrs = mOvr.laborHrs; }
+      if (mOvr.materialCost != null) { matCost = mOvr.materialCost; }
+      const finalLaborCost = laborHrs * rate;
+      const finalTotal = (mOvr.totalCost != null) ? mOvr.totalCost : (matCost + finalLaborCost);
+      const hasOverride = Object.keys(mOvr).length > 0;
+
       const flexLabel = isFlex ? ('Flex ' + capitalize(m.duct.flexColor || 'black')) : null;
       rows.push({
         _itemType: isFlex ? 'Flex Duct' : 'Duct Run', _size: m.duct.dims || '?', _shape: flexLabel || capitalize(shape),
         _page: page, _drawingId: drawingId, _drawingName: drawingName,
         _lengthFt: lengthFt, _matCost: matCost, _laborHrs: laborHrs,
-        _laborCost: laborCost, _totalCost: matCost + laborCost,
+        _laborCost: finalLaborCost, _totalCost: finalTotal,
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
+        _hasOverride: hasOverride, _overrides: mOvr,
         phase: m.phase || null, costGroup: m.costGroup || null, gauge: m.gauge || null,
         systemSymbol: m.systemSymbol || null,
         _sourceType: 'measurement', _sourceId: m.id,
@@ -524,15 +549,22 @@ function normalizeRows(allPageData, drawingNames) {
           assignedCat = co ? co.label : capitalize(fb);
         }
       }
+      // Apply manual overrides
+      const fOvr = f._overrides || {};
+      if (fOvr.laborHrs != null) laborHrs = fOvr.laborHrs;
+      if (fOvr.materialCost != null) matCost = fOvr.materialCost;
       const laborCost = laborHrs * rate;
+      const fTotal = (fOvr.totalCost != null) ? fOvr.totalCost : (matCost + laborCost);
+      const fHasOvr = Object.keys(fOvr).length > 0;
 
       rows.push({
         _itemType: FITTING_NAMES[f.type] || f.type,
         _size: f.sizeA + (f.sizeB ? '×' + f.sizeB : ''), _shape: capitalize(shape),
         _page: page, _drawingId: drawingId, _drawingName: drawingName,
         _lengthFt: 0, _matCost: matCost, _laborHrs: laborHrs,
-        _laborCost: laborCost, _totalCost: matCost + laborCost,
+        _laborCost: laborCost, _totalCost: fTotal,
         _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
+        _hasOverride: fHasOvr, _overrides: fOvr,
         phase: f.phase || null, costGroup: f.costGroup || null, gauge: f.gauge || null,
         systemSymbol: f.systemSymbol || null,
         _sourceType: 'fitting', _sourceId: f.id,
@@ -925,13 +957,20 @@ function renderTreeRows(node, cols, depth) {
     const hasKids = child._children && child._children._children && child._children._children.length > 0;
     const toggle = hasKids ? `<span class="cmp-toggle">${isCollapsed ? '▶' : '▼'}</span>` : `<span class="cmp-toggle"></span>`;
 
+    const grpHasOverride = child._rows.some(r => r._hasOverride);
     html += `<tr class="group-header depth-${depth}" onclick="window._cmpToggleCollapse('${escapePath(path)}')">`;
-    html += `<td>${toggle} ${escHtml(child.label)}</td>`;
+    html += `<td>${toggle} ${escHtml(child.label)}${grpHasOverride ? '<span class="cmp-ovr-dot" title="Contains overridden values"></span> <span style="font-size:9px;color:#ff6b6b;cursor:pointer;font-weight:400" onclick="event.stopPropagation();window._cmpClearOverrides(\'' + escapePath(path) + '\')" title="Clear all overrides in this group">↩</span>' : ''}</td>`;
     for (const c of cols) {
       const val = c.extract(child._rows);
       const cls = c.isSub ? 'num pinned-cat' : 'num';
       const style = c.isSub ? ` style="--cat-color:${c.color}"` : '';
-      html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
+      const editable = !c.alwaysOn && !c.isSub && (c.type === 'number' || c.type === 'currency') && child._rows.length > 0;
+      if (editable) {
+        const pathEnc = escapePath(path);
+        html += `<td class="${cls}"${style} ondblclick="event.stopPropagation(); window._cmpEditCell(this,'${c.key}','${pathEnc}',${child._rows.length})" style="cursor:cell" title="Double-click to edit">${formatVal(val, c.type)}</td>`;
+      } else {
+        html += `<td class="${cls}"${style}>${formatVal(val, c.type)}</td>`;
+      }
     }
     html += `</tr>`;
     if (!isCollapsed && child._children) html += renderTreeRows(child._children, cols, depth + 1);
@@ -1044,6 +1083,146 @@ window._cmpToggleCol = function(key) {
 };
 
 window._cmpToggleCollapse = function(path) { _collapsed[path] = !_collapsed[path]; renderCompiler(); };
+
+// ── Inline cell editing ───────────────────────────────────────────────
+
+window._cmpEditCell = function(td, colKey, groupPath, rowCount) {
+  const currentText = td.textContent.replace(/[,$]/g, '').replace('—', '').trim();
+  const currentVal = parseFloat(currentText) || 0;
+  const input = document.createElement('input');
+  input.className = 'cmp-cell-edit';
+  input.type = 'text';
+  input.value = currentVal || '';
+  input.setAttribute('data-col', colKey);
+  input.setAttribute('data-path', groupPath);
+  input.setAttribute('data-rows', rowCount);
+  input.setAttribute('data-original', currentVal);
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  const commit = () => {
+    const newVal = parseFloat(input.value);
+    if (isNaN(newVal) || newVal === currentVal) { renderCompiler(); return; }
+    _cmpApplyOverride(colKey, groupPath, newVal, currentVal);
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); renderCompiler(); }
+  });
+};
+
+// Map column key to the override field on source items
+const _COL_TO_FIELD = {
+  totalLF: 'lengthFt', materialCost: 'materialCost',
+  laborHrs: 'laborHrs', laborCost: 'laborCost', totalCost: 'totalCost'
+};
+
+async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
+  // Find the rows matching this group path
+  const filteredRows = applyFilters(_rows);
+  const tree = buildGroupTree(filteredRows, _activeGroups);
+  const targetRows = _findRowsByPath(tree, groupPath);
+  if (!targetRows || targetRows.length === 0) { renderCompiler(); return; }
+
+  const field = _COL_TO_FIELD[colKey];
+  if (!field) { renderCompiler(); return; }
+
+  // Distribute new value proportionally across items
+  const ratio = oldVal > 0 ? newVal / oldVal : 0;
+  const even = newVal / targetRows.length;
+
+  for (const row of targetRows) {
+    const oldItemVal = row['_' + field] || row[field] || 0;
+    const newItemVal = oldVal > 0 ? oldItemVal * ratio : even;
+
+    // Build override object
+    if (!row._overrides) row._overrides = {};
+    row._overrides[field] = parseFloat(newItemVal.toFixed(4));
+
+    // Cascade: if laborHrs changed, recalc laborCost
+    if (field === 'laborHrs') {
+      const rate = getLaborRate();
+      row._overrides.laborCost = parseFloat((newItemVal * rate).toFixed(2));
+    }
+
+    // Write back to IndexedDB source item
+    await _writeOverrideToSource(row);
+  }
+
+  // Reload and re-render
+  await loadCompilerData();
+  renderCompiler();
+}
+
+function _findRowsByPath(node, targetPath) {
+  if (!node._children) return null;
+  for (const child of node._children) {
+    if (child.path === targetPath) return child._rows;
+    const found = _findRowsByPath(child._children || {}, targetPath);
+    if (found) return found;
+  }
+  return null;
+}
+
+async function _writeOverrideToSource(row) {
+  if (!row._sourceType || !row._sourceId) return;
+  const drawingId = row._drawingId;
+  if (!drawingId) return;
+
+  // Load the pageData for this drawing
+  const allPD = await cGetByIndex('pageData', 'drawingId', drawingId);
+  for (const pd of allPD) {
+    let changed = false;
+    if (row._sourceType === 'measurement') {
+      for (const m of (pd.measurements || [])) {
+        if (m.id === row._sourceId) {
+          m._overrides = { ...m._overrides, ...row._overrides };
+          changed = true; break;
+        }
+      }
+    } else if (row._sourceType === 'fitting') {
+      for (const f of (pd.fittings || [])) {
+        if (f.id === row._sourceId) {
+          f._overrides = { ...f._overrides, ...row._overrides };
+          changed = true; break;
+        }
+      }
+    } else if (row._sourceType === 'stack') {
+      for (const s of (pd.stacks || [])) {
+        for (const it of (s.items || [])) {
+          if (it.id === row._sourceId) {
+            it._overrides = { ...it._overrides, ...row._overrides };
+            changed = true; break;
+          }
+        }
+        if (changed) break;
+      }
+    }
+    if (changed) {
+      await cPut('pageData', pd);
+      break;
+    }
+  }
+}
+
+// ── Clear overrides ───────────────────────────────────────────────────
+window._cmpClearOverrides = async function(groupPath) {
+  const filteredRows = applyFilters(_rows);
+  const tree = buildGroupTree(filteredRows, _activeGroups);
+  const targetRows = _findRowsByPath(tree, groupPath);
+  if (!targetRows) return;
+
+  for (const row of targetRows) {
+    row._overrides = {};
+    row._hasOverride = false;
+    await _writeOverrideToSource(row);
+  }
+  await loadCompilerData();
+  renderCompiler();
+};
 
 // Filter popover state
 let _openFilterPop = null;
