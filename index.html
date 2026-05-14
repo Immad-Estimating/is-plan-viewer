@@ -8121,20 +8121,24 @@ function _syncSelectionToCompiler() {
 async function refreshCompiler() {
   const el = document.getElementById('compilerContent');
   if (!el) return;
-  if (!_compilerInited) {
-    await Compiler.init(el, activeProjectId, activeDrawingId);
-    _compilerInited = true;
-  } else {
-    Compiler.setDrawing(activeDrawingId);
-    if (activeProjectId) Compiler.setProject(activeProjectId);
+  try {
+    if (!_compilerInited) {
+      await Compiler.init(el, activeProjectId, activeDrawingId);
+      _compilerInited = true;
+    } else {
+      Compiler.setDrawing(activeDrawingId);
+      if (activeProjectId) Compiler.setProject(activeProjectId);
+    }
+    Compiler.setSelection(
+      MultiSelect.getSelectedMeasIds(),
+      MultiSelect.getSelectedFitIds(),
+      MultiSelect.getSelectedStackIds()
+    );
+    await Compiler.refresh();
+  } catch (e) {
+    console.error('[Compiler] refreshCompiler error:', e);
+    el.innerHTML = '<div style="padding:20px;color:#ff6b6b;font-size:12px"><b>Compiler Error:</b><br>' + e.message + '<br><pre style="font-size:10px;color:#a0a0c0;margin-top:8px;white-space:pre-wrap">' + (e.stack || '') + '</pre></div>';
   }
-  // Push current canvas selection into compiler
-  Compiler.setSelection(
-    MultiSelect.getSelectedMeasIds(),
-    MultiSelect.getSelectedFitIds(),
-    MultiSelect.getSelectedStackIds()
-  );
-  await Compiler.refresh();
 }
 
 function updatePanel() {
