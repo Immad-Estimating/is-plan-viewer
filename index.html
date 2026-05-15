@@ -5055,7 +5055,9 @@ async function saveCurrentPageData() {
     costOverride: m.costOverride || false,
     gauge: m.gauge || null,
     systemSymbol: m.systemSymbol || null,
-    lined: m.lined || false
+    lined: m.lined || false,
+    // Compiler overrides (persisted so page saves don't wipe them)
+    ...(m._overrides ? { _overrides: m._overrides } : {}),
   }));
 
   const fittings = (pageFittings[pageNum] || []).map(f => ({
@@ -5069,7 +5071,16 @@ async function saveCurrentPageData() {
     costOverride: f.costOverride || false,
     gauge: f.gauge || null,
     systemSymbol: f.systemSymbol || null,
-    lined: f.lined || false
+    lined: f.lined || false,
+    // HVAC component fields (persisted for compiler labor resolution)
+    ...(f.type === 'hvac_component' ? {
+      hvacComponentId: f.hvacComponentId || null,
+      hvacTag: f.hvacTag || null,
+      hvacType: f.hvacType || null,
+      hvacCategory: f.hvacCategory || null,
+    } : {}),
+    // Compiler overrides (persisted so page saves don't wipe them)
+    ...(f._overrides ? { _overrides: f._overrides } : {}),
   }));
 
   const stacks = (pageStacks[pageNum] || []).map(s => ({
