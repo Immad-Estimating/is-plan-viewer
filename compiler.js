@@ -434,6 +434,13 @@ function normalizeRows(allPageData, drawingNames) {
       const mOvr = m._overrides || {};
       if (mOvr.laborHrs != null) { laborHrs = mOvr.laborHrs; }
       if (mOvr.materialCost != null) { matCost = mOvr.materialCost; }
+      // Apply individual labor category overrides back into the breakdown
+      for (const cat of LABOR_CATEGORIES) {
+        if (mOvr['laborCat_' + cat.key] != null) {
+          laborCatHrs[cat.key] = mOvr['laborCat_' + cat.key];
+          laborCatCost[cat.key] = mOvr['laborCat_' + cat.key] * rate;
+        }
+      }
       const finalLaborCost = laborHrs * rate;
       const finalTotal = (mOvr.totalCost != null) ? mOvr.totalCost : (matCost + finalLaborCost);
       const hasOverride = Object.keys(mOvr).length > 0;
@@ -599,6 +606,13 @@ function normalizeRows(allPageData, drawingNames) {
       const fOvr = f._overrides || {};
       if (fOvr.laborHrs != null) laborHrs = fOvr.laborHrs;
       if (fOvr.materialCost != null) matCost = fOvr.materialCost;
+      // Apply individual labor category overrides back into the breakdown
+      for (const cat of LABOR_CATEGORIES) {
+        if (fOvr['laborCat_' + cat.key] != null) {
+          laborCatHrs[cat.key] = fOvr['laborCat_' + cat.key];
+          laborCatCost[cat.key] = fOvr['laborCat_' + cat.key] * rate;
+        }
+      }
       const laborCost = laborHrs * rate;
       const fTotal = (fOvr.totalCost != null) ? fOvr.totalCost : (matCost + laborCost);
       const fHasOvr = Object.keys(fOvr).length > 0;
