@@ -3325,7 +3325,7 @@ window.aiReviewImportAll = async function() {
         // Track for spec-dupe auto-linking
         _createdBySpec[_impSpecKey(extracted)] = libraryEntry;
       },
-      onCreateNew: async (extracted, laborOverrides) => {
+      onCreateNew: async (extracted, laborOverrides, notesText) => {
         // Check if an identical spec was already created — auto-link instead
         const sk = _impSpecKey(extracted);
         if (_createdBySpec[sk]) {
@@ -3347,6 +3347,8 @@ window.aiReviewImportAll = async function() {
           entry.pricing.laborBreakdown = { ...laborOverrides };
           entry.pricing.laborHrs = Object.values(laborOverrides).reduce((s, v) => s + (parseFloat(v) || 0), 0);
         }
+        // Apply user-edited notes
+        if (notesText) entry.notes = notesText;
         const newId = await HVACLibrary.save(entry);
         entry.id = newId;
         _createdBySpec[sk] = entry;

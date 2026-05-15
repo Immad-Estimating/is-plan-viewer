@@ -383,6 +383,62 @@ function _resolveDefaultLabor(hvacType, category, tonnage) {
   return result;
 }
 
+// ── Auto-generate technical note from extracted specs ──────────────
+function _generateTechNote(item) {
+  const parts = [];
+  const cat = (item.category || 'equipment').toLowerCase();
+  const type = item.type || '';
+
+  // Manufacturer + model (always lead when present)
+  if (item.manufacturer && item.model) parts.push(item.manufacturer + ' ' + item.model);
+  else if (item.model) parts.push(item.model);
+  else if (item.manufacturer) parts.push(item.manufacturer);
+
+  // Category-specific highlights
+  if (['equipment', 'energy-recovery', 'makeup-air'].includes(cat)) {
+    if (item.tonnage) parts.push(item.tonnage + 'T');
+    if (item.cfm) parts.push(item.cfm.toLocaleString() + ' CFM');
+    if (item.heating) parts.push(item.heating);
+    if (item.refrigerant) parts.push(item.refrigerant);
+    if (item.voltage) parts.push(item.voltage);
+    if (item.mca || item.mocp) {
+      const elec = [];
+      if (item.mca) elec.push('MCA ' + item.mca + 'A');
+      if (item.mocp) elec.push('MOCP ' + item.mocp + 'A');
+      parts.push(elec.join('/'));
+    }
+  } else if (cat === 'fan') {
+    if (item.cfm) parts.push(item.cfm.toLocaleString() + ' CFM');
+    if (item.voltage) parts.push(item.voltage);
+    if (item.location) parts.push('serves ' + item.location);
+  } else if (cat === 'air-distribution') {
+    if (item.size) parts.push(item.size);
+    if (item.cfm) parts.push(item.cfm + ' CFM');
+    if (item.quantity && item.quantity > 1) parts.push('qty ' + item.quantity);
+  } else if (cat === 'terminal') {
+    if (item.cfm) parts.push(item.cfm.toLocaleString() + ' CFM');
+    if (item.size) parts.push(item.size);
+    if (item.heating) parts.push(item.heating);
+    if (item.voltage) parts.push(item.voltage);
+  } else if (cat === 'heating') {
+    if (item.heating) parts.push(item.heating);
+    if (item.voltage) parts.push(item.voltage);
+    if (item.cfm) parts.push(item.cfm + ' CFM');
+  } else if (cat === 'specialty') {
+    if (item.size) parts.push(item.size);
+    if (item.cfm) parts.push(item.cfm + ' CFM');
+    if (item.voltage) parts.push(item.voltage);
+    if (item.quantity && item.quantity > 1) parts.push('qty ' + item.quantity);
+  }
+
+  // Location at the end if not already added
+  if (item.location && !parts.some(p => p.includes(item.location))) {
+    parts.push('@ ' + item.location);
+  }
+
+  return parts.length > 0 ? parts.join(', ') : '';
+}
+
 // Build radar chart SVG
 function _renderRadarSVG(breakdown, applicableKeys) {
   const cats = LABOR_CATS;
@@ -686,6 +742,7 @@ const HVACLibrary = {
     // _ensureLaborDefaults is async but _laborDefaultsCache may already be loaded from init().
     // If not loaded yet, _resolveDefaultLabor falls back to category defaults.
     const laborBreakdown = _resolveDefaultLabor(item.type || '', category, item.tonnage ?? item.specs?.tonnage ?? null);
+    const techNote = _generateTechNote(item);
     const laborHrs = Object.values(laborBreakdown).reduce((s, v) => s + (v || 0), 0);
     return {
       tag: (item.tag || '').replace(/[-\s]?\d+$/, '').toUpperCase(), // strip trailing number → canonical
@@ -704,7 +761,7 @@ const HVACLibrary = {
         size: item.size ?? item.specs?.size ?? null,
       },
       pricing: { materialCost: 0, laborHrs, laborRate: null, laborBreakdown },
-      notes: '',
+      notes: techNote,
       createdAt: Date.now(),
       modifiedAt: Date.now(),
       usageCount: 0,
@@ -1208,7 +1265,7 @@ const HVACLibrary = {
             onClick: (ev) => {
               ev.stopPropagation();
               resolved.add(idx);
-              onCreateNew?.(extracted, { ...laborEdits });
+              onCreateNew?.(extracted, { ...laborEdits }, result._notesEdit || "");
               renderRows();
             },
           }, 'Save to Library');
@@ -1303,6 +1360,31 @@ const HVACLibrary = {
 
         expand.appendChild(laborSec);
 
+        // ── Technical Notes (editable) ──
+        const notesSec = _el('div', { style: { marginBottom: '8px' } });
+        const notesLabel = _el('div', { style: { fontSize: '10px', color: '#a0a0c0', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' } });
+        notesLabel.textContent = '📝 Description';
+        notesSec.appendChild(notesLabel);
+
+        // Generate note from extracted specs, or use library match note
+        const matchNote = (best && best.entry.notes) ? best.entry.notes : '';
+        const autoNote = _generateTechNote(extracted);
+        const displayNote = matchNote || autoNote;
+        if (!result._notesEdit) result._notesEdit = displayNote;
+
+        const notesInp = _el('input', {
+          type: 'text',
+          value: result._notesEdit || '',
+          placeholder: 'Technical description...',
+          style: {
+            width: '100%', background: '#16213e', border: '1px solid #333', color: '#e0e0e0',
+            padding: '5px 8px', borderRadius: '4px', fontSize: '11px',
+          },
+        });
+        notesInp.addEventListener('input', () => { result._notesEdit = notesInp.value; });
+        notesSec.appendChild(notesInp);
+        expand.appendChild(notesSec);
+
         // Match options
         if (matches.length > 0) {
           expand.appendChild(_el('div', {
@@ -1355,7 +1437,7 @@ const HVACLibrary = {
             style: { padding: '3px 10px', fontSize: '10px', marginLeft: '4px', color: '#4dabf7' },
             onClick: () => {
               resolved.add(idx);
-              onCreateNew?.(extracted, { ...laborEdits });
+              onCreateNew?.(extracted, { ...laborEdits }, result._notesEdit || "");
               renderRows();
             },
           }, 'Save as New'));
@@ -1409,7 +1491,7 @@ const HVACLibrary = {
           const best = r.matches?.[0];
           if (!best || best.score < 0.3) {
             resolved.add(idx);
-            onCreateNew?.(r.extracted, r._laborEdits ? { ...r._laborEdits } : {});
+            onCreateNew?.(r.extracted, r._laborEdits ? { ...r._laborEdits } : {}, r._notesEdit || "");
           }
         });
         renderRows();
