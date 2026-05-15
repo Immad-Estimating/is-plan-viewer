@@ -362,6 +362,105 @@ function getPriceBookLaborBreakdown(baseKey) {
 
 // ── Data normalization ────────────────────────────────────────────────
 
+// ── HVAC component type → labor-defaults key mapping ───────────────────
+const _HVAC_TYPE_TO_LABOR_KEY = {
+  'rooftop unit': 'rooftop-unit', 'package unit': 'rooftop-unit', 'rtu': 'rooftop-unit',
+  'air handler': 'rooftop-unit', 'ahu': 'rooftop-unit',
+  'split system': 'split-system', 'condensing unit': 'split-system', 'heat pump': 'split-system',
+  'mini split': 'mini-split', 'ptac': 'mini-split', 'wshp': 'mini-split',
+  'exhaust fan': 'exhaust-fan', 'return fan': 'exhaust-fan', 'transfer fan': 'exhaust-fan',
+  'supply fan': 'exhaust-fan', 'inline fan': 'exhaust-fan', 'ceiling fan': 'exhaust-fan',
+  'power ventilator': 'exhaust-fan', 'kitchen hood fan': 'exhaust-fan-lg', 'garage fan': 'exhaust-fan-lg',
+  'unit heater': 'unit-heater', 'cabinet heater': 'unit-heater', 'radiant heater': 'unit-heater',
+  'baseboard heater': 'unit-heater-elec', 'duct heater': 'unit-heater-elec',
+  'erv': 'erv', 'energy recovery wheel': 'erv', 'hrv': 'hrv',
+  'vav box': 'vav-box', 'fptu': 'fan-powered-box', 'fan powered box': 'fan-powered-box',
+  'fan coil unit': 'fan-powered-box', 'chilled beam': 'fan-powered-box',
+  'supply diffuser': 'supply-diffuser', 'linear diffuser': 'linear-diffuser', 'slot diffuser': 'linear-diffuser',
+  'return grille': 'return-grille', 'transfer grille': 'return-grille', 'register': 'register',
+  'louver': 'louver', 'intake louver': 'louver', 'exhaust louver': 'louver',
+  'makeup air unit': 'rooftop-unit', 'doas': 'erv',
+  'air curtain': 'louver', 'damper': 'louver', 'fire damper': 'louver',
+  'smoke damper': 'louver', 'combination fire/smoke damper': 'louver', 'control damper': 'louver', 'backdraft damper': 'louver',
+  'fume hood': 'exhaust-fan', 'kitchen hood': 'exhaust-fan-lg',
+};
+
+// Size-based labor key suffix for equipment with tonnage
+function _hvacSizeSuffix(tonnage) {
+  if (!tonnage) return '';
+  if (tonnage <= 3) return '-sm';
+  if (tonnage >= 15) return '-lg';
+  return ''; // standard
+}
+
+// Resolve labor hours for an HVAC component fitting.
+// Priority: 1) existing items with same tag, 2) labor-defaults by type, 3) category fallback
+function _resolveHvacLabor(f, existingRows, defaultRate) {
+  const result = {};
+  for (const cat of LABOR_CATEGORIES) result[cat.key] = 0;
+
+  // 1) Check existing compiled rows for same hvacTag — reuse their labor breakdown
+  if (f.hvacTag) {
+    const match = existingRows.find(r =>
+      r._sourceType === 'fitting' && r.systemSymbol === f.hvacTag && r._laborHrs > 0
+    );
+    if (match && match._laborCatHrs) {
+      for (const cat of LABOR_CATEGORIES) {
+        result[cat.key] = match._laborCatHrs[cat.key] || 0;
+      }
+      const total = Object.values(result).reduce((s, v) => s + v, 0);
+      if (total > 0) return result;
+    }
+  }
+
+  // 2) Look up labor-defaults by normalized type
+  const typeKey = (f.hvacType || '').toLowerCase().trim();
+  let laborKey = _HVAC_TYPE_TO_LABOR_KEY[typeKey] || null;
+
+  // Try fuzzy partial match if exact match fails
+  if (!laborKey) {
+    for (const [pattern, key] of Object.entries(_HVAC_TYPE_TO_LABOR_KEY)) {
+      if (typeKey.includes(pattern) || pattern.includes(typeKey)) {
+        laborKey = key;
+        break;
+      }
+    }
+  }
+
+  if (laborKey) {
+    // Try size-specific variant first (e.g., rooftop-unit-sm, exhaust-fan-lg)
+    const tonnage = f.hvacTonnage || (f.sizeA ? parseFloat(f.sizeA) / 4 : null);
+    const suffix = _hvacSizeSuffix(tonnage);
+    const sizedKey = suffix ? laborKey + suffix : null;
+    const defaults = (sizedKey && LABOR_DEFAULTS[sizedKey]) ? LABOR_DEFAULTS[sizedKey] : LABOR_DEFAULTS[laborKey];
+    if (defaults) {
+      for (const [catKey, hrs] of Object.entries(defaults)) {
+        if (typeof hrs === 'number') result[catKey] = hrs;
+      }
+      const total = Object.values(result).reduce((s, v) => s + v, 0);
+      if (total > 0) return result;
+    }
+  }
+
+  // 3) Category-based fallback
+  const cat = (f.hvacCategory || '').toLowerCase();
+  const fallbacks = {
+    'equipment': { 'rough': 6.0, 'startup': 1.5, 'stocking': 0.5 },
+    'fan': { 'rough': 1.5, 'startup': 0.5, 'stocking': 0.3 },
+    'air-distribution': { 'trim': 0.2, 'stocking': 0.05 },
+    'terminal': { 'rough': 1.5, 'trim': 0.5, 'stocking': 0.3 },
+    'energy-recovery': { 'air-handler': 5.0, 'startup': 1.5, 'stocking': 0.5 },
+    'heating': { 'rough': 1.5, 'stocking': 0.3, 'startup': 0.5 },
+    'makeup-air': { 'rough': 6.0, 'startup': 1.5, 'stocking': 0.5 },
+    'specialty': { 'rough': 0.5, 'stocking': 0.1 },
+  };
+  const fb = fallbacks[cat] || fallbacks['equipment'];
+  for (const [ck, hrs] of Object.entries(fb)) {
+    result[ck] = hrs;
+  }
+  return result;
+}
+
 function normalizeRows(allPageData, drawingNames) {
   const rows = [];
   const labRate = getLaborRate();
@@ -466,6 +565,56 @@ function normalizeRows(allPageData, drawingNames) {
 
     for (const f of (pd.fittings || [])) {
       const rate = f.laborRate || labRate;
+
+      // ── HVAC component labor assignment ──────────────────────────────
+      if (f.type === 'hvac_component') {
+        let hvacLabor = _resolveHvacLabor(f, rows, labRate);
+        const laborCatHrs = {};
+        const laborCatCost = {};
+        let assignedCat = 'unassigned';
+        let laborHrs = 0;
+        for (const cat of LABOR_CATEGORIES) {
+          const ch = hvacLabor[cat.key] || 0;
+          laborCatHrs[cat.key] = ch;
+          laborCatCost[cat.key] = ch * rate;
+          laborHrs += ch;
+          if (ch > 0 && assignedCat === 'unassigned') assignedCat = cat.label;
+        }
+        let matCost = f.materialCost || 0;
+        const origFLabHrs = laborHrs, origFMatCost = matCost;
+        const origFLabCost = laborHrs * rate;
+        const origFTotal = matCost + origFLabCost;
+        const origFLabCatHrs = { ...laborCatHrs };
+        const fOvr = f._overrides || {};
+        if (fOvr.laborHrs != null) laborHrs = fOvr.laborHrs;
+        if (fOvr.materialCost != null) matCost = fOvr.materialCost;
+        for (const cat of LABOR_CATEGORIES) {
+          if (fOvr['laborCat_' + cat.key] != null) {
+            laborCatHrs[cat.key] = fOvr['laborCat_' + cat.key];
+            laborCatCost[cat.key] = fOvr['laborCat_' + cat.key] * rate;
+          }
+        }
+        const laborCost = laborHrs * rate;
+        const fTotal = (fOvr.totalCost != null) ? fOvr.totalCost : (matCost + laborCost);
+        const fHasOvr = Object.keys(fOvr).length > 0;
+        rows.push({
+          _itemType: f.hvacType || f.hvacTag || 'HVAC Component',
+          _size: f.sizeA + (f.sizeB ? '×' + f.sizeB : ''), _shape: capitalize(f.hvacCategory || 'equipment'),
+          _page: page, _drawingId: drawingId, _drawingName: drawingName,
+          _lengthFt: 0, _matCost: matCost, _laborHrs: laborHrs,
+          _laborCost: laborCost, _totalCost: fTotal,
+          _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
+          _hasOverride: fHasOvr, _overrides: fOvr,
+          _orig_laborHrs: origFLabHrs, _orig_materialCost: origFMatCost,
+          _orig_laborCost: origFLabCost, _orig_totalCost: origFTotal, _orig_lengthFt: 0,
+          _orig_laborCatHrs: origFLabCatHrs,
+          phase: f.phase || null, costGroup: f.costGroup || null, gauge: f.gauge || null,
+          systemSymbol: f.systemSymbol || f.hvacTag || null,
+          _sourceType: 'fitting', _sourceId: f.id,
+        });
+        continue;
+      }
+
       const shape = inferFittingShape(f);
 
       const prefix = shape === 'rect' ? 'rect' : 'spiral';
