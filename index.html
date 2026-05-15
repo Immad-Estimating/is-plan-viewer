@@ -8582,21 +8582,30 @@ function renderInsertPalette() {
 function loadHvacInsertItems() {
   // Use project system symbols (actual extracted tags like RTU-1, EF-1, CD-1)
   // These are the real tags from the project, not generic library templates
-  _hvacLibraryItems = (projectSystemSymbols || []).map(sym => ({
-    _symId: sym.id,
-    tag: sym.tag,
-    type: sym.equipment?.type || sym.description?.split(' · ')[0] || '',
-    category: sym.equipment?.category || sym.category || 'equipment',
-    color: sym.color || '#4dabf7',
-    manufacturer: sym.equipment?.manufacturer || '',
-    model: sym.equipment?.model || '',
-    tonnage: sym.equipment?.tonnage || null,
-    cfm: sym.equipment?.cfm || null,
-    size: sym.equipment?.size || null,
-    voltage: sym.equipment?.voltage || null,
-    heating: sym.equipment?.heating || null,
-    quantity: sym.equipment?.quantity || null,
-  }));
+  _hvacLibraryItems = (projectSystemSymbols || []).map(sym => {
+    // Pull labor from library entry if linked, otherwise from pricing field
+    const bd = sym.equipment?.pricing?.laborBreakdown || sym.pricing?.laborBreakdown || {};
+    const totalLaborHrs = Object.values(bd).reduce((s, v) => s + (parseFloat(v) || 0), 0) ||
+      sym.equipment?.pricing?.laborHrs || sym.pricing?.laborHrs || 0;
+    return {
+      _symId: sym.id,
+      tag: sym.tag,
+      type: sym.equipment?.type || sym.description?.split(' · ')[0] || '',
+      category: sym.equipment?.category || sym.category || 'equipment',
+      color: sym.color || '#4dabf7',
+      manufacturer: sym.equipment?.manufacturer || '',
+      model: sym.equipment?.model || '',
+      tonnage: sym.equipment?.tonnage || null,
+      cfm: sym.equipment?.cfm || null,
+      size: sym.equipment?.size || null,
+      voltage: sym.equipment?.voltage || null,
+      heating: sym.equipment?.heating || null,
+      quantity: sym.equipment?.quantity || null,
+      laborHrs: totalLaborHrs,
+      laborBreakdown: bd,
+      pricing: sym.equipment?.pricing || sym.pricing || null,
+    };
+  });
   const slider = document.getElementById('sliderHvac');
   if (slider) slider.max = _hvacLibraryItems.length;
   updateInsertSection('hvac');
@@ -8652,7 +8661,8 @@ window.updateInsertSection = function(section) {
       html += `<div class="hvac-comp-row${sel}" onclick="event.stopPropagation(); selectHvacComponent('${escapeHtml(item.tag)}')" style="border-left:3px solid ${item.color || '#4dabf7'}">`;
       html += `<span class="comp-tag">${escapeHtml(item.tag)}</span>`;
       html += `<span class="comp-type">${escapeHtml(item.type || '')}</span>`;
-      if (specStr) html += `<span style="font-size:9px;color:#666;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px" title="${escapeHtml(specParts.join(' · '))}">${escapeHtml(specStr)}</span>`;
+      if (item.laborHrs > 0) html += `<span style="font-size:9px;color:#ffd43b;margin-left:auto;white-space:nowrap;font-weight:600" title="Labor hours per unit">${item.laborHrs.toFixed(1)}h</span>`;
+      else if (specStr) html += `<span style="font-size:9px;color:#666;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px" title="${escapeHtml(specParts.join(' · '))}">${escapeHtml(specStr)}</span>`;
       html += `</div>`;
     });
     container.innerHTML = html;
@@ -8730,8 +8740,18 @@ function updateConfigArea() {
     if (hc.manufacturer) hcSpecs.push(hc.manufacturer);
     if (hc.model) hcSpecs.push(hc.model);
     if (hc.voltage) hcSpecs.push(hc.voltage);
-    document.getElementById('hvacConfigTag').innerHTML = `<span style="color:${hc.color || '#00ff88'}">${escapeHtml(hc.tag)}</span> — ${escapeHtml(hc.type || '')}` +
-      (hcSpecs.length > 0 ? `<div style="font-size:10px;color:#a0a0c0;margin-top:2px">${escapeHtml(hcSpecs.join(' · '))}</div>` : '');
+    let configHtml = `<span style="color:${hc.color || '#00ff88'}">${escapeHtml(hc.tag)}</span> — ${escapeHtml(hc.type || '')}`;
+    if (hcSpecs.length > 0) configHtml += `<div style="font-size:10px;color:#a0a0c0;margin-top:2px">${escapeHtml(hcSpecs.join(' · '))}</div>`;
+    // Show labor hours summary
+    if (hc.laborHrs > 0) {
+      configHtml += `<div style="margin-top:4px;font-size:11px;color:#ffd43b;font-weight:600">👷 ${hc.laborHrs.toFixed(2)}h labor`;
+      if (hc.laborBreakdown && Object.keys(hc.laborBreakdown).length > 0) {
+        const parts = Object.entries(hc.laborBreakdown).filter(([,v]) => v > 0).map(([k,v]) => `${k}: ${v.toFixed(1)}h`);
+        if (parts.length > 0) configHtml += `<div style="font-size:9px;color:#a0a0c0;font-weight:400;margin-top:1px">${parts.join(' · ')}</div>`;
+      }
+      configHtml += `</div>`;
+    }
+    document.getElementById('hvacConfigTag').innerHTML = configHtml;
   } else {
     dimsArea.style.display = selectedFittingType ? 'block' : 'none';
     hvacArea.style.display = 'none';

@@ -299,6 +299,90 @@ function _getTotalBreakdownHrs(breakdown) {
   return Object.values(breakdown).reduce((s, v) => s + (parseFloat(v) || 0), 0);
 }
 
+// ── HVAC type → labor-defaults key mapping (shared with compiler) ────
+const _LIB_TYPE_TO_LABOR_KEY = {
+  'rooftop unit': 'rooftop-unit', 'package unit': 'rooftop-unit', 'rtu': 'rooftop-unit',
+  'air handler': 'rooftop-unit', 'ahu': 'rooftop-unit',
+  'split system': 'split-system', 'condensing unit': 'split-system', 'heat pump': 'split-system',
+  'mini split': 'mini-split', 'ptac': 'mini-split', 'wshp': 'mini-split',
+  'exhaust fan': 'exhaust-fan', 'return fan': 'exhaust-fan', 'transfer fan': 'exhaust-fan',
+  'supply fan': 'exhaust-fan', 'inline fan': 'exhaust-fan', 'ceiling fan': 'exhaust-fan',
+  'power ventilator': 'exhaust-fan', 'kitchen hood fan': 'exhaust-fan-lg', 'garage fan': 'exhaust-fan-lg',
+  'unit heater': 'unit-heater', 'cabinet heater': 'unit-heater', 'radiant heater': 'unit-heater',
+  'baseboard heater': 'unit-heater-elec', 'duct heater': 'unit-heater-elec',
+  'erv': 'erv', 'energy recovery wheel': 'erv', 'hrv': 'hrv',
+  'vav box': 'vav-box', 'fptu': 'fan-powered-box', 'fan powered box': 'fan-powered-box',
+  'fan coil unit': 'fan-powered-box', 'chilled beam': 'fan-powered-box',
+  'supply diffuser': 'supply-diffuser', 'linear diffuser': 'linear-diffuser', 'slot diffuser': 'linear-diffuser',
+  'return grille': 'return-grille', 'transfer grille': 'return-grille', 'register': 'register',
+  'louver': 'louver', 'intake louver': 'louver', 'exhaust louver': 'louver',
+  'makeup air unit': 'rooftop-unit', 'doas': 'erv',
+  'air curtain': 'louver', 'damper': 'louver', 'fire damper': 'louver',
+  'smoke damper': 'louver', 'combination fire/smoke damper': 'louver', 'control damper': 'louver',
+  'backdraft damper': 'louver', 'fume hood': 'exhaust-fan', 'kitchen hood': 'exhaust-fan-lg',
+};
+
+const _LIB_CAT_FALLBACKS = {
+  'equipment': { 'air-handler': 8.0, 'startup': 2.0, 'stocking': 1.0, 'qc': 0.5 },
+  'fan': { 'rough': 1.5, 'startup': 0.5, 'stocking': 0.3 },
+  'air-distribution': { 'trim': 0.2, 'stocking': 0.05 },
+  'terminal': { 'rough': 1.5, 'trim': 0.5, 'stocking': 0.3, 'startup': 0.3 },
+  'energy-recovery': { 'air-handler': 5.0, 'startup': 1.5, 'stocking': 0.5 },
+  'heating': { 'rough': 1.5, 'stocking': 0.3, 'startup': 0.5 },
+  'makeup-air': { 'air-handler': 6.0, 'startup': 1.5, 'stocking': 0.5 },
+  'specialty': { 'rough': 0.5, 'stocking': 0.1 },
+};
+
+// Resolve default labor breakdown for an HVAC type.
+// Reads from labor-defaults.json (loaded into _laborDefaultsCache at init).
+let _laborDefaultsCache = null;
+
+async function _ensureLaborDefaults() {
+  if (_laborDefaultsCache) return;
+  try {
+    const resp = await fetch('./labor-defaults.json');
+    if (!resp.ok) { _laborDefaultsCache = {}; return; }
+    const lj = await resp.json();
+    _laborDefaultsCache = {};
+    for (const sec of ['duct','fittings','accessories','equipment']) {
+      const data = lj[sec] || {};
+      for (const k in data) { if (k !== '_note') _laborDefaultsCache[k] = data[k]; }
+    }
+  } catch { _laborDefaultsCache = {}; }
+}
+
+function _resolveDefaultLabor(hvacType, category, tonnage) {
+  const result = {};
+  const typeKey = (hvacType || '').toLowerCase().trim();
+  let laborKey = _LIB_TYPE_TO_LABOR_KEY[typeKey] || null;
+  // Fuzzy partial match
+  if (!laborKey) {
+    for (const [pattern, key] of Object.entries(_LIB_TYPE_TO_LABOR_KEY)) {
+      if (typeKey.includes(pattern) || pattern.includes(typeKey)) { laborKey = key; break; }
+    }
+  }
+  if (laborKey && _laborDefaultsCache) {
+    // Size variant
+    let suffix = '';
+    if (tonnage != null) {
+      if (tonnage <= 3) suffix = '-sm';
+      else if (tonnage >= 15) suffix = '-lg';
+    }
+    const sizedKey = suffix ? laborKey + suffix : null;
+    const defaults = (sizedKey && _laborDefaultsCache[sizedKey]) ? _laborDefaultsCache[sizedKey] : _laborDefaultsCache[laborKey];
+    if (defaults) {
+      for (const [catKey, hrs] of Object.entries(defaults)) {
+        if (typeof hrs === 'number') result[catKey] = hrs;
+      }
+      if (Object.values(result).some(v => v > 0)) return result;
+    }
+  }
+  // Category fallback
+  const fb = _LIB_CAT_FALLBACKS[(category || '').toLowerCase()] || _LIB_CAT_FALLBACKS['equipment'];
+  for (const [ck, hrs] of Object.entries(fb)) result[ck] = hrs;
+  return result;
+}
+
 // Build radar chart SVG
 function _renderRadarSVG(breakdown, applicableKeys) {
   const cats = LABOR_CATS;
@@ -460,6 +544,7 @@ const HVACLibrary = {
   // ── DB init ───────────────────────────────────────────
   async init() {
     await _openDB();
+    await _ensureLaborDefaults();
   },
 
   // ── CRUD ──────────────────────────────────────────────
@@ -597,10 +682,15 @@ const HVACLibrary = {
 
   // ── Import from AI extraction ─────────────────────────
   createEntryFromExtracted(item) {
+    const category = item.category || 'equipment';
+    // _ensureLaborDefaults is async but _laborDefaultsCache may already be loaded from init().
+    // If not loaded yet, _resolveDefaultLabor falls back to category defaults.
+    const laborBreakdown = _resolveDefaultLabor(item.type || '', category, item.tonnage ?? item.specs?.tonnage ?? null);
+    const laborHrs = Object.values(laborBreakdown).reduce((s, v) => s + (v || 0), 0);
     return {
       tag: (item.tag || '').replace(/[-\s]?\d+$/, '').toUpperCase(), // strip trailing number → canonical
       type: item.type || '',
-      category: item.category || 'equipment',
+      category,
       manufacturer: item.manufacturer || null,
       model: item.model || null,
       specs: {
@@ -613,7 +703,7 @@ const HVACLibrary = {
         mocp: item.mocp ?? item.specs?.mocp ?? null,
         size: item.size ?? item.specs?.size ?? null,
       },
-      pricing: { materialCost: 0, laborHrs: 0, laborRate: null, laborBreakdown: {} },
+      pricing: { materialCost: 0, laborHrs, laborRate: null, laborBreakdown },
       notes: '',
       createdAt: Date.now(),
       modifiedAt: Date.now(),
