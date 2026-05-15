@@ -3310,7 +3310,12 @@ window.aiReviewImportAll = async function() {
     ].join('|');
 
     HVACLibrary.renderMatchStep(matchContent, matchResults, {
-      onLink: async (extracted, libraryEntry) => {
+      onLink: async (extracted, libraryEntry, notesText) => {
+        // Update library entry notes if user edited them
+        if (notesText && notesText !== (libraryEntry.notes || '')) {
+          libraryEntry.notes = notesText;
+          await HVACLibrary.save(libraryEntry);
+        }
         await HVACLibrary.incrementUsage(libraryEntry.id);
         const sym = projectSystemSymbols.find(s => s.tag === (extracted.tag || '').toUpperCase());
         if (sym) {

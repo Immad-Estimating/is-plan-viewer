@@ -1234,7 +1234,7 @@ const HVACLibrary = {
             onClick: (ev) => {
               ev.stopPropagation();
               resolved.add(idx);
-              onLink?.(extracted, best.entry);
+              onLink?.(extracted, best.entry, result._notesEdit || '');
               renderRows();
             },
           }, 'Link');
@@ -1353,17 +1353,21 @@ const HVACLibrary = {
         const displayNote = matchNote || autoNote;
         if (!result._notesEdit && result._notesEdit !== '') result._notesEdit = displayNote;
 
-        const notesInp = _el('input', {
-          type: 'text',
-          value: result._notesEdit || '',
-          placeholder: 'e.g., VFD supply fan, 100% OA, dual compressor, low-ambient kit...',
-          style: {
-            width: '100%', background: '#16213e', border: '1px solid #333', color: displayNote ? '#e0e0e0' : '#555',
-            padding: '5px 8px', borderRadius: '4px', fontSize: '11px',
-          },
+        const notesInp = document.createElement('input');
+        notesInp.type = 'text';
+        notesInp.value = result._notesEdit || '';
+        notesInp.placeholder = 'e.g., VFD supply fan, 100% OA, dual compressor, low-ambient kit...';
+        Object.assign(notesInp.style, {
+          width: '100%', background: '#16213e', border: '1px solid #333',
+          color: displayNote ? '#e0e0e0' : '#555',
+          padding: '5px 8px', borderRadius: '4px', fontSize: '11px', boxSizing: 'border-box',
         });
-        notesInp.addEventListener('input', () => { result._notesEdit = notesInp.value; });
-        notesInp.addEventListener('focus', () => { notesInp.style.color = '#e0e0e0'; });
+        notesInp.addEventListener('input', () => {
+          result._notesEdit = notesInp.value;
+          notesInp.style.color = '#e0e0e0';
+        });
+        notesInp.addEventListener('mousedown', (e) => e.stopPropagation());
+        notesInp.addEventListener('click', (e) => e.stopPropagation());
         notesSec.appendChild(notesInp);
         if (displayNote) {
           notesSec.appendChild(_el('div', { style: { fontSize: '9px', color: '#555', marginTop: '2px' } },
@@ -1396,7 +1400,7 @@ const HVACLibrary = {
               style: { padding: '2px 8px', fontSize: '10px' },
               onClick: () => {
                 resolved.add(idx);
-                onLink?.(extracted, m.entry);
+                onLink?.(extracted, m.entry, result._notesEdit || '');
                 renderRows();
               },
             }, 'Link');
@@ -1461,7 +1465,7 @@ const HVACLibrary = {
           const best = r.matches?.[0];
           if (best && best.score >= 0.8) {
             resolved.add(idx);
-            onLink?.(r.extracted, best.entry);
+            onLink?.(r.extracted, best.entry, r._notesEdit || '');
           }
         });
         renderRows();
