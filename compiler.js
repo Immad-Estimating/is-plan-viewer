@@ -1082,16 +1082,22 @@ function renderCompiler() {
 function renderCompilerRadar(rows, label) {
   if (!rows || rows.length === 0) return '';
   const rate = getLaborRate();
-  const totalHrs = rows.reduce((s, r) => s + (r._laborHrs || 0), 0);
-  if (totalHrs === 0) return '';
+  const isGlobalScope = !_radarTarget;
+  const rawTotalHrs = rows.reduce((s, r) => s + (r._laborHrs || 0), 0);
   const n = LABOR_CATEGORIES.length;
   const bd = [];
   let maxVal = 0.5;
+  let adjTotalHrs = 0;
   for (const cat of LABOR_CATEGORIES) {
-    const hrs = rows.reduce((s, r) => s + ((r._laborCatHrs && r._laborCatHrs[cat.key]) || 0), 0);
-    bd.push({ cat, hrs });
-    if (hrs > maxVal) maxVal = hrs;
+    const rawHrs = rows.reduce((s, r) => s + ((r._laborCatHrs && r._laborCatHrs[cat.key]) || 0), 0);
+    // At global scope, include grand total contingency for this category
+    const adjHrs = isGlobalScope ? rawHrs + (_grandAdj['laborHrs:' + cat.key] || 0) : rawHrs;
+    bd.push({ cat, hrs: adjHrs });
+    adjTotalHrs += adjHrs;
+    if (adjHrs > maxVal) maxVal = adjHrs;
   }
+  const totalHrs = isGlobalScope ? adjTotalHrs : rawTotalHrs;
+  if (totalHrs === 0 && rawTotalHrs === 0) return '';
   maxVal = Math.ceil(maxVal * 1.15) || 1;
   const cx = 100, cy = 100, R = 80;
   let html = '<div class="cmp-radar">';
@@ -1601,9 +1607,47 @@ window._cmpResetRadar = function() {
 window._cmpRadarEditCat = async function(catKey, value) {
   var newTotal = parseFloat(value);
   if (isNaN(newTotal)) { renderCompiler(); return; }
-  var rows = _radarRows || applyFilters(_rows);
-  if (!rows || rows.length === 0) return;
   var rate = getLaborRate();
+
+  // When radar is at project/selection scope (no specific group focused),
+  // use the grand total contingency system instead of distributing to items
+  if (!_radarTarget) {
+    var scopeRows = applyFilters(_rows);
+    var subtotal = scopeRows.reduce(function(s, r) { return s + ((r._laborCatHrs && r._laborCatHrs[catKey]) || 0); }, 0);
+    var contingency = newTotal - subtotal;
+    var adjKeyHrs = 'laborHrs:' + catKey;
+    var adjKeyCost = 'laborCost:' + catKey;
+    if (Math.abs(contingency) < 0.005) {
+      delete _grandAdj[adjKeyHrs];
+      delete _grandAdj[adjKeyCost];
+    } else {
+      _grandAdj[adjKeyHrs] = parseFloat(contingency.toFixed(4));
+      _grandAdj[adjKeyCost] = parseFloat((contingency * rate).toFixed(2));
+    }
+    // Also update the main laborHrs/laborCost contingencies to reflect the category change
+    var totalHrsAdj = 0, totalCostAdj = 0;
+    for (var ci = 0; ci < LABOR_CATEGORIES.length; ci++) {
+      var ck = LABOR_CATEGORIES[ci].key;
+      totalHrsAdj += _grandAdj['laborHrs:' + ck] || 0;
+      totalCostAdj += _grandAdj['laborCost:' + ck] || 0;
+    }
+    if (Math.abs(totalHrsAdj) < 0.005) delete _grandAdj.laborHrs;
+    else _grandAdj.laborHrs = parseFloat(totalHrsAdj.toFixed(4));
+    if (Math.abs(totalCostAdj) < 0.005) delete _grandAdj.laborCost;
+    else _grandAdj.laborCost = parseFloat(totalCostAdj.toFixed(2));
+    // Recalc totalCost contingency
+    var matAdj = _grandAdj.materialCost || 0;
+    var totalAdj = totalHrsAdj + matAdj;
+    if (Math.abs(totalAdj) < 0.005) delete _grandAdj.totalCost;
+    else _grandAdj.totalCost = parseFloat(totalAdj.toFixed(2));
+    _saveGrandAdj();
+    renderCompiler();
+    return;
+  }
+
+  // Group-focused radar: distribute override to individual items in the group
+  var rows = _radarRows;
+  if (!rows || rows.length === 0) return;
   var oldTotal = rows.reduce(function(s, r) { return s + ((r._laborCatHrs && r._laborCatHrs[catKey]) || 0); }, 0);
   var ratio = oldTotal > 0 ? newTotal / oldTotal : 0;
   var even = newTotal / rows.length;
