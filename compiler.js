@@ -1082,7 +1082,7 @@ function renderCompiler() {
 function renderCompilerRadar(rows, label) {
   if (!rows || rows.length === 0) return '';
   const rate = getLaborRate();
-  const isGlobalScope = !_radarTarget;
+  const isGlobalScope = !_radarTarget && _scope !== 'selection';
   const rawTotalHrs = rows.reduce((s, r) => s + (r._laborHrs || 0), 0);
   const n = LABOR_CATEGORIES.length;
   const bd = [];
@@ -1609,9 +1609,10 @@ window._cmpRadarEditCat = async function(catKey, value) {
   if (isNaN(newTotal)) { renderCompiler(); return; }
   var rate = getLaborRate();
 
-  // When radar is at project/selection scope (no specific group focused),
-  // use the grand total contingency system instead of distributing to items
-  if (!_radarTarget) {
+  // When radar is at project scope with no group focused,
+  // use the grand total contingency system instead of distributing to items.
+  // Selection scope always distributes to selected items (like a group).
+  if (!_radarTarget && _scope !== 'selection') {
     var scopeRows = applyFilters(_rows);
     var subtotal = scopeRows.reduce(function(s, r) { return s + ((r._laborCatHrs && r._laborCatHrs[catKey]) || 0); }, 0);
     var contingency = newTotal - subtotal;
@@ -1645,8 +1646,8 @@ window._cmpRadarEditCat = async function(catKey, value) {
     return;
   }
 
-  // Group-focused radar: distribute override to individual items in the group
-  var rows = _radarRows;
+  // Group-focused or selection-scope radar: distribute override to individual items
+  var rows = _radarRows || applyFilters(_rows);
   if (!rows || rows.length === 0) return;
   var oldTotal = rows.reduce(function(s, r) { return s + ((r._laborCatHrs && r._laborCatHrs[catKey]) || 0); }, 0);
   var ratio = oldTotal > 0 ? newTotal / oldTotal : 0;
