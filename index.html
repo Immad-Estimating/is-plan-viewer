@@ -3300,6 +3300,15 @@ window.aiReviewImportAll = async function() {
     const matchContent = document.createElement('div');
     matchContainer.appendChild(matchContent);
 
+    // Track created library entries by spec key for auto-linking spec-dupes
+    const _createdBySpec = {};
+    const _impSpecKey = (item) => [
+      (item.type || '').toLowerCase().trim(),
+      (item.manufacturer || '').toLowerCase().trim(),
+      (item.model || '').toLowerCase().trim(),
+      item.tonnage || '', item.cfm || '', (item.size || '').toLowerCase().trim()
+    ].join('|');
+
     HVACLibrary.renderMatchStep(matchContent, matchResults, {
       onLink: async (extracted, libraryEntry) => {
         await HVACLibrary.incrementUsage(libraryEntry.id);
@@ -3307,13 +3316,48 @@ window.aiReviewImportAll = async function() {
         if (sym) {
           sym.libraryId = libraryEntry.id;
           sym.equipment = { ...sym.equipment, ...libraryEntry.specs, manufacturer: libraryEntry.manufacturer, model: libraryEntry.model };
+          // Copy labor pricing from library entry to symbol
+          if (libraryEntry.pricing) sym.pricing = { ...libraryEntry.pricing };
           await saveProjectSystemSymbols(activeProjectId);
           renderSysSymbolList();
+          loadHvacInsertItems();
         }
+        // Track for spec-dupe auto-linking
+        _createdBySpec[_impSpecKey(extracted)] = libraryEntry;
       },
-      onCreateNew: async (extracted) => {
+      onCreateNew: async (extracted, laborOverrides) => {
+        // Check if an identical spec was already created — auto-link instead
+        const sk = _impSpecKey(extracted);
+        if (_createdBySpec[sk]) {
+          // Auto-link to existing
+          await HVACLibrary.incrementUsage(_createdBySpec[sk].id);
+          const sym = projectSystemSymbols.find(s => s.tag === (extracted.tag || '').toUpperCase());
+          if (sym) {
+            sym.libraryId = _createdBySpec[sk].id;
+            if (_createdBySpec[sk].pricing) sym.pricing = { ..._createdBySpec[sk].pricing };
+            await saveProjectSystemSymbols(activeProjectId);
+            renderSysSymbolList();
+            loadHvacInsertItems();
+          }
+          return;
+        }
         const entry = HVACLibrary.createEntryFromExtracted(extracted);
-        await HVACLibrary.save(entry);
+        // Apply labor overrides from user edits if provided
+        if (laborOverrides && Object.keys(laborOverrides).length > 0) {
+          entry.pricing.laborBreakdown = { ...laborOverrides };
+          entry.pricing.laborHrs = Object.values(laborOverrides).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+        }
+        const newId = await HVACLibrary.save(entry);
+        entry.id = newId;
+        _createdBySpec[sk] = entry;
+        // Copy pricing to symbol
+        const sym = projectSystemSymbols.find(s => s.tag === (extracted.tag || '').toUpperCase());
+        if (sym) {
+          sym.pricing = { ...entry.pricing };
+          await saveProjectSystemSymbols(activeProjectId);
+          renderSysSymbolList();
+          loadHvacInsertItems();
+        }
       },
       onSkip: () => { /* no-op */ },
     });
@@ -3397,10 +3441,37 @@ async function runScheduleExtraction(blob) {
       return '';
     }
 
+    // ── Spec-based dedup: detect items with identical specs under different tags ──
+    // Key = normalized type+manufacturer+model+tonnage+cfm+size
+    const _specKey = (eq) => [
+      (eq.type || '').toLowerCase().trim(),
+      (eq.manufacturer || '').toLowerCase().trim(),
+      (eq.model || '').toLowerCase().trim(),
+      eq.tonnage || '', eq.cfm || '', (eq.size || '').toLowerCase().trim()
+    ].join('|');
+    const specGroups = {};
+    equipment.forEach((eq, idx) => {
+      const key = _specKey(eq);
+      if (!specGroups[key]) specGroups[key] = [];
+      specGroups[key].push(idx);
+    });
+    // Mark duplicates: first in each group is the primary, rest are dupes
+    const dupePrimaryIdx = {}; // idx → primary idx (if this is a dupe)
+    for (const indices of Object.values(specGroups)) {
+      if (indices.length <= 1) continue;
+      const primaryIdx = indices[0];
+      for (let i = 1; i < indices.length; i++) {
+        dupePrimaryIdx[indices[i]] = primaryIdx;
+      }
+    }
+    window._aiDupePrimaryIdx = dupePrimaryIdx;
+
     // Build review rows — modern card style
     let reviewHtml = '';
     equipment.forEach((eq, idx) => {
       const isDupe = projectSystemSymbols.some(s => s.tag === (eq.tag || '').toUpperCase());
+      const isSpecDupe = dupePrimaryIdx[idx] != null;
+      const specDupePrimary = isSpecDupe ? equipment[dupePrimaryIdx[idx]] : null;
       const pAttr = primaryAttr(eq);
       // Secondary specs (everything not the primary)
       const secParts = [];
@@ -3442,6 +3513,7 @@ async function runScheduleExtraction(blob) {
       if (pAttr) reviewHtml += `<span style="font-size:12px;font-weight:700;color:#ffd43b;letter-spacing:0.3px">${escapeHtml(pAttr)}</span>`;
       if (secParts.length > 0) reviewHtml += `<span style="font-size:10px;color:#666">${escapeHtml(secParts.join(' \u00b7 '))}</span>`;
       if (isDupe) reviewHtml += `<span style="font-size:9px;color:#444;margin-left:auto;background:#222;padding:1px 6px;border-radius:4px">exists</span>`;
+      if (isSpecDupe) reviewHtml += `<span style="font-size:9px;color:#ffa94d;margin-left:auto;background:rgba(255,169,77,0.1);padding:1px 6px;border-radius:4px" title="Same specs as ${escapeHtml(specDupePrimary.tag)} — will link to same library entry">🔗 same as ${escapeHtml(specDupePrimary.tag)}</span>`;
       reviewHtml += `</div>`;
 
       reviewHtml += `</div>`; // end content area

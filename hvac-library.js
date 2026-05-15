@@ -1208,7 +1208,7 @@ const HVACLibrary = {
             onClick: (ev) => {
               ev.stopPropagation();
               resolved.add(idx);
-              onCreateNew?.(extracted);
+              onCreateNew?.(extracted, { ...laborEdits });
               renderRows();
             },
           }, 'Save to Library');
@@ -1235,6 +1235,73 @@ const HVACLibrary = {
             style: { fontSize: '11px', color: '#a0a0c0', marginBottom: '8px' },
           }, detailParts.join(' · ')));
         }
+
+        // ── Labor Hours Preview (editable before import) ──
+        const laborSec = _el('div', { style: { marginBottom: '8px', padding: '6px 8px', background: 'rgba(255,212,59,0.05)', borderRadius: '6px', border: '1px solid #2a2a4a' } });
+        const laborHead = _el('div', { style: { fontSize: '10px', color: '#ffd43b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px', fontWeight: '600' } });
+        laborHead.textContent = '👷 Labor Hours (per unit)';
+        laborSec.appendChild(laborHead);
+
+        // Resolve default labor for this item
+        const defaultBd = _resolveDefaultLabor(extracted.type || '', extracted.category || 'equipment', extracted.tonnage || null);
+        const applicableKeys = _applicableCats(extracted.category || 'equipment');
+        // If a library match exists, use its breakdown instead
+        const matchBd = (best && best.entry.pricing?.laborBreakdown && _getTotalBreakdownHrs(best.entry.pricing.laborBreakdown) > 0)
+          ? best.entry.pricing.laborBreakdown : null;
+        const displayBd = matchBd || defaultBd;
+
+        // Store live editable values per item
+        if (!result._laborEdits) result._laborEdits = {};
+        const laborEdits = result._laborEdits;
+        // Initialize from display breakdown
+        if (Object.keys(laborEdits).length === 0) {
+          for (const [k, v] of Object.entries(displayBd)) { if (v > 0) laborEdits[k] = v; }
+        }
+
+        const laborGrid = _el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '4px 8px' } });
+        const totalEl = _el('span', { style: { fontSize: '11px', color: '#ffd43b', fontWeight: '700', marginLeft: 'auto' } });
+
+        function updateLaborTotal() {
+          const total = Object.values(laborEdits).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+          totalEl.textContent = total.toFixed(2) + 'h';
+        }
+
+        LABOR_CATS.forEach(cat => {
+          if (!applicableKeys.includes(cat.key)) return;
+          const val = laborEdits[cat.key] || displayBd[cat.key] || 0;
+          if (!laborEdits[cat.key] && val > 0) laborEdits[cat.key] = val;
+          const wrap = _el('div', { style: { display: 'flex', alignItems: 'center', gap: '3px' } });
+          wrap.appendChild(_el('span', { style: { fontSize: '9px', color: cat.color, fontWeight: '700', width: '20px' } }, cat.short));
+          const inp = _el('input', {
+            type: 'text',
+            value: val > 0 ? val.toFixed(2) : '',
+            placeholder: '0',
+            style: {
+              width: '48px', background: '#16213e', border: '1px solid #333', color: '#e0e0e0',
+              padding: '2px 4px', borderRadius: '4px', fontSize: '11px', textAlign: 'center',
+            },
+          });
+          inp.addEventListener('change', () => {
+            laborEdits[cat.key] = parseFloat(inp.value) || 0;
+            updateLaborTotal();
+          });
+          wrap.appendChild(inp);
+          laborGrid.appendChild(wrap);
+        });
+
+        const laborRow = _el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } });
+        laborRow.appendChild(laborGrid);
+        laborRow.appendChild(totalEl);
+        laborSec.appendChild(laborRow);
+        updateLaborTotal();
+
+        if (matchBd) {
+          laborSec.appendChild(_el('div', { style: { fontSize: '9px', color: '#555', marginTop: '3px' } }, 'from library match — edit to override'));
+        } else {
+          laborSec.appendChild(_el('div', { style: { fontSize: '9px', color: '#555', marginTop: '3px' } }, 'auto-estimated from defaults — edit before importing'));
+        }
+
+        expand.appendChild(laborSec);
 
         // Match options
         if (matches.length > 0) {
@@ -1288,7 +1355,7 @@ const HVACLibrary = {
             style: { padding: '3px 10px', fontSize: '10px', marginLeft: '4px', color: '#4dabf7' },
             onClick: () => {
               resolved.add(idx);
-              onCreateNew?.(extracted);
+              onCreateNew?.(extracted, { ...laborEdits });
               renderRows();
             },
           }, 'Save as New'));
@@ -1342,7 +1409,7 @@ const HVACLibrary = {
           const best = r.matches?.[0];
           if (!best || best.score < 0.3) {
             resolved.add(idx);
-            onCreateNew?.(r.extracted);
+            onCreateNew?.(r.extracted, r._laborEdits ? { ...r._laborEdits } : {});
           }
         });
         renderRows();
