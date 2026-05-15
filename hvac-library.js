@@ -717,7 +717,8 @@ const HVACLibrary = {
     // _ensureLaborDefaults is async but _laborDefaultsCache may already be loaded from init().
     // If not loaded yet, _resolveDefaultLabor falls back to category defaults.
     const laborBreakdown = _resolveDefaultLabor(item.type || '', category, item.tonnage ?? item.specs?.tonnage ?? null);
-    const techNote = _generateTechNote(item);
+    // Use AI-generated note if available, fall back to local generation
+    const techNote = item.notes || _generateTechNote(item);
     const laborHrs = Object.values(laborBreakdown).reduce((s, v) => s + (v || 0), 0);
     return {
       tag: (item.tag || '').replace(/[-\s]?\d+$/, '').toUpperCase(), // strip trailing number → canonical
@@ -1347,10 +1348,11 @@ const HVACLibrary = {
         notesLabel.appendChild(_el('span', { style: { fontSize: '10px', color: '#a0a0c0', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' } }, '📝 Notes'));
         notesSec.appendChild(notesLabel);
 
-        // Generate note from extracted specs, or use library match note
+        // Use AI-generated note first, then library match note, then local fallback
+        const aiNote = extracted.notes || '';
         const matchNote = (best && best.entry.notes) ? best.entry.notes : '';
-        const autoNote = _generateTechNote(extracted);
-        const displayNote = matchNote || autoNote;
+        const localNote = _generateTechNote(extracted);
+        const displayNote = aiNote || matchNote || localNote;
         if (!result._notesEdit && result._notesEdit !== '') result._notesEdit = displayNote;
 
         const notesInp = document.createElement('input');
@@ -1370,8 +1372,9 @@ const HVACLibrary = {
         notesInp.addEventListener('click', (e) => e.stopPropagation());
         notesSec.appendChild(notesInp);
         if (displayNote) {
+          const noteSource = aiNote ? 'AI-generated from schedule' : (matchNote ? 'from library' : 'auto-estimated');
           notesSec.appendChild(_el('div', { style: { fontSize: '9px', color: '#555', marginTop: '2px' } },
-            matchNote ? 'from library — edit to update' : 'auto-filled from schedule — edit or clear'));
+            noteSource + ' — edit to update'));
         }
         expand.appendChild(notesSec);
 

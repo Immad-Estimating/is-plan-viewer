@@ -78,6 +78,7 @@ For EACH row/entry, extract these fields:
 - "size": Physical size for grilles/diffusers/dampers (e.g., "24x24", "12x8", "10\" round", null)
 - "quantity": If a quantity column exists showing multiples of the same tag (number or null, default null meaning 1)
 - "location": Serving area/room if shown (string or null)
+- "notes": A SHORT technical note (1 line max) highlighting what is special or noteworthy about THIS specific unit. Do NOT repeat the type, manufacturer, model, tonnage, CFM, voltage, or size — those are already captured in other fields. Focus ONLY on features that differentiate this unit: drive type (VFD, ECM, direct-drive), special coils (DX, chilled water, dual), OA configuration (100% OA, economizer, energy wheel), heating source if unusual, special accessories (low-ambient kit, hail guards, disconnect), mounting (curb, slab, suspended), or any notable spec from the schedule not captured elsewhere. If nothing is noteworthy, return null. Examples: "VFD supply, DX cooling w/ hot gas reheat, 100% OA, energy recovery wheel" or "ceiling mount, plug disconnect, backdraft damper, 12in roof curb" or "series FPB w/ ECM motor, electric reheat" or null.
 
 === SKIP THESE ===
 - Entering/leaving/discharge air temperatures
@@ -98,10 +99,10 @@ Rules:
 
 Return ONLY a JSON array. No markdown, no explanation.
 Examples:
-[{"tag":"RTU-1","type":"Rooftop Unit","category":"equipment","tonnage":10,"cfm":4000,"model":"RN-048","manufacturer":"AAON","heating":"150 MBH Gas","voltage":"208/3/60","refrigerant":"R-410A","mca":42,"mocp":60,"size":null,"quantity":null,"location":null},
-{"tag":"EF-1","type":"Exhaust Fan","category":"fan","tonnage":null,"cfm":2500,"model":"CSP-A1200","manufacturer":"Greenheck","heating":null,"voltage":"208/1/60","refrigerant":null,"mca":null,"mocp":null,"size":null,"quantity":null,"location":"Restrooms"},
-{"tag":"SD-1","type":"Supply Diffuser","category":"air-distribution","tonnage":null,"cfm":200,"model":"STR","manufacturer":"Titus","heating":null,"voltage":null,"refrigerant":null,"mca":null,"mocp":null,"size":"24x24","quantity":12,"location":null},
-{"tag":"FSD-1","type":"Combination Fire/Smoke Damper","category":"specialty","tonnage":null,"cfm":null,"model":"FSD-35","manufacturer":"Ruskin","heating":null,"voltage":"120/1/60","refrigerant":null,"mca":null,"mocp":null,"size":"24x12","quantity":4,"location":null}]`;
+[{"tag":"RTU-1","type":"Rooftop Unit","category":"equipment","tonnage":10,"cfm":4000,"model":"RN-048","manufacturer":"AAON","heating":"150 MBH Gas","voltage":"208/3/60","refrigerant":"R-410A","mca":42,"mocp":60,"size":null,"quantity":null,"location":null,"notes":"VFD supply, DX w/ hot gas reheat, 100% OA, energy recovery wheel"},
+{"tag":"EF-1","type":"Exhaust Fan","category":"fan","tonnage":null,"cfm":2500,"model":"CSP-A1200","manufacturer":"Greenheck","heating":null,"voltage":"208/1/60","refrigerant":null,"mca":null,"mocp":null,"size":null,"quantity":null,"location":"Restrooms","notes":"ceiling mount, plug disconnect, backdraft damper"},
+{"tag":"SD-1","type":"Supply Diffuser","category":"air-distribution","tonnage":null,"cfm":200,"model":"STR","manufacturer":"Titus","heating":null,"voltage":null,"refrigerant":null,"mca":null,"mocp":null,"size":"24x24","quantity":12,"location":null,"notes":null},
+{"tag":"FSD-1","type":"Combination Fire/Smoke Damper","category":"specialty","tonnage":null,"cfm":null,"model":"FSD-35","manufacturer":"Ruskin","heating":null,"voltage":"120/1/60","refrigerant":null,"mca":null,"mocp":null,"size":"24x12","quantity":4,"location":null,"notes":"UL rated, with fusible link"}]`;
 
 // ── Gemini API ────────────────────────────────────────
 
