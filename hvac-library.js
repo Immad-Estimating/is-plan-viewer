@@ -384,59 +384,34 @@ function _resolveDefaultLabor(hvacType, category, tonnage) {
 }
 
 // ── Auto-generate technical note from extracted specs ──────────────
+// Only includes info NOT already shown in the standard fields
+// (tag, type, manufacturer, model, tonnage, CFM, size, voltage are displayed elsewhere).
+// Focuses on what’s special/noteworthy about this specific unit.
 function _generateTechNote(item) {
   const parts = [];
   const cat = (item.category || 'equipment').toLowerCase();
-  const type = item.type || '';
 
-  // Manufacturer + model (always lead when present)
-  if (item.manufacturer && item.model) parts.push(item.manufacturer + ' ' + item.model);
-  else if (item.model) parts.push(item.model);
-  else if (item.manufacturer) parts.push(item.manufacturer);
+  // Heating type — important differentiator not always in primary display
+  if (item.heating) parts.push(item.heating);
 
-  // Category-specific highlights
-  if (['equipment', 'energy-recovery', 'makeup-air'].includes(cat)) {
-    if (item.tonnage) parts.push(item.tonnage + 'T');
-    if (item.cfm) parts.push(item.cfm.toLocaleString() + ' CFM');
-    if (item.heating) parts.push(item.heating);
-    if (item.refrigerant) parts.push(item.refrigerant);
-    if (item.voltage) parts.push(item.voltage);
-    if (item.mca || item.mocp) {
-      const elec = [];
-      if (item.mca) elec.push('MCA ' + item.mca + 'A');
-      if (item.mocp) elec.push('MOCP ' + item.mocp + 'A');
-      parts.push(elec.join('/'));
-    }
-  } else if (cat === 'fan') {
-    if (item.cfm) parts.push(item.cfm.toLocaleString() + ' CFM');
-    if (item.voltage) parts.push(item.voltage);
-    if (item.location) parts.push('serves ' + item.location);
-  } else if (cat === 'air-distribution') {
-    if (item.size) parts.push(item.size);
-    if (item.cfm) parts.push(item.cfm + ' CFM');
-    if (item.quantity && item.quantity > 1) parts.push('qty ' + item.quantity);
-  } else if (cat === 'terminal') {
-    if (item.cfm) parts.push(item.cfm.toLocaleString() + ' CFM');
-    if (item.size) parts.push(item.size);
-    if (item.heating) parts.push(item.heating);
-    if (item.voltage) parts.push(item.voltage);
-  } else if (cat === 'heating') {
-    if (item.heating) parts.push(item.heating);
-    if (item.voltage) parts.push(item.voltage);
-    if (item.cfm) parts.push(item.cfm + ' CFM');
-  } else if (cat === 'specialty') {
-    if (item.size) parts.push(item.size);
-    if (item.cfm) parts.push(item.cfm + ' CFM');
-    if (item.voltage) parts.push(item.voltage);
-    if (item.quantity && item.quantity > 1) parts.push('qty ' + item.quantity);
+  // Refrigerant — critical for procurement, R-454B vs R-410A matters
+  if (item.refrigerant) parts.push(item.refrigerant);
+
+  // Electrical — MCA/MOCP needed for panel scheduling
+  if (item.mca || item.mocp) {
+    const elec = [];
+    if (item.mca) elec.push('MCA ' + item.mca + 'A');
+    if (item.mocp) elec.push('MOCP ' + item.mocp + 'A');
+    parts.push(elec.join(' / '));
   }
 
-  // Location at the end if not already added
-  if (item.location && !parts.some(p => p.includes(item.location))) {
-    parts.push('@ ' + item.location);
-  }
+  // Location/serving area — useful context for field
+  if (item.location) parts.push('serves ' + item.location);
 
-  return parts.length > 0 ? parts.join(', ') : '';
+  // Quantity — only if multiple (otherwise assumed 1)
+  if (item.quantity && item.quantity > 1) parts.push('qty ' + item.quantity);
+
+  return parts.join(', ');
 }
 
 // Build radar chart SVG
@@ -866,6 +841,12 @@ const HVACLibrary = {
           const price = _priceSummary(entry);
           if (price) specs.appendChild(_el('span', { className: 'hvac-lib-pricing' }, price));
           left.appendChild(specs);
+          // Show notes inline if present
+          if (entry.notes) {
+            left.appendChild(_el('div', {
+              style: { fontSize: '10px', color: '#a0a0c0', marginTop: '2px', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+            }, entry.notes));
+          }
           header.appendChild(left);
 
           // Right: usage badge
@@ -1362,27 +1343,32 @@ const HVACLibrary = {
 
         // ── Technical Notes (editable) ──
         const notesSec = _el('div', { style: { marginBottom: '8px' } });
-        const notesLabel = _el('div', { style: { fontSize: '10px', color: '#a0a0c0', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' } });
-        notesLabel.textContent = '📝 Description';
+        const notesLabel = _el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' } });
+        notesLabel.appendChild(_el('span', { style: { fontSize: '10px', color: '#a0a0c0', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' } }, '📝 Notes'));
         notesSec.appendChild(notesLabel);
 
         // Generate note from extracted specs, or use library match note
         const matchNote = (best && best.entry.notes) ? best.entry.notes : '';
         const autoNote = _generateTechNote(extracted);
         const displayNote = matchNote || autoNote;
-        if (!result._notesEdit) result._notesEdit = displayNote;
+        if (!result._notesEdit && result._notesEdit !== '') result._notesEdit = displayNote;
 
         const notesInp = _el('input', {
           type: 'text',
           value: result._notesEdit || '',
-          placeholder: 'Technical description...',
+          placeholder: 'e.g., VFD supply fan, 100% OA, dual compressor, low-ambient kit...',
           style: {
-            width: '100%', background: '#16213e', border: '1px solid #333', color: '#e0e0e0',
+            width: '100%', background: '#16213e', border: '1px solid #333', color: displayNote ? '#e0e0e0' : '#555',
             padding: '5px 8px', borderRadius: '4px', fontSize: '11px',
           },
         });
         notesInp.addEventListener('input', () => { result._notesEdit = notesInp.value; });
+        notesInp.addEventListener('focus', () => { notesInp.style.color = '#e0e0e0'; });
         notesSec.appendChild(notesInp);
+        if (displayNote) {
+          notesSec.appendChild(_el('div', { style: { fontSize: '9px', color: '#555', marginTop: '2px' } },
+            matchNote ? 'from library — edit to update' : 'auto-filled from schedule — edit or clear'));
+        }
         expand.appendChild(notesSec);
 
         // Match options
