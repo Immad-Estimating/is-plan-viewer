@@ -180,6 +180,9 @@ const CSS = `
 .cmp-scope button { flex: 1; background: #1a1a2e; border: 1px solid #0f3460; color: #a0a0c0; padding: 5px 8px; border-radius: 5px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.15s; }
 .cmp-scope button.active { background: #e94560; border-color: #e94560; color: #fff; }
 .cmp-scope button:hover:not(.active) { border-color: #1a4080; color: #e0e0e0; }
+.cmp-reset-all { flex: none !important; background: none; border: 1px solid #ff6b6b; color: #ff6b6b; padding: 4px 10px; border-radius: 5px; cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.15s; white-space: nowrap; }
+.cmp-reset-all:hover { background: rgba(255,107,107,0.12); color: #ff8787; border-color: #ff8787; }
+.cmp-reset-all .cmp-reset-count { font-size: 9px; opacity: 0.7; margin-left: 2px; }
 .cmp-groups { padding: 6px 10px; border-bottom: 1px solid #0f3460; }
 .cmp-groups-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 .cmp-chip-bar { display: flex; flex-wrap: wrap; gap: 4px; min-height: 28px; padding: 2px; border: 1px dashed #0f3460; border-radius: 5px; position: relative; }
@@ -1030,12 +1033,13 @@ function renderCompiler() {
   const cols = getEffectiveColumns();
   let html = '';
 
-  // Scope toggle
+  // Scope toggle + reset all overrides button
+  const overrideCount = _rows.filter(r => r._hasOverride).length;
   html += `<div class="cmp-scope">
     <button class="${_scope === 'selection' ? 'active' : ''}" onclick="window._cmpSetScope('selection')">${_selMeasIds || _selFitIds || _selStackIds ? 'Selection (' + ((_selMeasIds ? _selMeasIds.size : 0) + (_selFitIds ? _selFitIds.size : 0) + (_selStackIds ? _selStackIds.size : 0)) + ')' : 'Selection'}</button>
-    <button class="${_scope === 'project' ? 'active' : ''}" onclick="window._cmpSetScope('project')">Entire Project</button>
+    <button class="${_scope === 'project' ? 'active' : ''}" onclick="window._cmpSetScope('project')">Entire Project</button>${overrideCount > 0 ? `
+    <button class="cmp-reset-all" onclick="window._cmpResetAllOverrides()" title="Reset all ${overrideCount} modified item${overrideCount !== 1 ? 's' : ''} back to calculated values">↩ Reset All<span class="cmp-reset-count">(${overrideCount})</span></button>` : ''}
   </div>`;
-
   // Grouping bar
   html += `<div class="cmp-groups"><div class="cmp-groups-label">Group by (drag to reorder)</div>`;
   html += `<div class="cmp-chip-bar" id="cmpChipBar" ondragover="event.preventDefault(); this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="window._cmpDropChip(event)">`;
@@ -1730,6 +1734,24 @@ window._cmpClearOverrides = async function(groupPath) {
     row._hasOverride = false;
     await _writeOverrideToSource(row);
   }
+  await loadCompilerData();
+  renderCompiler();
+};
+
+// ── Reset all overrides ───────────────────────────────────────────────
+window._cmpResetAllOverrides = async function() {
+  const targetRows = _rows.filter(r => r._hasOverride);
+  if (targetRows.length === 0) return;
+
+  for (const row of targetRows) {
+    row._overrides = {};
+    row._hasOverride = false;
+    await _writeOverrideToSource(row);
+  }
+
+  _grandAdj = {};
+  _saveGrandAdj();
+
   await loadCompilerData();
   renderCompiler();
 };
