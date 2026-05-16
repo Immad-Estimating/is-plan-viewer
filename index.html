@@ -92,6 +92,9 @@
   .anno-popover .slider-row .slider-val { font-size: 12px; color: #e0e0e0; min-width: 32px; text-align: right; }
   .meas-item .meas-edit-btn { background: none; border: none; color: #a0a0c0; cursor: pointer; font-size: 13px; padding: 0 4px; opacity: 0.5; }
   .meas-item .meas-edit-btn:hover { opacity: 1; color: #e94560; }
+  .meas-item.selected, .fitting-item.selected { border-color: #e94560; background: rgba(233,69,96,0.15); }
+  .fitting-item.selected { color: #e0e0e0; }
+  .meas-labor { display: block; color: #ffaa00; font-size: 11px; margin-top: 2px; }
   .meas-edit-inline { margin-top: 6px; padding-top: 6px; border-top: 1px solid #0f3460; }
   .meas-edit-inline label { font-size: 10px; color: #a0a0c0; display: block; margin-bottom: 2px; }
   .meas-edit-inline input[type="text"] { width: 100%; background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 4px 6px; border-radius: 3px; font-size: 11px; margin-bottom: 6px; }
@@ -2763,6 +2766,7 @@ const FITTINGS_BY_SHAPE = {
 let selectedFittingId = null;
 let selectedMeasId = null; // selected measurement for deletion/editing in idle mode
 let selectedHangerMeasId = null; // measurement whose auto hangers are selected
+let selectedManualHangerId = null; // manually inserted hanger selected in the analysis pane
 let selectedEndpointMeasId = null; // measurement whose endpoint is selected
 let selectedEndpointIdx = null;    // which point index is selected
 let elevationInputActive = false;  // is elevation input currently showing
@@ -5916,6 +5920,7 @@ viewer.addEventListener('click', (e) => {
       if (stackHit.type === 'callout') {
         selectedStackId = stackHit.stackId;
         selectedStackItemId = stackHit.itemId;
+        selectedManualHangerId = null;
         drawMeasureOverlay();
         updatePanel();
         return;
@@ -5923,6 +5928,7 @@ viewer.addEventListener('click', (e) => {
       if (stackHit.type === 'stackPoint') {
         selectedStackId = stackHit.stackId;
         selectedStackItemId = null;
+        selectedManualHangerId = null;
         const stack = (pageStacks[currentPage] || []).find(s => s.id === stackHit.stackId);
         if (stack) showStackPalette(stack);
         drawMeasureOverlay();
@@ -5937,6 +5943,7 @@ viewer.addEventListener('click', (e) => {
     pageStacks[currentPage].push(newStack);
     selectedStackId = newStack.id;
     selectedStackItemId = null;
+    selectedManualHangerId = null;
     showStackPalette(newStack);
     drawMeasureOverlay();
     updatePanel();
@@ -5955,6 +5962,7 @@ viewer.addEventListener('click', (e) => {
       selectedFittingId = null;
       selectedMeasId = null;
       selectedHangerMeasId = hangerLabelClick.measId;
+      selectedManualHangerId = null;
       selectedEndpointMeasId = null;
       selectedEndpointIdx = null;
       selectedStackId = null;
@@ -5969,6 +5977,7 @@ viewer.addEventListener('click', (e) => {
       selectedMeasId = null;
       selectedHangerMeasId = null;
       selectedFittingId = null;
+      selectedManualHangerId = null;
       if (stackHit.type === 'closeBtn') {
         deleteStackItem(stackHit.itemId);
         return;
@@ -5996,6 +6005,7 @@ viewer.addEventListener('click', (e) => {
       selectedMeasId = null;
       selectedHangerMeasId = null;
       selectedFittingId = fitHit.fittingId;
+      selectedManualHangerId = null;
       selectedStackId = null;
       selectedStackItemId = null;
       drawMeasureOverlay();
@@ -6008,6 +6018,7 @@ viewer.addEventListener('click', (e) => {
       selectedFittingId = null;
       selectedMeasId = null;
       selectedHangerMeasId = hangerHit.measId;
+      selectedManualHangerId = null;
       selectedEndpointMeasId = null;
       selectedEndpointIdx = null;
       selectedStackId = null;
@@ -6021,6 +6032,7 @@ viewer.addEventListener('click', (e) => {
     if (epClick) {
       selectedFittingId = null;
       selectedHangerMeasId = null;
+      selectedManualHangerId = null;
       selectedMeasId = epClick.measId;
       selectedEndpointMeasId = epClick.measId;
       selectedEndpointIdx = epClick.pointIdx;
@@ -6033,6 +6045,7 @@ viewer.addEventListener('click', (e) => {
     if (segHit) {
       selectedFittingId = null;
       selectedHangerMeasId = null;
+      selectedManualHangerId = null;
       selectedEndpointMeasId = null;
       selectedEndpointIdx = null;
       selectedMeasId = segHit.measId;
@@ -6041,10 +6054,11 @@ viewer.addEventListener('click', (e) => {
       return;
     }
     // Click on empty space: deselect
-    if (selectedMeasId || selectedHangerMeasId || selectedFittingId || selectedEndpointMeasId || selectedStackId || selectedStackItemId) {
+    if (selectedMeasId || selectedHangerMeasId || selectedFittingId || selectedManualHangerId || selectedEndpointMeasId || selectedStackId || selectedStackItemId) {
       selectedMeasId = null;
       selectedHangerMeasId = null;
       selectedFittingId = null;
+      selectedManualHangerId = null;
       selectedEndpointMeasId = null;
       selectedEndpointIdx = null;
       selectedStackId = null;
@@ -6274,6 +6288,7 @@ window.addEventListener('keydown', (e) => {
     if (measureMode) { toggleMeasureMode(); return; }
     if (selectedFittingId) { selectedFittingId = null; drawMeasureOverlay(); updatePanel(); return; }
     if (selectedHangerMeasId) { selectedHangerMeasId = null; drawMeasureOverlay(); updatePanel(); return; }
+    if (selectedManualHangerId) { selectedManualHangerId = null; drawMeasureOverlay(); updatePanel(); return; }
     if (selectedMeasId) { selectedMeasId = null; drawMeasureOverlay(); updatePanel(); return; }
   }
   else if (fittingMode && /^[1-9]$/.test(e.key)) {
@@ -6345,6 +6360,10 @@ window.addEventListener('keydown', (e) => {
   else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFittingId) {
     e.preventDefault();
     deleteFitting(selectedFittingId);
+  }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedManualHangerId) {
+    e.preventDefault();
+    deleteHanger(selectedManualHangerId);
   }
   else if ((e.key === 'p' || e.key === 'P') && selectedMeasId) {
     // Pin/unpin label: reset label offset to snap back to center
@@ -8902,6 +8921,7 @@ window.deleteHanger = function(id) {
       break;
     }
   }
+  if (selectedManualHangerId === id) selectedManualHangerId = null;
   updatePanel();
   scheduleSave();
 };
@@ -9047,6 +9067,100 @@ async function refreshCompiler() {
   }
 }
 
+function formatLaborSummary(hrs, cost) {
+  const h = Number.isFinite(hrs) ? hrs : 0;
+  const c = Number.isFinite(cost) ? cost : 0;
+  return `${h.toFixed(2)} hrs • $${c.toFixed(2)} labor`;
+}
+
+function getMeasurementLaborSummary(m) {
+  const lenFt = (m.distance && m.distance.unit === 'ft') ? (m.distance.value || 0) : 0;
+  let lhFt = m.laborHrsPerFt;
+  if (lhFt == null && m.duct) {
+    const dShape = m.duct.type || m.duct.shape || 'round';
+    if (dShape === 'round' || dShape === 'spiral') {
+      const dia = parseInt(m.duct.dims);
+      const sizeKey = dia ? 'duct-spiral-' + dia : null;
+      const baseEntry = sizeKey && priceBookCache ? priceBookCache[sizeKey] : null;
+      if (baseEntry && baseEntry.laborHrs != null) lhFt = baseEntry.laborHrs;
+    } else {
+      const pb = getPriceBookEntry('duct-' + dShape, m.duct.dims);
+      if (pb && pb.laborHrs != null) lhFt = pb.laborHrs;
+    }
+  }
+  const rate = m.laborRate != null ? m.laborRate : ((getProjectRateTable() || {}).laborRatePerHr || 45);
+  let hrs = (lhFt || 0) * lenFt;
+  if (m._overrides && m._overrides.laborHrs != null) hrs = m._overrides.laborHrs;
+  return { hrs, cost: hrs * rate };
+}
+
+function getFittingLaborSummary(f) {
+  let hrs = f.laborHrs;
+  if (hrs == null) {
+    const shape = getFittingShape(f);
+    const prefix = shape === 'round' ? (f.roundType || 'spiral') : shape;
+    const pbKey = f.type === 'rectTap' ? 'rectTap' : prefix + '-' + f.type;
+    const pb = getPriceBookEntry(pbKey, f.sizeA);
+    if (pb && pb.laborHrs != null) hrs = pb.laborHrs;
+  }
+  if (f._overrides && f._overrides.laborHrs != null) hrs = f._overrides.laborHrs;
+  const rate = f.laborRate != null ? f.laborRate : ((getProjectRateTable() || {}).laborRatePerHr || 45);
+  hrs = hrs || 0;
+  return { hrs, cost: hrs * rate };
+}
+
+function getManualHangerLaborSummary(h) {
+  const qty = h.quantity || 1;
+  const bd = HANGER_DEFAULTS.labor && HANGER_DEFAULTS.labor[h.hangerKey] ? HANGER_DEFAULTS.labor[h.hangerKey] : {};
+  let hrsEa = h.laborHrs != null ? h.laborHrs : Object.values(bd).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+  if (h._overrides && h._overrides.laborHrs != null) hrsEa = h._overrides.laborHrs;
+  const rate = h.laborRate != null ? h.laborRate : ((getProjectRateTable() || {}).laborRatePerHr || 45);
+  const hrs = (hrsEa || 0) * qty;
+  return { hrs, cost: hrs * rate };
+}
+
+window.selectAnalysisMeasurement = function(id) {
+  selectedMeasId = id;
+  selectedHangerMeasId = null;
+  selectedFittingId = null;
+  selectedManualHangerId = null;
+  selectedEndpointMeasId = null;
+  selectedEndpointIdx = null;
+  selectedStackId = null;
+  selectedStackItemId = null;
+  hideStackPalette();
+  drawMeasureOverlay();
+  updatePanel();
+};
+
+window.selectAnalysisFitting = function(id) {
+  selectedMeasId = null;
+  selectedHangerMeasId = null;
+  selectedFittingId = id;
+  selectedManualHangerId = null;
+  selectedEndpointMeasId = null;
+  selectedEndpointIdx = null;
+  selectedStackId = null;
+  selectedStackItemId = null;
+  hideStackPalette();
+  drawMeasureOverlay();
+  updatePanel();
+};
+
+window.selectAnalysisHanger = function(id) {
+  selectedMeasId = null;
+  selectedHangerMeasId = null;
+  selectedFittingId = null;
+  selectedManualHangerId = id;
+  selectedEndpointMeasId = null;
+  selectedEndpointIdx = null;
+  selectedStackId = null;
+  selectedStackItemId = null;
+  hideStackPalette();
+  drawMeasureOverlay();
+  updatePanel();
+};
+
 function updatePanel() {
   const content = document.getElementById('panelContent');
   const allPages = Array.from(new Set([
@@ -9076,7 +9190,7 @@ function updatePanel() {
       const hangerDetail = hangerPreview
         ? (hangerPreview.wireTotal ? ` • wire drop ${hangerPreview.heightFt} ft • wire ${hangerPreview.wireTotal.toFixed(1)} LF` : ` • height ${hangerPreview.heightFt} ft${hangerPreview.strapTotal ? ' • strap ' + hangerPreview.strapTotal.toFixed(1) + ' LF' : ''}`)
         : '';
-      const hangerInfo = hangerPreview ? `<div class="meas-duct" style="color:#ffaa00;cursor:pointer" onclick="editMeasurementHangerHeight(${m.id})" title="Click to edit hanger height/drop">Hangers: ${hangerPreview.qty}× ${escapeHtml(getHangerLabel(hangerPreview.rule.hangerKey))} @ ${hangerPreview.rule.spacingFt} ft${hangerDetail}</div>` : '';
+      const hangerInfo = hangerPreview ? `<div class="meas-duct" style="color:#ffaa00;cursor:pointer" onclick="event.stopPropagation();editMeasurementHangerHeight(${m.id})" title="Click to edit hanger height/drop">Hangers: ${hangerPreview.qty}× ${escapeHtml(getHangerLabel(hangerPreview.rule.hangerKey))} @ ${hangerPreview.rule.spacingFt} ft${hangerDetail}</div>` : '';
       // Elevation info + auto fittings
       let elevInfo = '';
       const elevChanges = m.points.filter(p => p.elevation && parseElevChange(p.elevation));
@@ -9090,18 +9204,21 @@ function updatePanel() {
       }
 
       const customLabel = m.labelText ? `<div class="meas-duct" style="color:#e94560;font-style:italic">"${escapeHtml(m.labelText)}"</div>` : '';
-      html += `<div class="meas-item" data-id="${m.id}">
+      const labor = getMeasurementLaborSummary(m);
+      const selectedClass = (m.id === selectedMeasId || m.id === selectedHangerMeasId || m.id === selectedEndpointMeasId) ? ' selected' : '';
+      html += `<div class="meas-item${selectedClass}" data-id="${m.id}" onclick="selectAnalysisMeasurement(${m.id})">
         <div class="meas-info">
           <div class="meas-length">${m.distance.formatted}</div>
           ${ductInfo}
+          <div class="meas-labor">${formatLaborSummary(labor.hrs, labor.cost)}</div>
           ${flexDropInput}
           ${hangerInfo}
           ${elevInfo}
           ${customLabel}
         </div>
-        <button class="meas-edit-btn" onclick="editMeasurement(${m.id})" title="Edit label">✏️</button>
-        <button class="meas-edit-btn" onclick="editMeasCost(${m.id})" title="Edit cost">💲</button>
-        <button class="meas-delete" onclick="deleteMeasurement(${m.id})" title="Delete">×</button>
+        <button class="meas-edit-btn" onclick="event.stopPropagation();editMeasurement(${m.id})" title="Edit label">✏️</button>
+        <button class="meas-edit-btn" onclick="event.stopPropagation();editMeasCost(${m.id})" title="Edit cost">💲</button>
+        <button class="meas-delete" onclick="event.stopPropagation();deleteMeasurement(${m.id})" title="Delete">×</button>
       </div>`;
     }
     html += `</div>`;
@@ -9130,11 +9247,12 @@ function updatePanel() {
         for (const f of items) {
           const dims = f.sizeA + (f.sizeB ? '/' + f.sizeB : '');
           const subtype = getFittingShape(f) === 'round' ? ((f.roundType || 'spiral') === 'spiral' ? ' SPR' : ' SNP') : '';
-          const sel = f.id === selectedFittingId ? ' style="background:rgba(233,69,96,0.15)"' : '';
-          html += `<div class="fitting-item" id="fi-${f.id}"${sel}>`;
-          html += `<span>${dims}${subtype} @ ${f.rotation}°</span>`;
-          html += `<button class="meas-edit-btn" onclick="editFittingCost(${f.id})" title="Edit cost">💲</button>`;
-          html += `<button class="fi-delete" onclick="deleteFitting(${f.id})" title="Delete">×</button>`;
+          const sel = f.id === selectedFittingId ? ' selected' : '';
+          const labor = getFittingLaborSummary(f);
+          html += `<div class="fitting-item${sel}" id="fi-${f.id}" onclick="selectAnalysisFitting(${f.id})">`;
+          html += `<span>${dims}${subtype} @ ${f.rotation}°<span class="meas-labor">${formatLaborSummary(labor.hrs, labor.cost)}</span></span>`;
+          html += `<button class="meas-edit-btn" onclick="event.stopPropagation();editFittingCost(${f.id})" title="Edit cost">💲</button>`;
+          html += `<button class="fi-delete" onclick="event.stopPropagation();deleteFitting(${f.id})" title="Delete">×</button>`;
           html += `</div>`;
         }
         html += `</div></div>`;
@@ -9165,11 +9283,13 @@ function updatePanel() {
           ? ` • wire drop ${height} ft • wire ${(wireEach * (h.quantity || 1)).toFixed(1)} LF`
           : (unit === 'LF' ? ` • height ${height} ft • strap ${(strapEach * (h.quantity || 1)).toFixed(1)} LF` : '');
         const note = h.note ? `<div class="meas-duct" style="color:#a0a0c0">${escapeHtml(h.note)}</div>` : '';
-        html += `<div class="fitting-item" id="hi-${h.id}">`;
-        html += `<span>${label}${size} x ${h.quantity || 1}${spacing}${lengthInfo}</span>`;
-        if (isHeightEditableHanger(h.hangerKey)) html += `<button class="meas-edit-btn" onclick="editHangerHeight(${h.id})" title="Edit hanger height/drop">↕</button>`;
-        html += `<button class="meas-edit-btn" onclick="editHangerCost(${h.id})" title="Edit cost">💲</button>`;
-        html += `<button class="fi-delete" onclick="deleteHanger(${h.id})" title="Delete">×</button>`;
+        const labor = getManualHangerLaborSummary(h);
+        const sel = h.id === selectedManualHangerId ? ' selected' : '';
+        html += `<div class="fitting-item${sel}" id="hi-${h.id}" onclick="selectAnalysisHanger(${h.id})">`;
+        html += `<span>${label}${size} x ${h.quantity || 1}${spacing}${lengthInfo}<span class="meas-labor">${formatLaborSummary(labor.hrs, labor.cost)}</span></span>`;
+        if (isHeightEditableHanger(h.hangerKey)) html += `<button class="meas-edit-btn" onclick="event.stopPropagation();editHangerHeight(${h.id})" title="Edit hanger height/drop">↕</button>`;
+        html += `<button class="meas-edit-btn" onclick="event.stopPropagation();editHangerCost(${h.id})" title="Edit cost">💲</button>`;
+        html += `<button class="fi-delete" onclick="event.stopPropagation();deleteHanger(${h.id})" title="Delete">×</button>`;
         html += `${note}</div>`;
       }
     }
