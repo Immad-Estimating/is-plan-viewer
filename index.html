@@ -7358,8 +7358,9 @@ function drawAutoHangersForMeasurement(m) {
   const selected = selectedHangerMeasId === m.id;
   const preview = markers[0].preview;
   const color = selected ? '#e94560' : '#ffaa00';
-  const halfW = Math.max(6, getDuctHalfWidthPx(m.duct));
-  const markerHalf = Math.max(halfW + 5, 10 * baseScale);
+  const halfW = Math.max(1.5, getDuctHalfWidthPx(m.duct));
+  const edgePad = Math.max(1, Math.min(4, halfW * 0.15));
+  const markerHalf = halfW + edgePad;
 
   mCtx.save();
   mCtx.setLineDash([]);
@@ -7423,8 +7424,8 @@ function drawAutoHangersForMeasurement(m) {
 function drawHangerSymbol(mk, hangerKey, markerHalf, color, selected) {
   const angle = Math.atan2(mk.uy, mk.ux);
   const crossSpan = markerHalf;
-  const bandHalf = Math.max(3, crossSpan * 0.12);
-  const tab = Math.max(4, crossSpan * 0.18);
+  const bandHalf = Math.max(1.5, Math.min(3, crossSpan * 0.12));
+  const tab = Math.max(2, Math.min(5, crossSpan * 0.18));
   const lw = selected ? 3 : 2;
   const family = (HANGER_DEFAULTS.types && HANGER_DEFAULTS.types[hangerKey] && HANGER_DEFAULTS.types[hangerKey].family) || '';
 
