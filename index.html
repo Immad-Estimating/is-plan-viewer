@@ -5460,10 +5460,20 @@ function _syncSelectionToCompiler() {
   }, 150);
 }
 
+async function flushCurrentPageDataForCompiler() {
+  if (!activeDrawingId) return;
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  await saveCurrentPageData();
+}
+
 async function refreshCompiler() {
   const el = document.getElementById('compilerContent');
   if (!el) return;
   try {
+    await flushCurrentPageDataForCompiler();
     if (!_compilerInited) {
       await Compiler.init(el, activeProjectId, activeDrawingId);
       _compilerInited = true;
