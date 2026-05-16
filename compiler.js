@@ -6,7 +6,7 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_DEFAULTS, HANGER_DEFAULTS } from './price-defaults.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -363,6 +363,126 @@ function getPriceBookLaborBreakdown(baseKey) {
   return result;
 }
 
+function getHangerLabel(hangerKey) {
+  const def = HANGER_DEFAULTS.types && HANGER_DEFAULTS.types[hangerKey];
+  return def ? def.label : hangerKey;
+}
+
+function getHangerMaterialEach(hangerKey) {
+  const pb = _priceBookCache && _priceBookCache[hangerKey];
+  if (pb && pb.materialCost != null) return pb.materialCost;
+  const def = HANGER_DEFAULTS.pricing && HANGER_DEFAULTS.pricing[hangerKey];
+  return def && def.materialCost != null ? def.materialCost : 0;
+}
+
+function getHangerLaborBreakdown(hangerKey) {
+  const bd = getPriceBookLaborBreakdown(hangerKey);
+  if (Object.keys(bd).length > 0) return bd;
+  return (HANGER_DEFAULTS.labor && HANGER_DEFAULTS.labor[hangerKey]) ? HANGER_DEFAULTS.labor[hangerKey] : {};
+}
+
+function buildHangerRow(h, page, drawingId, drawingName, labRate, source) {
+  const qty = Math.max(0, parseFloat(h.quantity) || 0);
+  const rate = h.laborRate || labRate;
+  const matEach = h.materialCost != null ? h.materialCost : getHangerMaterialEach(h.hangerKey);
+  let matCost = matEach * qty;
+  const bd = h.laborHrs != null ? { rough: h.laborHrs } : getHangerLaborBreakdown(h.hangerKey);
+  const laborCatHrs = {};
+  const laborCatCost = {};
+  let assignedCat = 'unassigned';
+  for (const cat of LABOR_CATEGORIES) {
+    const ch = (bd[cat.key] || 0) * qty;
+    laborCatHrs[cat.key] = ch;
+    laborCatCost[cat.key] = ch * rate;
+    if (ch > 0 && assignedCat === 'unassigned') assignedCat = cat.label;
+  }
+  let laborHrs = Object.values(laborCatHrs).reduce((s, v) => s + v, 0);
+  const origLaborHrs = laborHrs, origMatCost = matCost;
+  const origLaborCost = laborHrs * rate;
+  const origTotal = matCost + origLaborCost;
+  const origLaborCatHrs = { ...laborCatHrs };
+  const hOvr = h._overrides || {};
+  if (hOvr.laborHrs != null) laborHrs = hOvr.laborHrs;
+  if (hOvr.materialCost != null) matCost = hOvr.materialCost;
+  for (const cat of LABOR_CATEGORIES) {
+    if (hOvr['laborCat_' + cat.key] != null) {
+      laborCatHrs[cat.key] = hOvr['laborCat_' + cat.key];
+      laborCatCost[cat.key] = hOvr['laborCat_' + cat.key] * rate;
+    }
+  }
+  const laborCost = laborHrs * rate;
+  const totalCost = hOvr.totalCost != null ? hOvr.totalCost : matCost + laborCost;
+  return {
+    _itemType: source === 'auto' ? 'Auto Hanger' : 'Hanger',
+    _size: h.size || '',
+    _shape: getHangerLabel(h.hangerKey),
+    _page: page, _drawingId: drawingId, _drawingName: drawingName,
+    _lengthFt: 0, _matCost: matCost, _laborHrs: laborHrs,
+    _laborCost: laborCost, _totalCost: totalCost,
+    _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
+    _hasOverride: Object.keys(hOvr).length > 0, _overrides: hOvr,
+    _orig_laborHrs: origLaborHrs, _orig_materialCost: origMatCost,
+    _orig_laborCost: origLaborCost, _orig_totalCost: origTotal, _orig_lengthFt: 0,
+    _orig_laborCatHrs: origLaborCatHrs,
+    phase: h.phase || null, costGroup: h.costGroup || null, gauge: null,
+    systemSymbol: h.systemSymbol || null,
+    _sourceType: source === 'auto' ? 'auto-hanger' : 'hanger',
+    _sourceId: h.id,
+    _sourceMeasurementId: h.sourceMeasurementId || null,
+    _hangerKey: h.hangerKey,
+    _hangerQty: qty,
+    _hangerSource: source || h.source || 'manual',
+  };
+}
+
+function parseDuctSizeForHanger(dims) {
+  if (!dims) return null;
+  const parts = String(dims).split('x').map(v => parseFloat(v));
+  if (parts.length === 1 && Number.isFinite(parts[0])) return { max: parts[0], min: parts[0] };
+  if (parts.length === 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
+    return { max: Math.max(parts[0], parts[1]), min: Math.min(parts[0], parts[1]) };
+  }
+  return null;
+}
+
+function findAutoHangerRule(m, shape) {
+  const dims = parseDuctSizeForHanger(m.duct && m.duct.dims);
+  for (const rule of (HANGER_DEFAULTS.autoRules || [])) {
+    const applies = rule.appliesTo || {};
+    const shapes = applies.shape || [];
+    if (shapes.length && !shapes.includes(shape)) continue;
+    if (dims) {
+      if (applies.minSizeIn != null && dims.max < applies.minSizeIn) continue;
+      if (applies.maxSizeIn != null && dims.max > applies.maxSizeIn) continue;
+    }
+    return rule;
+  }
+  return null;
+}
+
+function buildAutoHangerForMeasurement(m, lengthFt, shape) {
+  if (!m.duct || m.disableAutoHangers) return null;
+  const rule = findAutoHangerRule(m, shape);
+  if (!rule || !rule.hangerKey || !rule.spacingFt) return null;
+  const qty = Math.max(rule.minCount || 1, Math.ceil(lengthFt / rule.spacingFt));
+  if (qty <= 0) return null;
+  return {
+    id: 'auto-hanger-' + m.id + '-' + rule.id,
+    hangerKey: rule.hangerKey,
+    quantity: qty,
+    size: m.duct.dims || '',
+    spacingFt: rule.spacingFt,
+    phase: m.phase || 'rough',
+    costGroup: m.costGroup || null,
+    materialCost: null,
+    laborHrs: null,
+    laborRate: m.laborRate || null,
+    systemSymbol: m.systemSymbol || null,
+    source: 'auto',
+    sourceMeasurementId: m.id,
+  };
+}
+
 // ── Data normalization ────────────────────────────────────────────────
 
 // ── HVAC component type → labor-defaults key mapping ───────────────────
@@ -564,6 +684,12 @@ function normalizeRows(allPageData, drawingNames) {
         _sourceType: 'measurement', _sourceId: m.id,
         _lined: m.lined || false, _linerPerFt: linerPerFt,
       });
+
+      const hangerShape = isFlex ? 'flex' : shape;
+      const autoHanger = buildAutoHangerForMeasurement(m, lengthFt, hangerShape);
+      if (autoHanger) {
+        rows.push(buildHangerRow(autoHanger, page, drawingId, drawingName, labRate, 'auto'));
+      }
     }
 
     for (const f of (pd.fittings || [])) {
@@ -786,6 +912,11 @@ function normalizeRows(allPageData, drawingNames) {
         systemSymbol: f.systemSymbol || null,
         _sourceType: 'fitting', _sourceId: f.id,
       });
+    }
+
+    for (const h of (pd.hangers || [])) {
+      if (!h.hangerKey) continue;
+      rows.push(buildHangerRow(h, page, drawingId, drawingName, labRate, 'manual'));
     }
 
     for (const s of (pd.stacks || [])) {
@@ -1701,6 +1832,13 @@ async function _writeOverrideToSource(row) {
       for (const f of (pd.fittings || [])) {
         if (f.id === row._sourceId) {
           f._overrides = isEmpty ? undefined : { ...ovr };
+          changed = true; break;
+        }
+      }
+    } else if (row._sourceType === 'hanger') {
+      for (const h of (pd.hangers || [])) {
+        if (h.id === row._sourceId) {
+          h._overrides = isEmpty ? undefined : { ...ovr };
           changed = true; break;
         }
       }

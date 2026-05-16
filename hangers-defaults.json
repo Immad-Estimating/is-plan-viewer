@@ -1,0 +1,161 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "lastUpdated": "2026-05-15",
+    "description": "Hanger and support defaults for IS Plan Viewer. Pricing and labor values are seed defaults; project or company Price Book overrides take priority.",
+    "units": {
+      "pricing": "$/EA",
+      "labor": "hrs/EA",
+      "spacing": "ft"
+    }
+  },
+  "types": {
+    "hanger-strap": {
+      "label": "Strap Hanger",
+      "family": "strap",
+      "unit": "EA",
+      "description": "Light-duty duct strap hanger."
+    },
+    "hanger-threaded-rod": {
+      "label": "Threaded Rod Hanger",
+      "family": "rod",
+      "unit": "EA",
+      "description": "Single or paired threaded rod hanger support."
+    },
+    "hanger-trapeze": {
+      "label": "Trapeze Hanger",
+      "family": "trapeze",
+      "unit": "EA",
+      "description": "Unistrut/channel trapeze support with rods and hardware."
+    },
+    "hanger-clevis": {
+      "label": "Clevis Hanger",
+      "family": "clevis",
+      "unit": "EA",
+      "description": "Clevis-style round pipe or duct support."
+    },
+    "hanger-ring-band": {
+      "label": "Ring/Band Hanger",
+      "family": "ring",
+      "unit": "EA",
+      "description": "Round ring or band hanger."
+    },
+    "hanger-riser-clamp": {
+      "label": "Riser Clamp",
+      "family": "riser",
+      "unit": "EA",
+      "description": "Vertical riser support clamp."
+    },
+    "hanger-equipment-support": {
+      "label": "Equipment Support",
+      "family": "equipment",
+      "unit": "EA",
+      "description": "Equipment support frame, stand, or curb support allowance."
+    },
+    "hanger-vibration-isolator": {
+      "label": "Vibration Isolation Hanger",
+      "family": "isolation",
+      "unit": "EA",
+      "description": "Isolation hanger for equipment or vibration-sensitive supports."
+    },
+    "hanger-beam-clamp": {
+      "label": "Beam Clamp",
+      "family": "hardware",
+      "unit": "EA",
+      "description": "Beam clamp hardware component."
+    },
+    "hanger-anchor": {
+      "label": "Anchor",
+      "family": "hardware",
+      "unit": "EA",
+      "description": "Concrete or structural anchor hardware component."
+    },
+    "hanger-nut-washer": {
+      "label": "Nuts/Washers Set",
+      "family": "hardware",
+      "unit": "EA",
+      "description": "Nuts and washers hardware allowance."
+    },
+    "hanger-strut-channel": {
+      "label": "Strut Channel",
+      "family": "hardware",
+      "unit": "EA",
+      "description": "Strut/channel component for trapeze assemblies."
+    }
+  },
+  "pricing": {
+    "hanger-strap": { "materialCost": 2.5 },
+    "hanger-threaded-rod": { "materialCost": 8.5 },
+    "hanger-trapeze": { "materialCost": 22.0 },
+    "hanger-clevis": { "materialCost": 12.0 },
+    "hanger-ring-band": { "materialCost": 9.0 },
+    "hanger-riser-clamp": { "materialCost": 18.0 },
+    "hanger-equipment-support": { "materialCost": 75.0 },
+    "hanger-vibration-isolator": { "materialCost": 45.0 },
+    "hanger-beam-clamp": { "materialCost": 6.0 },
+    "hanger-anchor": { "materialCost": 3.5 },
+    "hanger-nut-washer": { "materialCost": 1.25 },
+    "hanger-strut-channel": { "materialCost": 14.0 }
+  },
+  "labor": {
+    "hanger-strap": { "rough": 0.08, "stocking": 0.01, "qc": 0.01 },
+    "hanger-threaded-rod": { "rough": 0.16, "stocking": 0.02, "qc": 0.01 },
+    "hanger-trapeze": { "rough": 0.28, "stocking": 0.04, "qc": 0.02 },
+    "hanger-clevis": { "rough": 0.18, "stocking": 0.02, "qc": 0.01 },
+    "hanger-ring-band": { "rough": 0.14, "stocking": 0.02, "qc": 0.01 },
+    "hanger-riser-clamp": { "rough": 0.30, "stocking": 0.03, "qc": 0.02 },
+    "hanger-equipment-support": { "rough": 0.75, "stocking": 0.10, "qc": 0.05 },
+    "hanger-vibration-isolator": { "rough": 0.35, "stocking": 0.04, "qc": 0.03 },
+    "hanger-beam-clamp": { "rough": 0.05, "stocking": 0.01 },
+    "hanger-anchor": { "rough": 0.06, "stocking": 0.01 },
+    "hanger-nut-washer": { "rough": 0.02, "stocking": 0.01 },
+    "hanger-strut-channel": { "rough": 0.08, "stocking": 0.02 }
+  },
+  "autoRules": [
+    {
+      "id": "round-small-strap",
+      "hangerKey": "hanger-strap",
+      "appliesTo": { "source": "measurement", "shape": ["round"], "maxSizeIn": 12 },
+      "spacingFt": 8,
+      "minCount": 1,
+      "description": "Default strap hanger for small round duct."
+    },
+    {
+      "id": "round-large-rod",
+      "hangerKey": "hanger-threaded-rod",
+      "appliesTo": { "source": "measurement", "shape": ["round"], "minSizeIn": 13 },
+      "spacingFt": 8,
+      "minCount": 1,
+      "description": "Threaded rod hanger for larger round duct."
+    },
+    {
+      "id": "rect-trapeze",
+      "hangerKey": "hanger-trapeze",
+      "appliesTo": { "source": "measurement", "shape": ["rect", "oval"] },
+      "spacingFt": 8,
+      "minCount": 1,
+      "description": "Trapeze support for rectangular and oval duct runs."
+    },
+    {
+      "id": "flex-strap",
+      "hangerKey": "hanger-strap",
+      "appliesTo": { "source": "measurement", "shape": ["flex"] },
+      "spacingFt": 5,
+      "minCount": 1,
+      "description": "Closer strap spacing for flex duct."
+    }
+  ],
+  "assemblies": {
+    "hanger-trapeze": [
+      { "componentKey": "hanger-strut-channel", "quantity": 1 },
+      { "componentKey": "hanger-threaded-rod", "quantity": 2 },
+      { "componentKey": "hanger-beam-clamp", "quantity": 2 },
+      { "componentKey": "hanger-nut-washer", "quantity": 4 }
+    ],
+    "hanger-threaded-rod": [
+      { "componentKey": "hanger-threaded-rod", "quantity": 1 },
+      { "componentKey": "hanger-beam-clamp", "quantity": 1 },
+      { "componentKey": "hanger-nut-washer", "quantity": 2 }
+    ]
+  }
+}

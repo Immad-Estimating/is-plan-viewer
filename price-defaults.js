@@ -494,6 +494,15 @@ let _laborLoaded = false;
 export const LABOR_DEFAULTS = {};
 export const LABOR_RATES = {};
 export let LABOR_DEFAULT_RATE = 45;
+let _hangersLoaded = false;
+export const HANGER_DEFAULTS = {
+  _meta: {},
+  types: {},
+  pricing: {},
+  labor: {},
+  autoRules: [],
+  assemblies: {},
+};
 
 export async function loadLaborDefaults() {
   if (_laborLoaded) return;
@@ -511,6 +520,25 @@ export async function loadLaborDefaults() {
     }
     _laborLoaded = true;
   } catch (e) { console.warn('Could not load labor-defaults.json:', e); }
+}
+
+export async function loadHangerDefaults() {
+  if (_hangersLoaded) return;
+  try {
+    const resp = await fetch('./hangers-defaults.json');
+    if (!resp.ok) return;
+    const hj = await resp.json();
+    HANGER_DEFAULTS._meta = hj._meta || {};
+    HANGER_DEFAULTS.types = hj.types || {};
+    HANGER_DEFAULTS.pricing = hj.pricing || {};
+    HANGER_DEFAULTS.labor = hj.labor || {};
+    HANGER_DEFAULTS.autoRules = Array.isArray(hj.autoRules) ? hj.autoRules : [];
+    HANGER_DEFAULTS.assemblies = hj.assemblies || {};
+    for (const key in HANGER_DEFAULTS.labor) {
+      LABOR_DEFAULTS[key] = HANGER_DEFAULTS.labor[key];
+    }
+    _hangersLoaded = true;
+  } catch (e) { console.warn('Could not load hangers-defaults.json:', e); }
 }
 
 // ── Spiral Saddle Tap pricing (exposed, $/EA by branch×main) ─────────
