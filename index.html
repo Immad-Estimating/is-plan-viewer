@@ -5132,6 +5132,9 @@ let _snapPreviewCacheTime = 0;
 const SNAP_CACHE_TTL = 150; // ms
 let dragLabelMeasId = null;
 let dragLabelStart = null; // {x,y} pdf coords at drag start
+let isDraggingHangerLabel = false;
+let dragHangerLabelMeasId = null;
+let dragHangerLabelStart = null;
 let dragCalloutStackId = null;
 let dragCalloutItemId = null;
 let dragCalloutStart = null;
@@ -5183,6 +5186,7 @@ async function saveCurrentPageData() {
     labelTextOpacity: m.labelTextOpacity != null ? m.labelTextOpacity : null,
     labelFillOpacity: m.labelFillOpacity != null ? m.labelFillOpacity : null,
     labelOffset: m.labelOffset || null,
+    hangerLabelOffset: m.hangerLabelOffset || null,
     phase: m.phase || null,
     materialCostPerFt: m.materialCostPerFt != null ? m.materialCostPerFt : null,
     laborHrsPerFt: m.laborHrsPerFt != null ? m.laborHrsPerFt : null,
@@ -5451,6 +5455,30 @@ viewer.addEventListener('mousedown', (e) => {
     const pt = screenToPdf(e.clientX, e.clientY);
     const displayScale = currentScale / baseScale;
     const hitR = 8 / displayScale;
+    // Priority 0.5: selected hanger annotation drag
+    const hangerLabelHit = hitTestHangerLabel(pt.x, pt.y);
+    if (hangerLabelHit) {
+      isDraggingHangerLabel = true;
+      dragHangerLabelMeasId = hangerLabelHit.measId;
+      dragHangerLabelStart = { x: pt.x, y: pt.y };
+      selectedHangerMeasId = hangerLabelHit.measId;
+      selectedMeasId = null;
+      e.preventDefault();
+      viewer.style.cursor = 'move';
+      return;
+    }
+    const hangerMarkerHit = hitTestAutoHanger(pt.x, pt.y, hitR * 1.8);
+    if (hangerMarkerHit) {
+      selectedHangerMeasId = hangerMarkerHit.measId;
+      selectedMeasId = null;
+      selectedFittingId = null;
+      selectedEndpointMeasId = null;
+      selectedEndpointIdx = null;
+      e.preventDefault();
+      drawMeasureOverlay();
+      updatePanel();
+      return;
+    }
     // Priority 1: endpoint drag
     const epHit = hitTestEndpoint(pt.x, pt.y, hitR);
     if (epHit) {
@@ -5546,6 +5574,19 @@ window.addEventListener('mousemove', (e) => {
     return;
   }
   // Label dragging
+  if (isDraggingHangerLabel && dragHangerLabelMeasId != null) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const m = findMeasurement(dragHangerLabelMeasId);
+    if (m && m._hangerLabelDefault) {
+      m.hangerLabelOffset = {
+        dx: pt.x - m._hangerLabelDefault.x,
+        dy: pt.y - m._hangerLabelDefault.y
+      };
+      drawMeasureOverlay();
+    }
+    return;
+  }
+
   if (isDraggingLabel && dragLabelMeasId != null) {
     const pt = screenToPdf(e.clientX, e.clientY);
     const m = findMeasurement(dragLabelMeasId);
@@ -5631,7 +5672,7 @@ window.addEventListener('mousemove', (e) => {
   }
 
   // Cursor: grab on endpoints, move on segments/fittings/stacks
-  if (!isPanning && !measureMode && !fittingMode && !isDraggingEndpoint && !isDraggingSegment && !isDraggingFitting && !isDraggingStack && !isDraggingCallout && pdfDoc) {
+  if (!isPanning && !measureMode && !fittingMode && !isDraggingEndpoint && !isDraggingSegment && !isDraggingFitting && !isDraggingStack && !isDraggingCallout && !isDraggingHangerLabel && pdfDoc) {
     const hpt = screenToPdf(e.clientX, e.clientY);
     const ds = currentScale / baseScale;
     const hr = 8 / ds;
@@ -5645,8 +5686,9 @@ window.addEventListener('mousemove', (e) => {
         const fitHit = hitTestFitting(hpt.x, hpt.y);
         if (fitHit) { viewer.style.cursor = 'move'; }
         else {
-          const hangerHit = hitTestAutoHanger(hpt.x, hpt.y, hr * 1.8);
-          if (hangerHit) { viewer.style.cursor = 'pointer'; }
+          const hangerLabelHit = hitTestHangerLabel(hpt.x, hpt.y);
+          const hangerHit = hangerLabelHit || hitTestAutoHanger(hpt.x, hpt.y, hr * 1.8);
+          if (hangerHit) { viewer.style.cursor = hangerLabelHit ? 'move' : 'pointer'; }
           else {
             const segHit = hitTestSegment(hpt.x, hpt.y, hr * 1.5);
             viewer.style.cursor = segHit ? 'move' : '';
@@ -5679,6 +5721,17 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mouseup', (e) => {
   // Multi-select release
   MultiSelect.onShiftMouseUp(e, screenToPdf);
+
+  if (isDraggingHangerLabel) {
+    isDraggingHangerLabel = false;
+    dragHangerLabelMeasId = null;
+    dragHangerLabelStart = null;
+    viewer.style.cursor = '';
+    drawMeasureOverlay();
+    updatePanel();
+    scheduleSave();
+    return;
+  }
 
   if (isDraggingLabel) {
     isDraggingLabel = false;
@@ -5804,6 +5857,20 @@ viewer.addEventListener('click', (e) => {
     const ds = currentScale / baseScale;
     const hr = 8 / ds;
     // Check stack hit first
+    const hangerLabelClick = hitTestHangerLabel(pt.x, pt.y);
+    if (hangerLabelClick) {
+      selectedFittingId = null;
+      selectedMeasId = null;
+      selectedHangerMeasId = hangerLabelClick.measId;
+      selectedEndpointMeasId = null;
+      selectedEndpointIdx = null;
+      selectedStackId = null;
+      selectedStackItemId = null;
+      drawMeasureOverlay();
+      updatePanel();
+      return;
+    }
+
     const stackHit = hitTestStack(pt.x, pt.y);
     if (stackHit) {
       selectedMeasId = null;
@@ -5846,7 +5913,7 @@ viewer.addEventListener('click', (e) => {
     const hangerHit = hitTestAutoHanger(pt.x, pt.y, hr * 1.8);
     if (hangerHit) {
       selectedFittingId = null;
-      selectedMeasId = hangerHit.measId;
+      selectedMeasId = null;
       selectedHangerMeasId = hangerHit.measId;
       selectedEndpointMeasId = null;
       selectedEndpointIdx = null;
@@ -5909,6 +5976,23 @@ viewer.addEventListener('click', (e) => {
 });
 
 viewer.addEventListener('dblclick', (e) => {
+  if (!measureMode && !fittingMode) {
+    const pt = screenToPdf(e.clientX, e.clientY);
+    const hangerLabelHit = hitTestHangerLabel(pt.x, pt.y);
+    if (hangerLabelHit) {
+      const m = findMeasurement(hangerLabelHit.measId);
+      if (m && m.hangerLabelOffset) {
+        m.hangerLabelOffset = null;
+        selectedHangerMeasId = m.id;
+        selectedMeasId = null;
+        drawMeasureOverlay();
+        scheduleSave();
+        e.preventDefault();
+        return;
+      }
+    }
+  }
+
   // Double-click on a detached label: pin it back to center
   if (!measureMode && !fittingMode) {
     const pt = screenToPdf(e.clientX, e.clientY);
@@ -6634,6 +6718,7 @@ function finishMeasurement() {
     labelTextOpacity: null, // per-measurement text opacity override
     labelFillOpacity: null, // per-measurement fill opacity override
     labelOffset: null,      // {dx,dy} offset from auto midpoint (null = pinned to center)
+    hangerLabelOffset: null, // {dx,dy} offset from auto hanger label default (null = pinned)
     phase: null,
     materialCostPerFt: null,
     laborHrsPerFt: null,
@@ -7011,6 +7096,19 @@ function hitTestLabel(pdfX, pdfY) {
   return null;
 }
 
+function hitTestHangerLabel(pdfX, pdfY) {
+  const measurements = pageMeasurements[currentPage] || [];
+  for (let i = measurements.length - 1; i >= 0; i--) {
+    const m = measurements[i];
+    if (!m._hangerLabelBox) continue;
+    const b = m._hangerLabelBox;
+    if (pdfX >= b.x && pdfX <= b.x + b.w && pdfY >= b.y && pdfY <= b.y + b.h) {
+      return { measId: m.id };
+    }
+  }
+  return null;
+}
+
 function pointToSegmentDist(px, py, ax, ay, bx, by) {
   const dx = bx - ax, dy = by - ay;
   const len2 = dx*dx + dy*dy;
@@ -7153,23 +7251,10 @@ function drawAutoHangersForMeasurement(m) {
 
   mCtx.save();
   mCtx.setLineDash([]);
-  mCtx.strokeStyle = color;
-  mCtx.fillStyle = color;
-  mCtx.lineWidth = selected ? 3 : 2;
   mCtx.globalAlpha = selected ? 1 : 0.88;
 
   for (const mk of markers) {
-    const ax = mk.x + mk.nx * markerHalf;
-    const ay = mk.y + mk.ny * markerHalf;
-    const bx = mk.x - mk.nx * markerHalf;
-    const by = mk.y - mk.ny * markerHalf;
-    mCtx.beginPath();
-    mCtx.moveTo(ax, ay);
-    mCtx.lineTo(bx, by);
-    mCtx.stroke();
-    mCtx.beginPath();
-    mCtx.arc(mk.x, mk.y, selected ? 5 : 4, 0, Math.PI * 2);
-    mCtx.fill();
+    drawHangerSymbol(mk, preview.rule.hangerKey, markerHalf, color, selected);
   }
 
   if (selected) {
@@ -7183,8 +7268,13 @@ function drawAutoHangersForMeasurement(m) {
     mCtx.font = `bold ${renderFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
     const tw = mCtx.measureText(text).width;
     const pad = 4 * (renderFontSize / 14);
-    const lx = first.x + first.nx * (markerHalf + 12);
-    const ly = first.y + first.ny * (markerHalf + 12);
+    const defX = first.x + first.nx * (markerHalf + 12);
+    const defY = first.y + first.ny * (markerHalf + 12);
+    if (!m._hangerLabelDefault) m._hangerLabelDefault = {};
+    m._hangerLabelDefault.x = defX;
+    m._hangerLabelDefault.y = defY;
+    const lx = defX + ((m.hangerLabelOffset && m.hangerLabelOffset.dx) || 0);
+    const ly = defY + ((m.hangerLabelOffset && m.hangerLabelOffset.dy) || 0);
 
     mCtx.save();
     mCtx.translate(lx, ly);
@@ -7202,6 +7292,101 @@ function drawAutoHangersForMeasurement(m) {
     mCtx.textBaseline = 'alphabetic';
     mCtx.fillText(text, 0, 0);
     mCtx.restore();
+
+    m._hangerLabelBox = {
+      x: lx - (pad * labelScale),
+      y: ly - ((renderFontSize + pad) * labelScale),
+      w: (tw + pad * 2) * labelScale,
+      h: (renderFontSize + pad * 2) * labelScale
+    };
+  } else {
+    m._hangerLabelBox = null;
+  }
+
+  mCtx.restore();
+}
+
+function drawHangerSymbol(mk, hangerKey, markerHalf, color, selected) {
+  const angle = Math.atan2(mk.uy, mk.ux);
+  const span = markerHalf;
+  const cap = Math.max(4, span * 0.16);
+  const lw = selected ? 3 : 2;
+  const family = (HANGER_DEFAULTS.types && HANGER_DEFAULTS.types[hangerKey] && HANGER_DEFAULTS.types[hangerKey].family) || '';
+
+  mCtx.save();
+  mCtx.translate(mk.x, mk.y);
+  mCtx.rotate(angle);
+  mCtx.strokeStyle = color;
+  mCtx.fillStyle = color;
+  mCtx.lineWidth = lw;
+  mCtx.lineCap = 'round';
+  mCtx.lineJoin = 'round';
+
+  if (hangerKey === 'hanger-strap' || family === 'strap') {
+    // Strap: continuous U band around the duct with small fastening tabs.
+    mCtx.beginPath();
+    mCtx.moveTo(-cap, -span);
+    mCtx.quadraticCurveTo(-span * 0.34, 0, -cap, span);
+    mCtx.moveTo(cap, -span);
+    mCtx.quadraticCurveTo(span * 0.34, 0, cap, span);
+    mCtx.stroke();
+    mCtx.fillRect(-cap * 1.6, -span - cap * 0.55, cap * 3.2, cap * 0.8);
+    mCtx.fillRect(-cap * 1.6, span - cap * 0.25, cap * 3.2, cap * 0.8);
+  } else if (hangerKey === 'hanger-trapeze' || family === 'trapeze') {
+    // Trapeze: channel under duct with two rods and clamp dots.
+    const rodX = Math.max(cap * 2.2, span * 0.36);
+    mCtx.beginPath();
+    mCtx.moveTo(-rodX, -span);
+    mCtx.lineTo(-rodX, span * 0.72);
+    mCtx.moveTo(rodX, -span);
+    mCtx.lineTo(rodX, span * 0.72);
+    mCtx.moveTo(-span, span * 0.72);
+    mCtx.lineTo(span, span * 0.72);
+    mCtx.stroke();
+    mCtx.fillRect(-span, span * 0.72 - cap * 0.45, span * 2, cap * 0.9);
+    mCtx.beginPath();
+    mCtx.arc(-rodX, -span, cap * 0.7, 0, Math.PI * 2);
+    mCtx.arc(rodX, -span, cap * 0.7, 0, Math.PI * 2);
+    mCtx.fill();
+  } else if (hangerKey === 'hanger-threaded-rod' || family === 'rod') {
+    // Rod hanger: paired rods with small attachment plates.
+    const rodX = Math.max(cap * 1.8, span * 0.28);
+    mCtx.beginPath();
+    mCtx.moveTo(-rodX, -span);
+    mCtx.lineTo(-rodX, span);
+    mCtx.moveTo(rodX, -span);
+    mCtx.lineTo(rodX, span);
+    mCtx.stroke();
+    mCtx.fillRect(-rodX - cap, -span - cap * 0.5, cap * 2, cap);
+    mCtx.fillRect(rodX - cap, -span - cap * 0.5, cap * 2, cap);
+  } else if (family === 'clevis' || family === 'ring') {
+    // Clevis/ring: band around round duct.
+    mCtx.beginPath();
+    mCtx.ellipse(0, 0, span * 0.44, span * 0.82, 0, 0, Math.PI * 2);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.moveTo(0, -span);
+    mCtx.lineTo(0, -span * 0.46);
+    mCtx.stroke();
+  } else {
+    // Generic support: compact bracket with center pickup.
+    mCtx.beginPath();
+    mCtx.moveTo(-span * 0.75, 0);
+    mCtx.lineTo(span * 0.75, 0);
+    mCtx.moveTo(0, -span);
+    mCtx.lineTo(0, span);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.arc(0, 0, cap, 0, Math.PI * 2);
+    mCtx.fill();
+  }
+
+  if (selected) {
+    mCtx.strokeStyle = 'rgba(233,69,96,0.25)';
+    mCtx.lineWidth = Math.max(6, lw * 2);
+    mCtx.beginPath();
+    mCtx.arc(0, 0, span * 0.95, 0, Math.PI * 2);
+    mCtx.stroke();
   }
 
   mCtx.restore();
