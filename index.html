@@ -10587,6 +10587,13 @@ function drawSpiralFittingSeams(type, D, D2) {
     seamOnRun(x, y, half, 0);
   }
 
+  function capSeam(x1, y1, x2, y2) {
+    mCtx.beginPath();
+    mCtx.moveTo(x1, y1);
+    mCtx.lineTo(x2, y2);
+    mCtx.stroke();
+  }
+
   function drawElbowSeams(sweep) {
     const CLR = D * 1.5;
     const innerR = D;
@@ -10616,6 +10623,46 @@ function drawSpiralFittingSeams(type, D, D2) {
     return;
   }
 
+  if (type === 'endcap') {
+    capSeam(D * 0.06, -halfW * 0.55, D * 0.2, halfW * 0.55);
+    mCtx.restore();
+    return;
+  }
+
+  if (type === 'coupling') {
+    seamAt(-D * 0.24, 0, halfW * 0.75);
+    seamAt(D * 0.24, 0, halfW * 0.75);
+    seamOnRun(0, 0, halfW * 1.08, Math.PI / 2);
+    mCtx.restore();
+    return;
+  }
+
+  if (type === 'reducer' || type === 'eccReducer') {
+    const len = Math.abs(D - D2) * 1.5 || D;
+    const xLimit = len * 0.22;
+    seamAt(-xLimit, 0, halfW * 0.75);
+    seamAt(xLimit, 0, Math.max(2, halfB * 0.75));
+    mCtx.restore();
+    return;
+  }
+
+  if (type === 'transition') {
+    const len = Math.max(D, D2) * 1.5;
+    const xLimit = len * 0.32;
+    seamAt(-xLimit, 0, halfW * 0.72);
+    seamAt(xLimit, 0, Math.max(2, halfB * 0.72));
+    mCtx.restore();
+    return;
+  }
+
+  if (type === 'wye') {
+    seamAt(-D * 0.45, 0, halfW * 0.75);
+    seamOnRun(D * 0.65, -D * 0.85, halfB, -Math.PI / 6);
+    seamOnRun(D * 0.65, D * 0.85, halfB, Math.PI / 6);
+    mCtx.restore();
+    return;
+  }
+
   const mainXs = [-D * 0.9, -D * 0.25, D * 0.4, D * 0.95];
   for (const x of mainXs) seamAt(x, 0, halfW);
 
@@ -10625,14 +10672,6 @@ function drawSpiralFittingSeams(type, D, D2) {
     seamOnRun(D * 0.65, -D * 0.65, halfB, -Math.PI / 4);
   } else if (type === 'lateral') {
     seamOnRun(D * 0.65, D * 1.15, halfB, Math.PI / 4);
-  } else if (type === 'wye') {
-    seamOnRun(D * 0.65, -D * 0.85, halfB, -Math.PI / 6);
-    seamOnRun(D * 0.65, D * 0.85, halfB, Math.PI / 6);
-  } else if (type === 'reducer' || type === 'eccReducer' || type === 'transition') {
-    seamAt(0, 0, Math.min(halfW, halfB || halfW));
-  }
-  if (type === 'coupling') {
-    seamOnRun(0, 0, halfW * 1.08, Math.PI / 2);
   }
 
   mCtx.restore();
