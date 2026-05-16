@@ -500,6 +500,7 @@ export const HANGER_DEFAULTS = {
   types: {},
   pricing: {},
   labor: {},
+  takeoffDefaults: {},
   autoRules: [],
   assemblies: {},
 };
@@ -532,6 +533,7 @@ export async function loadHangerDefaults() {
     HANGER_DEFAULTS.types = hj.types || {};
     HANGER_DEFAULTS.pricing = hj.pricing || {};
     HANGER_DEFAULTS.labor = hj.labor || {};
+    HANGER_DEFAULTS.takeoffDefaults = hj.takeoffDefaults || {};
     HANGER_DEFAULTS.autoRules = Array.isArray(hj.autoRules) ? hj.autoRules : [];
     HANGER_DEFAULTS.assemblies = hj.assemblies || {};
     for (const key in HANGER_DEFAULTS.labor) {

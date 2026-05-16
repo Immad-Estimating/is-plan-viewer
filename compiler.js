@@ -375,6 +375,20 @@ function getHangerMaterialEach(hangerKey) {
   return def && def.materialCost != null ? def.materialCost : 0;
 }
 
+function getHangerMaterialRate(hangerKey) {
+  const pb = _priceBookCache && _priceBookCache[hangerKey];
+  if (pb && pb.materialCost != null) return pb.materialCost;
+  const def = HANGER_DEFAULTS.pricing && HANGER_DEFAULTS.pricing[hangerKey];
+  if (!def) return 0;
+  if (def.materialUnit === 'LF' && def.materialCostPerLf != null) return def.materialCostPerLf;
+  return def.materialCost != null ? def.materialCost : 0;
+}
+
+function getHangerMaterialUnit(hangerKey) {
+  const def = HANGER_DEFAULTS.pricing && HANGER_DEFAULTS.pricing[hangerKey];
+  return def && def.materialUnit ? def.materialUnit : 'EA';
+}
+
 function getHangerLaborBreakdown(hangerKey) {
   const bd = getPriceBookLaborBreakdown(hangerKey);
   if (Object.keys(bd).length > 0) return bd;
@@ -384,8 +398,11 @@ function getHangerLaborBreakdown(hangerKey) {
 function buildHangerRow(h, page, drawingId, drawingName, labRate, source) {
   const qty = Math.max(0, parseFloat(h.quantity) || 0);
   const rate = h.laborRate || labRate;
-  const matEach = h.materialCost != null ? h.materialCost : getHangerMaterialEach(h.hangerKey);
-  let matCost = matEach * qty;
+  const materialUnit = h.materialUnit || getHangerMaterialUnit(h.hangerKey);
+  const strapLengthEach = materialUnit === 'LF' ? calculateStrapLengthEach(h) : 0;
+  const materialQty = materialUnit === 'LF' ? strapLengthEach * qty : qty;
+  const matRate = h.materialCost != null ? h.materialCost : getHangerMaterialRate(h.hangerKey);
+  let matCost = matRate * materialQty;
   const bd = h.laborHrs != null ? { rough: h.laborHrs } : getHangerLaborBreakdown(h.hangerKey);
   const laborCatHrs = {};
   const laborCatCost = {};
@@ -431,16 +448,44 @@ function buildHangerRow(h, page, drawingId, drawingName, labRate, source) {
     _sourceMeasurementId: h.sourceMeasurementId || null,
     _hangerKey: h.hangerKey,
     _hangerQty: qty,
+    _hangerMaterialUnit: materialUnit,
+    _hangerMaterialQty: materialQty,
+    _hangerHeightFt: h.hangingHeightFt != null ? h.hangingHeightFt : null,
+    _strapLengthEachFt: strapLengthEach || null,
     _hangerSource: source || h.source || 'manual',
   };
+}
+
+function getStrapDefaults() {
+  return (HANGER_DEFAULTS.takeoffDefaults && HANGER_DEFAULTS.takeoffDefaults.strap) || {};
+}
+
+function calculateStrapLengthEach(h) {
+  if (h.hangerKey !== 'hanger-strap') return 0;
+  const defaults = getStrapDefaults();
+  const heightFt = h.hangingHeightFt != null
+    ? parseFloat(h.hangingHeightFt)
+    : (defaults.defaultHangingHeightFt != null ? parseFloat(defaults.defaultHangingHeightFt) : 2);
+  const fastenerAllowanceFt = defaults.fastenerAllowanceFt != null ? parseFloat(defaults.fastenerAllowanceFt) : 0.5;
+  const wasteFactor = defaults.wasteFactor != null ? parseFloat(defaults.wasteFactor) : 1;
+  const dims = parseDuctSizeForHanger(h.size || h.ductSize || '');
+  let wrapFt = 0;
+  if (dims) {
+    if (dims.isRound) {
+      wrapFt = Math.PI * dims.max / 24; // half circumference in feet
+    } else {
+      wrapFt = dims.max / 12; // simplified bottom-width strap contact
+    }
+  }
+  return Math.max(0, (2 * (heightFt || 0) + wrapFt + fastenerAllowanceFt) * wasteFactor);
 }
 
 function parseDuctSizeForHanger(dims) {
   if (!dims) return null;
   const parts = String(dims).split('x').map(v => parseFloat(v));
-  if (parts.length === 1 && Number.isFinite(parts[0])) return { max: parts[0], min: parts[0] };
+  if (parts.length === 1 && Number.isFinite(parts[0])) return { max: parts[0], min: parts[0], isRound: true };
   if (parts.length === 2 && Number.isFinite(parts[0]) && Number.isFinite(parts[1])) {
-    return { max: Math.max(parts[0], parts[1]), min: Math.min(parts[0], parts[1]) };
+    return { max: Math.max(parts[0], parts[1]), min: Math.min(parts[0], parts[1]), isRound: false };
   }
   return null;
 }
@@ -471,6 +516,8 @@ function buildAutoHangerForMeasurement(m, lengthFt, shape) {
     hangerKey: rule.hangerKey,
     quantity: qty,
     size: m.duct.dims || '',
+    ductSize: m.duct.dims || '',
+    hangingHeightFt: m.hangerHeightFt != null ? m.hangerHeightFt : null,
     spacingFt: rule.spacingFt,
     phase: m.phase || 'rough',
     costGroup: m.costGroup || null,

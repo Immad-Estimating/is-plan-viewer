@@ -2,11 +2,23 @@
   "_meta": {
     "version": "1.0.0",
     "lastUpdated": "2026-05-15",
-    "description": "Hanger and support defaults for IS Plan Viewer. Pricing and labor values are seed defaults; project or company Price Book overrides take priority.",
+    "description": "Hanger and support defaults for IS Plan Viewer. Pricing and labor values are seed defaults; project or company Price Book overrides take priority. Auto spacing follows a simplified SMACNA-style maximum spacing model and should be verified against project specifications.",
     "units": {
-      "pricing": "$/EA",
+      "pricing": "$/EA unless the pricing entry declares materialUnit LF",
       "labor": "hrs/EA",
-      "spacing": "ft"
+      "spacing": "ft",
+      "hangingHeight": "ft",
+      "strapLength": "LF"
+    }
+  },
+  "takeoffDefaults": {
+    "strap": {
+      "defaultHangingHeightFt": 2,
+      "fastenerAllowanceFt": 0.5,
+      "wasteFactor": 1.1,
+      "roundWrap": "half-circumference",
+      "rectWrap": "bottom-width",
+      "description": "Strap LF per hanger = two vertical drops + duct wrap allowance + fastener allowance, multiplied by waste factor."
     }
   },
   "types": {
@@ -84,7 +96,7 @@
     }
   },
   "pricing": {
-    "hanger-strap": { "materialCost": 2.5 },
+    "hanger-strap": { "materialCostPerLf": 0.45, "materialUnit": "LF" },
     "hanger-threaded-rod": { "materialCost": 8.5 },
     "hanger-trapeze": { "materialCost": 22.0 },
     "hanger-clevis": { "materialCost": 12.0 },
@@ -116,32 +128,36 @@
       "id": "round-small-strap",
       "hangerKey": "hanger-strap",
       "appliesTo": { "source": "measurement", "shape": ["round"], "maxSizeIn": 12 },
-      "spacingFt": 8,
+      "spacingFt": 10,
       "minCount": 1,
+      "standardRef": "SMACNA simplified: rigid duct supports not over 10 ft apart; verify project/spec requirements.",
       "description": "Default strap hanger for small round duct."
     },
     {
       "id": "round-large-rod",
       "hangerKey": "hanger-threaded-rod",
       "appliesTo": { "source": "measurement", "shape": ["round"], "minSizeIn": 13 },
-      "spacingFt": 8,
+      "spacingFt": 10,
       "minCount": 1,
+      "standardRef": "SMACNA simplified: rigid duct supports not over 10 ft apart; verify project/spec requirements.",
       "description": "Threaded rod hanger for larger round duct."
     },
     {
       "id": "rect-trapeze",
       "hangerKey": "hanger-trapeze",
       "appliesTo": { "source": "measurement", "shape": ["rect", "oval"] },
-      "spacingFt": 8,
+      "spacingFt": 10,
       "minCount": 1,
+      "standardRef": "SMACNA simplified: rigid duct supports not over 10 ft apart; verify project/spec requirements.",
       "description": "Trapeze support for rectangular and oval duct runs."
     },
     {
       "id": "flex-strap",
       "hangerKey": "hanger-strap",
       "appliesTo": { "source": "measurement", "shape": ["flex"] },
-      "spacingFt": 5,
+      "spacingFt": 4,
       "minCount": 1,
+      "standardRef": "Flexible duct support spacing commonly capped at 4 ft; verify project/spec requirements.",
       "description": "Closer strap spacing for flex duct."
     }
   ],
