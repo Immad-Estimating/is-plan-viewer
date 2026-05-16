@@ -10663,13 +10663,19 @@ function drawSpiralFittingSeams(type, D, D2) {
     return;
   }
 
+  if (type === 'saddle45y') {
+    // Saddle taps keep the main duct clean; only the takeoff branch shows spiral detail.
+    seamOnRun(D * 0.58, -D * 0.58, halfB * 0.75, -Math.PI / 4);
+    seamOnRun(D * 0.95, -D * 0.95, halfB * 0.75, -Math.PI / 4);
+    mCtx.restore();
+    return;
+  }
+
   const mainXs = [-D * 0.9, -D * 0.25, D * 0.4, D * 0.95];
   for (const x of mainXs) seamAt(x, 0, halfW);
 
   if (type === 'tee') {
     seamOnRun(0, D * 1.05, halfB, Math.PI / 2);
-  } else if (type === 'saddle45y') {
-    seamOnRun(D * 0.65, -D * 0.65, halfB, -Math.PI / 4);
   } else if (type === 'lateral') {
     seamOnRun(D * 0.65, D * 1.15, halfB, Math.PI / 4);
   }
