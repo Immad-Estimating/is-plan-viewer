@@ -5199,6 +5199,8 @@ window.updatePBEntry = async function(key, prop, value) {
   var existing = (priceBookCache && priceBookCache[key]) || { key: key };
   existing[prop] = value === '' ? null : parseFloat(value) || null;
   await savePriceBookEntry(key, existing);
+  renderPriceBook();
+  if (_activePanelTab === 'comp' && _compilerInited) refreshCompiler();
 };
 
 // ---- Vertical Stack state ----
