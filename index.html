@@ -9081,11 +9081,9 @@ function getMeasurementLaborSummary(m) {
     if (dShape === 'round' || dShape === 'spiral') {
       const dia = parseInt(m.duct.dims);
       const sizeKey = dia ? 'duct-spiral-' + dia : null;
-      const baseEntry = sizeKey && priceBookCache ? priceBookCache[sizeKey] : null;
-      if (baseEntry && baseEntry.laborHrs != null) lhFt = baseEntry.laborHrs;
+      if (sizeKey) lhFt = getTotalLaborHrs(sizeKey);
     } else {
-      const pb = getPriceBookEntry('duct-' + dShape, m.duct.dims);
-      if (pb && pb.laborHrs != null) lhFt = pb.laborHrs;
+      lhFt = getTotalLaborHrs('duct-' + dShape);
     }
   }
   const rate = m.laborRate != null ? m.laborRate : ((getProjectRateTable() || {}).laborRatePerHr || 45);
@@ -9100,8 +9098,11 @@ function getFittingLaborSummary(f) {
     const shape = getFittingShape(f);
     const prefix = shape === 'round' ? (f.roundType || 'spiral') : shape;
     const pbKey = f.type === 'rectTap' ? 'rectTap' : prefix + '-' + f.type;
-    const pb = getPriceBookEntry(pbKey, f.sizeA);
-    if (pb && pb.laborHrs != null) hrs = pb.laborHrs;
+    const sizeKey = f.type === 'boot' && f.sizeA && f.sizeB
+      ? pbKey + '-' + f.sizeA + 'x' + f.sizeB
+      : pbKey + (f.sizeA ? '-' + f.sizeA : '');
+    hrs = getTotalLaborHrs(sizeKey);
+    if (!hrs) hrs = getTotalLaborHrs(pbKey);
   }
   if (f._overrides && f._overrides.laborHrs != null) hrs = f._overrides.laborHrs;
   const rate = f.laborRate != null ? f.laborRate : ((getProjectRateTable() || {}).laborRatePerHr || 45);
