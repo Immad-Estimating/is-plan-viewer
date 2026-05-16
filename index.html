@@ -4829,6 +4829,71 @@ function getHangerPriceBookItems(family) {
     });
 }
 
+function getHangerPriceBookMaterialRate(key) {
+  var entry = priceBookCache ? priceBookCache[key] : null;
+  if (entry && entry.materialCost != null) return parseFloat(entry.materialCost) || 0;
+  var def = HANGER_DEFAULTS.pricing && HANGER_DEFAULTS.pricing[key];
+  if (!def) return 0;
+  if (def.materialUnit === 'LF' && def.materialCostPerLf != null) return parseFloat(def.materialCostPerLf) || 0;
+  return def.materialCost != null ? (parseFloat(def.materialCost) || 0) : 0;
+}
+
+function getHangerPriceBookMaterialUnit(key) {
+  var def = HANGER_DEFAULTS.pricing && HANGER_DEFAULTS.pricing[key];
+  return def && def.materialUnit ? def.materialUnit : 'EA';
+}
+
+function getSpiralWireAssemblyPreview() {
+  var defaults = (HANGER_DEFAULTS.takeoffDefaults && HANGER_DEFAULTS.takeoffDefaults.spiralWire) || {};
+  var dropFt = defaults.defaultDropFt != null ? parseFloat(defaults.defaultDropFt) : 2;
+  var wireEach = calculateSpiralWireLengthEach('hanger-spiral-wire', dropFt);
+  var assembly = HANGER_DEFAULTS.assemblies && HANGER_DEFAULTS.assemblies['hanger-spiral-wire'];
+  var parts = [];
+  var total = 0;
+  if (!Array.isArray(assembly)) return { dropFt, wireEach, total, parts };
+  for (var i = 0; i < assembly.length; i++) {
+    var component = assembly[i];
+    var componentKey = component.componentKey;
+    if (!componentKey) continue;
+    var qtyEach = component.quantity === 'wireLengthEach' ? wireEach : (parseFloat(component.quantity) || 0);
+    var unit = getHangerPriceBookMaterialUnit(componentKey);
+    var rate = getHangerPriceBookMaterialRate(componentKey);
+    var amount = qtyEach * rate;
+    total += amount;
+    parts.push({
+      key: componentKey,
+      label: getHangerLabel(componentKey),
+      qtyEach,
+      unit,
+      rate,
+      amount
+    });
+  }
+  return { dropFt, wireEach, total, parts };
+}
+
+function renderSpiralWireAssemblyBreakdown() {
+  var preview = getSpiralWireAssemblyPreview();
+  var html = '<tr style="background:rgba(15,52,96,0.18);border-bottom:1px solid rgba(15,52,96,0.35)">';
+  html += '<td colspan="3" style="padding:7px 8px;color:#a0a0c0;font-size:10px;line-height:1.5">';
+  html += '<div><span style="color:#e0e0e0;font-weight:600">Assembly pricing:</span> derived from components at default ' + preview.dropFt + ' ft wire drop.</div>';
+  html += '<div><span style="color:#ffaa00">Wire length:</span> ' + preview.wireEach.toFixed(2) + ' LF each';
+  html += ' <span style="color:#666">including upper/lower allowances and waste</span></div>';
+  for (var i = 0; i < preview.parts.length; i++) {
+    var p = preview.parts[i];
+    html += '<div style="display:flex;justify-content:space-between;gap:10px">';
+    html += '<span>' + escapeHtml(p.label) + '</span>';
+    html += '<span style="color:#00ff88">' + p.qtyEach.toFixed(p.unit === 'LF' ? 2 : 0) + ' ' + p.unit + ' × $' + p.rate.toFixed(2) + ' = $' + p.amount.toFixed(2) + '</span>';
+    html += '</div>';
+  }
+  html += '<div style="margin-top:3px;border-top:1px solid #0f3460;padding-top:3px;display:flex;justify-content:space-between">';
+  html += '<span style="color:#e0e0e0">Derived material per hanger</span><span style="color:#00ff88;font-weight:700">$' + preview.total.toFixed(2) + ' / EA</span>';
+  html += '</div>';
+  html += '<div style="color:#666;margin-top:3px">Edit the wire rope and upper/lower/gripper component rows in Hanger Hardware to change this assembly price.</div>';
+  html += '</td></tr>';
+  return html;
+}
+
 function renderHangerPriceBookSection(sec) {
   var html = pbColumnHeader(true, sec.id);
   var items = getHangerPriceBookItems(sec.family);
@@ -4840,13 +4905,22 @@ function renderHangerPriceBookSection(sec) {
     var unit = def && def.materialUnit ? def.materialUnit : 'EA';
     var mc = entry && entry.materialCost != null ? entry.materialCost : (def ? (unit === 'LF' ? def.materialCostPerLf : def.materialCost) : null);
     var totalLh = getTotalLaborHrs(key);
+    var isSpiralWireAssembly = key === 'hanger-spiral-wire';
+    var assemblyPreview = isSpiralWireAssembly ? getSpiralWireAssemblyPreview() : null;
     html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
     html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + ' <span style="color:#666;font-size:9px">$/'+ unit + '</span></td>';
-    html += '<td style="padding:4px 2px">' + pbInput(key, 'materialCost', mc) + '</td>';
+    if (isSpiralWireAssembly) {
+      html += '<td style="padding:4px 2px;text-align:center"><span style="color:#00ff88;font-size:11px" title="Derived from wire and attachment components">$' + assemblyPreview.total.toFixed(2) + '/EA</span></td>';
+    } else {
+      html += '<td style="padding:4px 2px">' + pbInput(key, 'materialCost', mc) + '</td>';
+    }
     html += '<td style="padding:4px 2px;text-align:center;cursor:pointer" onclick="toggleRadarChart(\'' + key + '\',\'accessory\',\'\')" title="Click to edit labor breakdown">';
     html += '<span style="color:#ffaa00;font-size:11px">' + (totalLh > 0 ? totalLh.toFixed(2) + 'h' : '\u2014') + '</span>';
     html += ' <span style="color:#555;font-size:9px">\u25BC</span></td>';
     html += '</tr>';
+    if (isSpiralWireAssembly) {
+      html += renderSpiralWireAssemblyBreakdown();
+    }
     if (radarChartTarget === key) {
       html += '<tr onclick="event.stopPropagation()"><td colspan="3" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
       html += renderRadarChart(key, 'accessory', '');
