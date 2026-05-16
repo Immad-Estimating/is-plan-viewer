@@ -21,7 +21,7 @@ export function installCommandRoll(ctx = {}) {
     el = document.createElement('div');
     el.className = 'command-roll';
     el.innerHTML = '<div class="cr-title">Command Roll</div><div class="cr-list"></div><div class="cr-history"></div>';
-    document.body.appendChild(el);
+    (viewer || document.body).appendChild(el);
     el.addEventListener('wheel', handleWheel, { passive: false });
     el.addEventListener('click', (e) => {
       const row = e.target.closest('[data-cr-idx]');
@@ -41,7 +41,7 @@ export function installCommandRoll(ctx = {}) {
     style.id = 'command-roll-css';
     style.textContent = `
 .command-roll {
-  position: fixed;
+  position: absolute;
   z-index: 180;
   min-width: 190px;
   max-width: 245px;
@@ -146,13 +146,12 @@ export function installCommandRoll(ctx = {}) {
   function position() {
     if (!el || !anchorPoint || !viewer) return;
     const screen = pdfToScreen(anchorPoint.x, anchorPoint.y);
-    const rect = viewer.getBoundingClientRect();
     const w = el.offsetWidth || 210;
     const h = el.offsetHeight || 120;
-    let left = rect.left + screen.x + 18;
-    let top = rect.top + screen.y - 18;
-    left = Math.max(12, Math.min(window.innerWidth - w - 12, left));
-    top = Math.max(12, Math.min(window.innerHeight - h - 12, top));
+    let left = screen.x + 18;
+    let top = screen.y - 18;
+    left = Math.max(8, Math.min(viewer.clientWidth - w - 8, left));
+    top = Math.max(8, Math.min(viewer.clientHeight - h - 8, top));
     el.style.left = left + 'px';
     el.style.top = top + 'px';
   }

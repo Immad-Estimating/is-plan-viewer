@@ -6176,7 +6176,7 @@ function applyCommandRollReducerSize(command) {
 function executeCommandRollCommand(command, ctx = {}) {
   if (!command || !ctx.anchor) return false;
   if (command.action === 'fitting') {
-    placeFittingAtPoint(ctx.anchor, command);
+    placeFittingAtPoint(ctx.anchor, { ...command, disableSnap: true });
     applyCommandRollReducerSize(command);
     return true;
   }
@@ -6214,10 +6214,12 @@ function placeFittingAtPoint(pt, opts = {}) {
   fittingIdCounter++;
 
   let placeX = pt.x, placeY = pt.y;
-  const placeholderConns = [{ x: placeX, y: placeY }];
-  const placeTargets = getAllSnapTargets(null, null);
-  const placeSnap = findBestSnap(placeholderConns, placeTargets, SNAP_THRESHOLD_PX);
-  if (placeSnap.snapped) { placeX += placeSnap.snapDx; placeY += placeSnap.snapDy; }
+  if (!opts.disableSnap) {
+    const placeholderConns = [{ x: placeX, y: placeY }];
+    const placeTargets = getAllSnapTargets(null, null);
+    const placeSnap = findBestSnap(placeholderConns, placeTargets, SNAP_THRESHOLD_PX);
+    if (placeSnap.snapped) { placeX += placeSnap.snapDx; placeY += placeSnap.snapDy; }
+  }
 
   const _shape = opts.shape || currentFittingShape || 'round';
   const _roundType = opts.roundType != null ? opts.roundType : (_shape === 'round' ? roundDuctType : null);
