@@ -2632,6 +2632,15 @@ viewer.addEventListener('mousedown', (e) => {
     }
   }
 
+  if (CommandRoll.isActive() && e.ctrlKey) {
+    isPanning = true;
+    startX = e.clientX - panX;
+    startY = e.clientY - panY;
+    viewer.classList.add('grabbing');
+    e.preventDefault();
+    return;
+  }
+
   if ((measureMode || fittingMode || stackMode) && !e.shiftKey) return;
   isPanning = true;
   startX = e.clientX - panX;
@@ -2918,14 +2927,7 @@ viewer.addEventListener('click', (e) => {
     return;
   }
 
-  if (ductDrawMode && CommandRoll.isActive()) {
-    const command = CommandRoll.getSelectedCommand();
-    if (command && command.action !== 'continue') {
-      e.preventDefault();
-      CommandRoll.executeSelected();
-      return;
-    }
-  }
+  if (handleCommandRollCanvasClick(e)) return;
 
   // Stack mode: click to interact with stacks or create new ones
   if (stackMode) {
@@ -3091,13 +3093,12 @@ viewer.addEventListener('click', (e) => {
 
   if (!measureMode) return;
 
-  let pt = screenToPdf(e.clientX, e.clientY);
-  if (e.shiftKey && measPoints.length > 0) pt = constrainOrtho(pt, measPoints[measPoints.length - 1], true);
-  // Snap to nearest endpoint of existing ductwork/fittings
-  const snapTargets = getAllSnapTargets(null, null);
-  const snap = findBestSnap([pt], snapTargets, SNAP_THRESHOLD_PX);
-  if (snap.snapped) { pt = { x: pt.x + snap.snapDx, y: pt.y + snap.snapDy }; }
+  const pt = getMeasureClickPoint(e);
   measPoints.push(pt);
+  if (ductDrawMode && isRigidDuctDraw() && measPoints.length >= 2) {
+    finishMeasurement();
+    return;
+  }
   drawMeasureOverlay();
 });
 
@@ -3160,11 +3161,123 @@ viewer.addEventListener('dblclick', (e) => {
   finishMeasurement();
 });
 
+function getMeasureClickPoint(e) {
+  let pt = screenToPdf(e.clientX, e.clientY);
+  if (e.shiftKey && measPoints.length > 0) pt = constrainOrtho(pt, measPoints[measPoints.length - 1], true);
+  const snapTargets = getAllSnapTargets(null, null);
+  const snap = findBestSnap([pt], snapTargets, SNAP_THRESHOLD_PX);
+  if (snap.snapped) pt = { x: pt.x + snap.snapDx, y: pt.y + snap.snapDy };
+  return pt;
+}
+
+function isRigidDuctDraw() {
+  return ductDrawMode && getDuctDrawConfig().type !== 'flex';
+}
+
+function getCommandRollClickPoint(e) {
+  let pt = screenToPdf(e.clientX, e.clientY);
+  if (e.shiftKey && measPoints.length > 0) pt = constrainOrtho(pt, measPoints[measPoints.length - 1], true);
+  return pt;
+}
+
+function endActiveDuctPathForCommandRoll() {
+  if (!ductDrawMode || measPoints.length === 0) return;
+  if (measPoints.length >= 2) {
+    finishMeasurement();
+  } else {
+    measPoints = [];
+    drawMeasureOverlay();
+  }
+}
+
+function handleCommandRollCanvasClick(e) {
+  if (!ductDrawMode || !CommandRoll.isActive()) return false;
+  const command = CommandRoll.getSelectedCommand();
+  if (!command || command.action === 'continue') return false;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  if (command.action === 'exit') {
+    CommandRoll.executeSelected();
+    return true;
+  }
+
+  const clickPt = getCommandRollClickPoint(e);
+  const shouldFinishActiveRun = measPoints.length > 0;
+  if (measPoints.length > 0) {
+    measPoints.push(clickPt);
+    if (measPoints.length >= 2) {
+      finishMeasurement();
+    } else {
+      CommandRoll.update({ anchor: clickPt, duct: getDuctDrawConfig() });
+      drawMeasureOverlay();
+      return true;
+    }
+  } else {
+    CommandRoll.update({ anchor: clickPt, duct: getDuctDrawConfig() });
+  }
+
+  CommandRoll.executeSelected({ anchor: clickPt, keepSelection: true });
+  if (!shouldFinishActiveRun) {
+    drawMeasureOverlay();
+    updatePanel();
+  }
+  return true;
+}
+
+function handleCommandRollFinishKey(e) {
+  if (!ductDrawMode || !CommandRoll.isActive()) return false;
+  if (e.key !== 'Enter' && e.key !== ' ') return false;
+  const command = CommandRoll.getSelectedCommand();
+  if (!command || command.action === 'continue' || command.action === 'exit') return false;
+  if (measPoints.length < 2) return false;
+  const anchor = measPoints[measPoints.length - 1];
+  e.preventDefault();
+  finishMeasurement();
+  CommandRoll.executeSelected({ anchor, keepSelection: true });
+  return true;
+}
+
+function handleCommandRollTransformKey(e) {
+  if (!ductDrawMode || !CommandRoll.isActive()) return false;
+  const command = CommandRoll.getSelectedCommand();
+  if (!command || command.action !== 'fitting') return false;
+  if (e.key === 'r' || e.key === 'R' || e.key === ']') {
+    e.preventDefault();
+    commandRollRotation = (commandRollRotation + 90) % 360;
+    CommandRoll.render();
+    drawMeasureOverlay();
+    return true;
+  }
+  if (e.key === '[') {
+    e.preventDefault();
+    commandRollRotation = ((commandRollRotation - 90) % 360 + 360) % 360;
+    CommandRoll.render();
+    drawMeasureOverlay();
+    return true;
+  }
+  if (e.key === 'm' || e.key === 'M') {
+    e.preventDefault();
+    commandRollMirrored = !commandRollMirrored;
+    CommandRoll.render();
+    drawMeasureOverlay();
+    return true;
+  }
+  return false;
+}
+
 // Mouse wheel zoom
 viewer.addEventListener('wheel', (e) => {
   if (!pdfDoc) return;
   if (e.target.closest('.scale-popover')) return;
-  if (CommandRoll.isActive() && CommandRoll.handleWheel(e)) return;
+  if (CommandRoll.isActive() && !e.ctrlKey) {
+    endActiveDuctPathForCommandRoll();
+    if (CommandRoll.handleWheel(e)) {
+      drawMeasureOverlay();
+      return;
+    }
+  }
   e.preventDefault();
   const rect = viewer.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
@@ -3217,6 +3330,8 @@ window.addEventListener('keydown', (e) => {
   if (currentRoute.view !== 'viewer') return;
   if (!pdfDoc) return;
 
+  if (handleCommandRollFinishKey(e)) return;
+  if (handleCommandRollTransformKey(e)) return;
   if (CommandRoll.isActive() && CommandRoll.handleKeyDown(e)) return;
 
   // In duct draw mode: number keys, x, and backspace edit dimensions
@@ -4566,6 +4681,8 @@ function drawMeasureOverlay() {
     drawFitting(ghost, false);
     mCtx.globalAlpha = 1.0;
   }
+
+  drawCommandRollGhost();
 
   // Snap preview indicator - cached to avoid getAllSnapTargets() every frame
   if ((measureMode || fittingMode) && mousePos) {
@@ -6100,9 +6217,63 @@ function getCommandRollSizeA(duct) {
   return document.getElementById('fpSizeA')?.value || '14';
 }
 
-function getCommandRollSizeB(type) {
-  if (!['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap','plenum'].includes(type)) return '';
-  return document.getElementById('fpSizeB')?.value || '';
+let commandRollRotation = 0;
+let commandRollMirrored = false;
+const commandRollFieldOverrides = {};
+
+const COMMAND_ROLL_ROUND_SIZES = [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 42, 48, 54, 60];
+
+function getCommandRollLowerNumber(value) {
+  const n = parseFloat(value);
+  if (!Number.isFinite(n)) return value;
+  for (let i = COMMAND_ROLL_ROUND_SIZES.length - 1; i >= 0; i--) {
+    if (COMMAND_ROLL_ROUND_SIZES[i] < n) return String(COMMAND_ROLL_ROUND_SIZES[i]);
+  }
+  return String(n);
+}
+
+function getCommandRollLowerSize(sizeA, shape) {
+  const raw = String(sizeA || '').trim();
+  if (!raw) return '';
+  if (shape === 'rect' || shape === 'oval' || raw.includes('x')) {
+    const parts = raw.toLowerCase().split('x').map(v => v.trim()).filter(Boolean);
+    if (parts.length >= 2) return `${getCommandRollLowerNumber(parts[0])}x${getCommandRollLowerNumber(parts[1])}`;
+  }
+  return getCommandRollLowerNumber(raw);
+}
+
+function getCommandRollNeedsSizeB(type) {
+  return ['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap','plenum'].includes(type);
+}
+
+function getCommandRollDefaultSizeB(type, sizeA, shape) {
+  if (!getCommandRollNeedsSizeB(type)) return '';
+  if (['reducer','eccReducer'].includes(type)) return getCommandRollLowerSize(sizeA, shape);
+  return document.getElementById('fpSizeB')?.value || sizeA || '';
+}
+
+function getCommandRollFields(type) {
+  if (!type || type === 'hvac_component') return [];
+  if (['reducer','eccReducer'].includes(type)) {
+    return [
+      { key: 'sizeA', label: 'In' },
+      { key: 'sizeB', label: 'Out' },
+    ];
+  }
+  if (getCommandRollNeedsSizeB(type)) {
+    return [
+      { key: 'sizeA', label: 'Main' },
+      { key: 'sizeB', label: type === 'plenum' ? 'L' : 'Br' },
+    ];
+  }
+  return [{ key: 'sizeA', label: 'Size' }];
+}
+
+function applyCommandRollFieldOverride(command, field, value) {
+  if (!command || !command.id) return;
+  if (!commandRollFieldOverrides[command.id]) commandRollFieldOverrides[command.id] = {};
+  commandRollFieldOverrides[command.id][field] = value;
+  drawMeasureOverlay();
 }
 
 function getCommandRollStartAnchor() {
@@ -6121,16 +6292,25 @@ function buildCommandRollCommands(ctx = {}) {
   ];
 
   for (const item of (FITTINGS_BY_SHAPE[shape] || FITTINGS_BY_SHAPE.round)) {
+    const commandId = `fitting-${shape}-${item.type}`;
+    const overrides = commandRollFieldOverrides[commandId] || {};
+    const commandSizeA = overrides.sizeA || sizeA;
+    const commandSizeB = overrides.sizeB != null
+      ? overrides.sizeB
+      : getCommandRollDefaultSizeB(item.type, commandSizeA, shape);
     commands.push({
-      id: `fitting-${shape}-${item.type}`,
+      id: commandId,
       action: 'fitting',
       kind: shape === 'round' ? (roundTypeForCommand || 'round') : shape,
       type: item.type,
       label: item.title || item.label || item.type,
       shape,
       roundType: roundTypeForCommand,
-      sizeA,
-      sizeB: getCommandRollSizeB(item.type),
+      sizeA: commandSizeA,
+      sizeB: commandSizeB,
+      fields: getCommandRollFields(item.type),
+      rotation: commandRollRotation,
+      mirrored: commandRollMirrored,
       gauge: document.getElementById('ddGauge') ? document.getElementById('ddGauge').value : '26',
     });
   }
@@ -6187,11 +6367,54 @@ function executeCommandRollCommand(command, ctx = {}) {
   return false;
 }
 
+function drawCommandRollGhost() {
+  if (!ductDrawMode || !CommandRoll.isActive() || !mousePos) return;
+  const command = CommandRoll.getSelectedCommand();
+  if (!command || command.action === 'continue' || command.action === 'exit') return;
+  if (command.action === 'fitting') {
+    const ghost = {
+      type: command.type,
+      x: mousePos.x,
+      y: mousePos.y,
+      rotation: command.rotation || 0,
+      mirrored: command.mirrored || false,
+      shape: command.shape || 'round',
+      roundType: command.roundType || null,
+      sizeA: command.sizeA || getCommandRollSizeA(getDuctDrawConfig()),
+      sizeB: command.sizeB || ''
+    };
+    mCtx.save();
+    mCtx.globalAlpha = 0.46;
+    drawFitting(ghost, false);
+    mCtx.restore();
+    return;
+  }
+  if (command.action === 'hvac' && command.hvac) {
+    const hvac = command.hvac;
+    const ghost = {
+      type: 'hvac_component',
+      hvacTag: hvac.tag || 'HVAC',
+      hvacType: hvac.type || '',
+      hvacCategory: hvac.category || '',
+      x: mousePos.x,
+      y: mousePos.y,
+      rotation: 0,
+      sizeA: String(hvac.tonnage ? Math.max(24, hvac.tonnage * 4) : (hvac.size ? parseInt(hvac.size) || 24 : 24)),
+      sizeB: String(hvac.tonnage ? Math.max(16, hvac.tonnage * 2.5) : (hvac.size && hvac.size.includes('x') ? parseInt(hvac.size.split('x')[1]) || 16 : 16)),
+    };
+    mCtx.save();
+    mCtx.globalAlpha = 0.42;
+    drawFitting(ghost, false);
+    mCtx.restore();
+  }
+}
+
 const CommandRoll = installCommandRoll({
   viewer,
   pdfToScreen,
   getCommands: buildCommandRollCommands,
   onExecuteCommand: executeCommandRollCommand,
+  onFieldChange: applyCommandRollFieldOverride,
   onExit: () => {
     if (ductDrawMode) toggleDuctDraw();
   },

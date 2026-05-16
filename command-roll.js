@@ -4,6 +4,7 @@ export function installCommandRoll(ctx = {}) {
     pdfToScreen = function(x, y) { return { x, y }; },
     getCommands = function() { return []; },
     onExecuteCommand = function() {},
+    onFieldChange = function() {},
     onExit = function() {},
   } = ctx;
 
@@ -32,6 +33,15 @@ export function installCommandRoll(ctx = {}) {
       render();
       executeSelected();
     });
+    el.addEventListener('input', (e) => {
+      const input = e.target.closest('[data-cr-field]');
+      if (!input) return;
+      e.stopPropagation();
+      const cmd = getSelectedCommand();
+      if (!cmd) return;
+      cmd[input.dataset.crField] = input.value;
+      onFieldChange(cmd, input.dataset.crField, input.value);
+    });
     return el;
   }
 
@@ -43,17 +53,17 @@ export function installCommandRoll(ctx = {}) {
 .command-roll {
   position: absolute;
   z-index: 180;
-  min-width: 190px;
-  max-width: 245px;
-  padding: 7px;
-  border: 1px solid rgba(233, 69, 96, 0.55);
-  border-radius: 10px;
-  background: rgba(9, 14, 28, 0.78);
+  width: 190px;
+  padding: 6px;
+  border: 1px solid rgba(233, 69, 96, 0.65);
+  border-radius: 9px;
+  background: rgba(9, 14, 28, 0.94);
   box-shadow: 0 8px 24px rgba(0,0,0,0.38);
   color: #e8edf7;
   font: 11px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(3px);
   user-select: none;
+  pointer-events: none;
   display: none;
 }
 .command-roll.active { display: block; }
@@ -74,13 +84,12 @@ export function installCommandRoll(ctx = {}) {
   grid-template-columns: 18px 1fr auto;
   align-items: center;
   gap: 5px;
-  padding: 5px 7px;
+  padding: 4px 6px;
   border-radius: 7px;
-  cursor: pointer;
   color: #cfd6ea;
   border: 1px solid transparent;
 }
-.cr-row:hover { background: rgba(255,255,255,0.06); }
+.cr-row.dim { opacity: 0.55; }
 .cr-row.selected {
   background: rgba(233, 69, 96, 0.2);
   border-color: rgba(233, 69, 96, 0.65);
@@ -96,8 +105,8 @@ export function installCommandRoll(ctx = {}) {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
-  margin-top: 6px;
-  padding-top: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
   border-top: 1px solid rgba(160,160,192,0.18);
 }
 .cr-hist-item {
@@ -110,6 +119,35 @@ export function installCommandRoll(ctx = {}) {
   border-radius: 999px;
   padding: 2px 6px;
   font-size: 9px;
+}
+.cr-fields {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 5px;
+}
+.cr-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #9aa5c3;
+  font-size: 9px;
+}
+.cr-field input {
+  min-width: 0;
+  width: 100%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(160,160,192,0.35);
+  border-radius: 5px;
+  color: #fff;
+  padding: 3px 4px;
+  font: 10px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  outline: none;
+}
+.cr-field input:focus {
+  border-color: rgba(233,69,96,0.85);
+  background: rgba(233,69,96,0.14);
 }
 `;
     document.head.appendChild(style);
@@ -128,28 +166,50 @@ export function installCommandRoll(ctx = {}) {
       return;
     }
     rebuildCommands();
-    node.querySelector('.cr-title').innerHTML = '<span>Command Roll</span><span>Wheel / Enter</span>';
-    node.querySelector('.cr-list').innerHTML = commands.map((cmd, idx) => `
-      <div class="cr-row${idx === selectedIdx ? ' selected' : ''}" data-cr-idx="${idx}">
-        <span>${idx === selectedIdx ? '>' : ''}</span>
+    const visible = getVisibleCommands();
+    node.querySelector('.cr-title').innerHTML = `<span>Command Roll</span><span>${selectedIdx + 1}/${commands.length}</span>`;
+    node.querySelector('.cr-list').innerHTML = visible.map(({ cmd, idx }) => `
+      <div class="cr-row${idx === selectedIdx ? ' selected' : ' dim'}" data-cr-idx="${idx}">
+        <span>${idx === selectedIdx ? '>' : idx < selectedIdx ? '^' : 'v'}</span>
         <span>${escapeHtml(cmd.label || cmd.type || 'Command')}</span>
         <span class="cr-kind">${escapeHtml(cmd.kind || cmd.action || '')}</span>
       </div>
     `).join('');
-    node.querySelector('.cr-history').innerHTML = history.slice(-6).map(item =>
+    const selected = commands[selectedIdx];
+    const fields = selected && Array.isArray(selected.fields) ? selected.fields : [];
+    const fieldsHtml = fields.map(field => `
+      <label class="cr-field">
+        <span>${escapeHtml(field.label || field.key)}</span>
+        <input data-cr-field="${escapeHtml(field.key)}" value="${escapeHtml(selected[field.key] || '')}" />
+      </label>
+    `).join('');
+    node.querySelector('.cr-list').insertAdjacentHTML('beforeend', fieldsHtml ? `<div class="cr-fields">${fieldsHtml}</div>` : '');
+    node.querySelector('.cr-history').innerHTML = history.slice(-3).map(item =>
       `<span class="cr-hist-item" title="${escapeHtml(item)}">${escapeHtml(item)}</span>`
     ).join('');
     position();
     node.classList.add('active');
   }
 
+  function getVisibleCommands() {
+    if (commands.length <= 3) return commands.map((cmd, idx) => ({ cmd, idx }));
+    const seen = new Set();
+    return [-1, 0, 1].map(offset => {
+      const idx = (selectedIdx + offset + commands.length) % commands.length;
+      return { cmd: commands[idx], idx };
+    }).filter(item => {
+      if (seen.has(item.idx)) return false;
+      seen.add(item.idx);
+      return true;
+    });
+  }
+
   function position() {
     if (!el || !anchorPoint || !viewer) return;
-    const screen = pdfToScreen(anchorPoint.x, anchorPoint.y);
     const w = el.offsetWidth || 210;
     const h = el.offsetHeight || 120;
-    let left = screen.x + 18;
-    let top = screen.y - 18;
+    let left = viewer.clientWidth - w - 16;
+    let top = 64;
     left = Math.max(8, Math.min(viewer.clientWidth - w - 8, left));
     top = Math.max(8, Math.min(viewer.clientHeight - h - 8, top));
     el.style.left = left + 'px';
@@ -175,7 +235,7 @@ export function installCommandRoll(ctx = {}) {
     return commands[selectedIdx] || null;
   }
 
-  function executeSelected() {
+  function executeSelected(opts = {}) {
     const cmd = getSelectedCommand();
     if (!cmd) return false;
     if (cmd.action === 'exit') {
@@ -188,11 +248,12 @@ export function installCommandRoll(ctx = {}) {
       render();
       return false;
     }
-    const didExecute = onExecuteCommand(cmd, { anchor: anchorPoint, duct: ductConfig });
+    const didExecute = onExecuteCommand(cmd, { anchor: opts.anchor || anchorPoint, duct: ductConfig });
     if (didExecute !== false) {
       history.push(cmd.label || cmd.type || 'Command');
       if (history.length > 12) history = history.slice(-12);
-      selectedIdx = 0;
+      if (!opts.keepSelection) selectedIdx = 0;
+      if (opts.anchor) anchorPoint = opts.anchor;
       render();
       return true;
     }
