@@ -1340,6 +1340,7 @@ let dragFittingStart = null; // {x,y} mouse start in PDF coords
 let dragFittingOrigPos = null; // {x,y} original fitting position
 let fittingDragRotate = false;
 let fittingDragStartAngle = 0;
+let suppressNextCanvasClick = false;
 const pageFittings = {};
 
 // ---- Cost & Labor Engine ----
@@ -2537,6 +2538,9 @@ viewer.addEventListener('mousedown', (e) => {
   // Stack/callout drag: when not in measure/fitting mode
   if (!measureMode && !fittingMode) {
     const ptStack = screenToPdf(e.clientX, e.clientY);
+    const displayScale = currentScale / baseScale;
+    const hitR = 8 / displayScale;
+    if (tryStartCtrlDuplicateDrag(e, ptStack, hitR)) return;
     const stackHit = hitTestStack(ptStack.x, ptStack.y);
     if (stackHit && stackHit.type === 'callout') {
       isDraggingCallout = true;
@@ -2562,6 +2566,7 @@ viewer.addEventListener('mousedown', (e) => {
     const pt = screenToPdf(e.clientX, e.clientY);
     const displayScale = currentScale / baseScale;
     const hitR = 8 / displayScale;
+    if (tryStartCtrlDuplicateDrag(e, pt, hitR)) return;
     // Priority 0.5: selected hanger annotation drag
     const hangerLabelHit = hitTestHangerLabel(pt.x, pt.y);
     if (hangerLabelHit) {
@@ -2901,6 +2906,12 @@ window.addEventListener('mouseup', (e) => {
 
 viewer.addEventListener('click', (e) => {
   if (!pdfDoc) return;
+  if (suppressNextCanvasClick) {
+    suppressNextCanvasClick = false;
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   if (isPanning) return;
 
   if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('.command-roll') || e.target.closest('#stackPalette') || e.target.closest('#flexDropPopup')) {
@@ -3168,6 +3179,116 @@ function getMeasureClickPoint(e) {
   const snap = findBestSnap([pt], snapTargets, SNAP_THRESHOLD_PX);
   if (snap.snapped) pt = { x: pt.x + snap.snapDx, y: pt.y + snap.snapDy };
   return pt;
+}
+
+function clonePlain(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function tryStartCtrlDuplicateDrag(e, pt, hitR) {
+  if (!e.ctrlKey || e.shiftKey || measureMode || fittingMode || stackMode) return false;
+
+  const fitHit = hitTestFitting(pt.x, pt.y);
+  if (fitHit) {
+    const source = (pageFittings[currentPage] || []).find(f => f.id === fitHit.fittingId);
+    if (!source) return false;
+    const clone = clonePlain(source);
+    clone.id = ++fittingIdCounter;
+    if (!pageFittings[currentPage]) pageFittings[currentPage] = [];
+    pageFittings[currentPage].push(clone);
+    selectedFittingId = clone.id;
+    selectedMeasId = null;
+    selectedStackId = null;
+    selectedStackItemId = null;
+    isDraggingFitting = true;
+    dragFittingId = clone.id;
+    dragFittingStart = { x: pt.x, y: pt.y };
+    dragFittingOrigPos = { x: clone.x, y: clone.y };
+    e.preventDefault();
+    suppressNextCanvasClick = true;
+    viewer.classList.add('grabbing');
+    drawMeasureOverlay();
+    updatePanel();
+    return true;
+  }
+
+  const stackHit = hitTestStack(pt.x, pt.y);
+  if (stackHit && stackHit.type === 'callout') {
+    const stack = (pageStacks[currentPage] || []).find(s => s.id === stackHit.stackId);
+    const source = stack && stack.items ? stack.items.find(item => item.id === stackHit.itemId) : null;
+    if (!stack || !source) return false;
+    const clone = clonePlain(source);
+    clone.id = ++stackItemIdCounter;
+    if (clone.callout) {
+      clone.callout.x += 8;
+      clone.callout.y += 8;
+    }
+    stack.items.push(clone);
+    selectedStackId = stack.id;
+    selectedStackItemId = clone.id;
+    selectedFittingId = null;
+    selectedMeasId = null;
+    isDraggingCallout = true;
+    dragCalloutStackId = stack.id;
+    dragCalloutItemId = clone.id;
+    dragCalloutStart = { x: pt.x, y: pt.y };
+    e.preventDefault();
+    suppressNextCanvasClick = true;
+    viewer.classList.add('grabbing');
+    drawMeasureOverlay();
+    updatePanel();
+    return true;
+  }
+
+  if (stackHit && stackHit.type === 'stackPoint') {
+    const source = (pageStacks[currentPage] || []).find(s => s.id === stackHit.stackId);
+    if (!source) return false;
+    const clone = clonePlain(source);
+    clone.id = ++stackIdCounter;
+    if (clone.items) clone.items.forEach(item => { item.id = ++stackItemIdCounter; });
+    if (!pageStacks[currentPage]) pageStacks[currentPage] = [];
+    pageStacks[currentPage].push(clone);
+    selectedStackId = clone.id;
+    selectedStackItemId = null;
+    selectedFittingId = null;
+    selectedMeasId = null;
+    isDraggingStack = true;
+    dragStackId = clone.id;
+    dragStackStart = { x: pt.x, y: pt.y };
+    e.preventDefault();
+    suppressNextCanvasClick = true;
+    viewer.classList.add('grabbing');
+    drawMeasureOverlay();
+    updatePanel();
+    return true;
+  }
+
+  const segHit = hitTestSegment(pt.x, pt.y, hitR * 1.5);
+  if (segHit) {
+    const source = findMeasurement(segHit.measId);
+    if (!source) return false;
+    const clone = clonePlain(source);
+    clone.id = ++measureIdCounter;
+    window._measIdCounter = measureIdCounter;
+    if (!pageMeasurements[currentPage]) pageMeasurements[currentPage] = [];
+    pageMeasurements[currentPage].push(clone);
+    selectedMeasId = clone.id;
+    selectedFittingId = null;
+    selectedStackId = null;
+    selectedStackItemId = null;
+    isDraggingSegment = true;
+    dragMeasId = clone.id;
+    dragSegStartMouse = { x: pt.x, y: pt.y };
+    dragSegOrigPoints = clone.points ? clone.points.map(p => ({ x: p.x, y: p.y })) : null;
+    e.preventDefault();
+    suppressNextCanvasClick = true;
+    viewer.classList.add('grabbing');
+    drawMeasureOverlay();
+    updatePanel();
+    return true;
+  }
+
+  return false;
 }
 
 function isRigidDuctDraw() {
