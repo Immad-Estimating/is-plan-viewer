@@ -3755,6 +3755,7 @@ var activePBTab = 'rect';
 var pbRoundType = { 'round-fit': 'spiral', 'round-duct': 'spiral' }; // toggle: 'spiral' or 'snaplock'
 var pbFlexColor = { 'round-flex': 'black' }; // toggle: 'black' or 'silver'
 var pbExpandedItems = {}; // tracks which fitting rows are expanded to show per-size pricing
+var pbExpandedAssemblies = {}; // tracks expanded hanger assembly pricing details
 var pbPerimClass = { 'rect-fit': 0 }; // active perimeter class index per section (rect duct)
 var pbMinWidthClass = { 'rect-fit': 0 }; // active min-width class index per section (rect fittings)
 var pbLinerActive = false; // when true, rect duct/fit prices include liner adder
@@ -3903,6 +3904,7 @@ function pbSaveLayout() {
     roundType: pbRoundType,
     perimClass: pbPerimClass,
     minWidthClass: pbMinWidthClass,
+    expandedAssemblies: pbExpandedAssemblies,
     laborCat: activeLaborCat,
     tab: activePBTab,
     linerActive: pbLinerActive,
@@ -3942,6 +3944,7 @@ function pbApplyLayout(panel) {
     if (layout.minWidthClass) {
       for (var mwk in layout.minWidthClass) pbMinWidthClass[mwk] = layout.minWidthClass[mwk];
     }
+    if (layout.expandedAssemblies) pbExpandedAssemblies = layout.expandedAssemblies;
     if (layout.linerActive != null) pbLinerActive = layout.linerActive;
     if (layout.activeLiner) pbActiveLiner = layout.activeLiner;
     if (layout.laborCat) activeLaborCat = layout.laborCat;
@@ -4077,6 +4080,12 @@ window.setPBTab = function(tab) {
 
 window.togglePBSection = function(sectionId) {
   pbCollapsed[sectionId] = !pbCollapsed[sectionId];
+  renderPriceBook();
+  pbSaveLayout();
+};
+
+window.togglePBAssembly = function(key) {
+  pbExpandedAssemblies[key] = !pbExpandedAssemblies[key];
   renderPriceBook();
   pbSaveLayout();
 };
@@ -4907,8 +4916,13 @@ function renderHangerPriceBookSection(sec) {
     var totalLh = getTotalLaborHrs(key);
     var isSpiralWireAssembly = key === 'hanger-spiral-wire';
     var assemblyPreview = isSpiralWireAssembly ? getSpiralWireAssemblyPreview() : null;
+    var isAssemblyExpanded = isSpiralWireAssembly && !!pbExpandedAssemblies[key];
     html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
-    html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">' + item.label + ' <span style="color:#666;font-size:9px">$/'+ unit + '</span></td>';
+    html += '<td style="padding:4px;color:#e0e0e0;font-size:11px">';
+    if (isSpiralWireAssembly) {
+      html += '<button onclick="event.stopPropagation();togglePBAssembly(\'' + key + '\')" title="Show/hide assembly pricing" style="background:transparent;border:none;color:#a0a0c0;cursor:pointer;font-size:10px;padding:0 4px 0 0">' + (isAssemblyExpanded ? '\u25BC' : '\u25B6') + '</button>';
+    }
+    html += item.label + ' <span style="color:#666;font-size:9px">$/'+ unit + '</span></td>';
     if (isSpiralWireAssembly) {
       html += '<td style="padding:4px 2px;text-align:center"><span style="color:#00ff88;font-size:11px" title="Derived from wire and attachment components">$' + assemblyPreview.total.toFixed(2) + '/EA</span></td>';
     } else {
@@ -4918,7 +4932,7 @@ function renderHangerPriceBookSection(sec) {
     html += '<span style="color:#ffaa00;font-size:11px">' + (totalLh > 0 ? totalLh.toFixed(2) + 'h' : '\u2014') + '</span>';
     html += ' <span style="color:#555;font-size:9px">\u25BC</span></td>';
     html += '</tr>';
-    if (isSpiralWireAssembly) {
+    if (isSpiralWireAssembly && isAssemblyExpanded) {
       html += renderSpiralWireAssemblyBreakdown();
     }
     if (radarChartTarget === key) {
