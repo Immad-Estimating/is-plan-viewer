@@ -185,22 +185,13 @@
       "description": "Default hanging wire support for exposed spiral duct."
     },
     {
-      "id": "round-small-strap",
+      "id": "round-strap",
       "hangerKey": "hanger-strap",
-      "appliesTo": { "source": "measurement", "shape": ["round"], "maxSizeIn": 12 },
+      "appliesTo": { "source": "measurement", "shape": ["round"] },
       "spacingFt": 10,
       "minCount": 1,
       "standardRef": "SMACNA simplified: rigid duct supports not over 10 ft apart; verify project/spec requirements.",
-      "description": "Default strap hanger for small round duct."
-    },
-    {
-      "id": "round-large-rod",
-      "hangerKey": "hanger-threaded-rod",
-      "appliesTo": { "source": "measurement", "shape": ["round"], "minSizeIn": 13 },
-      "spacingFt": 10,
-      "minCount": 1,
-      "standardRef": "SMACNA simplified: rigid duct supports not over 10 ft apart; verify project/spec requirements.",
-      "description": "Threaded rod hanger for larger round duct."
+      "description": "Default strap hanger for non-spiral round and snaplock duct."
     },
     {
       "id": "rect-trapeze",
