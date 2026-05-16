@@ -977,6 +977,7 @@ import { installTakeoffRenderer } from './takeoff-renderer.js';
 import { installInsertPalette } from './insert-palette.js';
 import { installProjectShell } from './project-shell.js';
 import { installBackupRestore } from './backup-restore.js';
+import { installCommandRoll } from './command-roll.js';
 import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS, LABOR_RATES, LABOR_DEFAULT_RATE, HANGER_DEFAULTS, loadLaborDefaults, loadHangerDefaults } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
@@ -2893,7 +2894,7 @@ viewer.addEventListener('click', (e) => {
   if (!pdfDoc) return;
   if (isPanning) return;
 
-  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette') || e.target.closest('#flexDropPopup')) {
+  if (e.target.closest('.scale-widget') || e.target.closest('.duct-popup') || e.target.closest('.custom-length-popup') || e.target.closest('.calibration-banner') || e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('.command-roll') || e.target.closest('#stackPalette') || e.target.closest('#flexDropPopup')) {
     return;
   }
 
@@ -2915,6 +2916,15 @@ viewer.addEventListener('click', (e) => {
   if (fittingMode) {
     handleFittingClick(e);
     return;
+  }
+
+  if (ductDrawMode && CommandRoll.isActive()) {
+    const command = CommandRoll.getSelectedCommand();
+    if (command && command.action !== 'continue') {
+      e.preventDefault();
+      CommandRoll.executeSelected();
+      return;
+    }
   }
 
   // Stack mode: click to interact with stacks or create new ones
@@ -3154,6 +3164,7 @@ viewer.addEventListener('dblclick', (e) => {
 viewer.addEventListener('wheel', (e) => {
   if (!pdfDoc) return;
   if (e.target.closest('.scale-popover')) return;
+  if (CommandRoll.isActive() && CommandRoll.handleWheel(e)) return;
   e.preventDefault();
   const rect = viewer.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
@@ -3205,6 +3216,8 @@ window.addEventListener('keydown', (e) => {
   // Only handle shortcuts when viewer is active
   if (currentRoute.view !== 'viewer') return;
   if (!pdfDoc) return;
+
+  if (CommandRoll.isActive() && CommandRoll.handleKeyDown(e)) return;
 
   // In duct draw mode: number keys, x, and backspace edit dimensions
   if (ductDrawMode && measPoints.length === 0) {
@@ -3758,6 +3771,11 @@ window.toggleDuctDraw = function() {
   document.getElementById('measureBtn').classList.toggle('active', measureMode && !ductDrawMode);
   viewer.classList.toggle('measuring', measureMode);
   document.getElementById('ductDrawBar').classList.toggle('active', ductDrawMode);
+  if (ductDrawMode) {
+    CommandRoll.start({ anchor: getCommandRollStartAnchor(), duct: getDuctDrawConfig() });
+  } else {
+    CommandRoll.stop();
+  }
   if (!ductDrawMode) {
     measPoints = [];
     measureMode = false;
@@ -3862,6 +3880,8 @@ function finishMeasurement() {
     meas.laborHrsPerFt = _dcd.laborHrsPerFt;
     meas.laborRate = _dcd.laborRate;
     meas.gauge = document.getElementById('ddGauge') ? document.getElementById('ddGauge').value : '26';
+    const lastPt = meas.points[meas.points.length - 1];
+    CommandRoll.update({ anchor: lastPt, duct: meas.duct });
     measPoints = [];
     drawMeasureOverlay();
     updatePanel();
@@ -6062,6 +6082,121 @@ function updateConfigArea() { return InsertPalette.updateConfigArea(); }
 function selectFittingType(type) { return InsertPalette.selectFittingType(type); }
 function rotateFittingInput(deg) { return InsertPalette.rotateFittingInput(deg); }
 
+function getCommandRollShape(duct) {
+  if (!duct) return currentFittingShape || 'round';
+  if (duct.type === 'rect' || duct.type === 'oval') return duct.type;
+  return 'round';
+}
+
+function getCommandRollRoundType(duct) {
+  if (!duct) return roundDuctType || 'spiral';
+  if (duct.type === 'spiral') return 'spiral';
+  if (duct.type === 'round') return 'snaplock';
+  return roundDuctType || 'spiral';
+}
+
+function getCommandRollSizeA(duct) {
+  if (duct && duct.dims) return duct.dims;
+  return document.getElementById('fpSizeA')?.value || '14';
+}
+
+function getCommandRollSizeB(type) {
+  if (!['tee','saddle45y','lateral','wye','reducer','eccReducer','transition','rectTap','plenum'].includes(type)) return '';
+  return document.getElementById('fpSizeB')?.value || '';
+}
+
+function getCommandRollStartAnchor() {
+  if (mousePos) return mousePos;
+  const rect = viewer.getBoundingClientRect();
+  return screenToPdf(rect.left + rect.width / 2, rect.top + rect.height / 2);
+}
+
+function buildCommandRollCommands(ctx = {}) {
+  const duct = ductDrawMode ? getDuctDrawConfig() : (ctx.duct || getDuctDrawConfig());
+  const shape = getCommandRollShape(duct);
+  const roundTypeForCommand = shape === 'round' ? getCommandRollRoundType(duct) : null;
+  const sizeA = getCommandRollSizeA(duct);
+  const commands = [
+    { id: 'continue', action: 'continue', kind: 'duct', label: `Continue Duct ${sizeA}` }
+  ];
+
+  for (const item of (FITTINGS_BY_SHAPE[shape] || FITTINGS_BY_SHAPE.round)) {
+    commands.push({
+      id: `fitting-${shape}-${item.type}`,
+      action: 'fitting',
+      kind: shape === 'round' ? (roundTypeForCommand || 'round') : shape,
+      type: item.type,
+      label: item.title || item.label || item.type,
+      shape,
+      roundType: roundTypeForCommand,
+      sizeA,
+      sizeB: getCommandRollSizeB(item.type),
+      gauge: document.getElementById('ddGauge') ? document.getElementById('ddGauge').value : '26',
+    });
+  }
+
+  for (const sym of (projectSystemSymbols || []).slice(0, 8)) {
+    commands.push({
+      id: `hvac-${sym.id || sym.tag}`,
+      action: 'hvac',
+      kind: 'accessory',
+      label: sym.tag || sym.description || 'HVAC',
+      hvac: {
+        _symId: sym.id,
+        tag: sym.tag,
+        type: sym.equipment?.type || sym.description?.split(' · ')[0] || '',
+        category: sym.equipment?.category || sym.category || '',
+        tonnage: sym.equipment?.tonnage || null,
+        size: sym.equipment?.size || null,
+        pricing: sym.equipment?.pricing || sym.pricing || null,
+      }
+    });
+  }
+
+  commands.push({ id: 'exit', action: 'exit', kind: 'exit', label: 'Exit Command' });
+  return commands;
+}
+
+function applyCommandRollReducerSize(command) {
+  if (!['reducer','eccReducer'].includes(command.type)) return;
+  const nextSize = String(command.sizeB || '').trim();
+  if (!nextSize) return;
+  const ductType = document.getElementById('ddType')?.value;
+  if (ductType === 'rect' || ductType === 'oval') {
+    const parts = nextSize.toLowerCase().split('x').map(v => v.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      document.getElementById('ddW').value = parts[0];
+      document.getElementById('ddH').value = parts[1];
+    }
+  } else {
+    document.getElementById('ddDiam').value = nextSize;
+  }
+}
+
+function executeCommandRollCommand(command, ctx = {}) {
+  if (!command || !ctx.anchor) return false;
+  if (command.action === 'fitting') {
+    placeFittingAtPoint(ctx.anchor, command);
+    applyCommandRollReducerSize(command);
+    return true;
+  }
+  if (command.action === 'hvac') {
+    placeHvacComponentAtPoint(ctx.anchor, { hvac: command.hvac });
+    return true;
+  }
+  return false;
+}
+
+const CommandRoll = installCommandRoll({
+  viewer,
+  pdfToScreen,
+  getCommands: buildCommandRollCommands,
+  onExecuteCommand: executeCommandRollCommand,
+  onExit: () => {
+    if (ductDrawMode) toggleDuctDraw();
+  },
+});
+
 function rotateFittingSelected(deg) {
   if (!selectedFittingId) return;
   const fittings = pageFittings[currentPage] || [];
@@ -6070,6 +6205,86 @@ function rotateFittingSelected(deg) {
   f.rotation = ((f.rotation + deg) % 360 + 360) % 360;
   drawMeasureOverlay();
   scheduleSave();
+}
+
+function placeFittingAtPoint(pt, opts = {}) {
+  const type = opts.type || selectedFittingType;
+  if (!type) return null;
+  if (!pageFittings[currentPage]) pageFittings[currentPage] = [];
+  fittingIdCounter++;
+
+  let placeX = pt.x, placeY = pt.y;
+  const placeholderConns = [{ x: placeX, y: placeY }];
+  const placeTargets = getAllSnapTargets(null, null);
+  const placeSnap = findBestSnap(placeholderConns, placeTargets, SNAP_THRESHOLD_PX);
+  if (placeSnap.snapped) { placeX += placeSnap.snapDx; placeY += placeSnap.snapDy; }
+
+  const _shape = opts.shape || currentFittingShape || 'round';
+  const _roundType = opts.roundType != null ? opts.roundType : (_shape === 'round' ? roundDuctType : null);
+  const _sA = opts.sizeA || document.getElementById('fpSizeA').value || '14';
+  const _sB = opts.sizeB != null ? opts.sizeB : (document.getElementById('fpSizeB').value || '');
+  const _cd = getCostDefaults(type, _sA, _sB, _roundType);
+  const f = {
+    id: fittingIdCounter,
+    type,
+    x: placeX, y: placeY,
+    rotation: opts.rotation != null ? opts.rotation : (parseFloat(document.getElementById('fpRotation').value) || 0),
+    mirrored: opts.mirrored != null ? opts.mirrored : fittingPreMirrored,
+    shape: _shape,
+    roundType: _roundType,
+    sizeA: _sA,
+    sizeB: _sB,
+    label: null,
+    phase: _cd.phase,
+    materialCost: _cd.materialCost,
+    laborHrs: _cd.laborHrs,
+    laborRate: _cd.laborRate,
+    costGroup: null,
+    costOverride: false,
+    gauge: opts.gauge || (document.getElementById('fpGauge') ? document.getElementById('fpGauge').value : '26'),
+    systemSymbol: activeSystemSymbol || null
+  };
+  pageFittings[currentPage].push(f);
+  selectedFittingId = null;
+  drawMeasureOverlay();
+  updatePanel();
+  scheduleSave();
+  return f;
+}
+
+function placeHvacComponentAtPoint(pt, opts = {}) {
+  const hvac = opts.hvac || selectedHvacComponent;
+  if (!hvac) return null;
+  if (!pageFittings[currentPage]) pageFittings[currentPage] = [];
+  fittingIdCounter++;
+  const f = {
+    id: fittingIdCounter,
+    type: 'hvac_component',
+    hvacComponentId: hvac._symId || null,
+    hvacTag: hvac.tag || 'HVAC',
+    hvacType: hvac.type || '',
+    hvacCategory: hvac.category || '',
+    x: pt.x, y: pt.y,
+    rotation: 0,
+    mirrored: false,
+    sizeA: String(hvac.tonnage ? Math.max(24, hvac.tonnage * 4) : (hvac.size ? parseInt(hvac.size) || 24 : 24)),
+    sizeB: String(hvac.tonnage ? Math.max(16, hvac.tonnage * 2.5) : (hvac.size && hvac.size.includes('x') ? parseInt(hvac.size.split('x')[1]) || 16 : 16)),
+    label: hvac.tag || 'HVAC',
+    phase: 'rough',
+    materialCost: (hvac.pricing && hvac.pricing.materialCost) || null,
+    laborHrs: null,
+    laborRate: null,
+    costGroup: null,
+    costOverride: false,
+    gauge: '',
+    systemSymbol: activeSystemSymbol || null
+  };
+  pageFittings[currentPage].push(f);
+  selectedFittingId = null;
+  drawMeasureOverlay();
+  updatePanel();
+  scheduleSave();
+  return f;
 }
 
 function handleFittingClick(e) {
@@ -6108,76 +6323,9 @@ function handleFittingClick(e) {
 
   // Place new fitting if a type is selected
   if (selectedFittingType) {
-    if (!pageFittings[currentPage]) pageFittings[currentPage] = [];
-    fittingIdCounter++;
-    // Snap placement to nearby connection points
-    let placeX = pt.x, placeY = pt.y;
-    const placeholderConns = [{ x: placeX, y: placeY }];
-    const placeTargets = getAllSnapTargets(null, null);
-    const placeSnap = findBestSnap(placeholderConns, placeTargets, SNAP_THRESHOLD_PX);
-    if (placeSnap.snapped) { placeX += placeSnap.snapDx; placeY += placeSnap.snapDy; }
-    const _sA = document.getElementById('fpSizeA').value || '14';
-    const _sB = document.getElementById('fpSizeB').value || '';
-    const _shape = currentFittingShape || 'round';
-    const _roundType = _shape === 'round' ? roundDuctType : null;
-    const _cd = getCostDefaults(selectedFittingType, _sA, _sB, _roundType);
-    const f = {
-      id: fittingIdCounter,
-      type: selectedFittingType,
-      x: placeX, y: placeY,
-      rotation: parseFloat(document.getElementById('fpRotation').value) || 0,
-      mirrored: fittingPreMirrored,
-      shape: _shape,
-      roundType: _roundType,
-      sizeA: _sA,
-      sizeB: _sB,
-      label: null,
-      phase: _cd.phase,
-      materialCost: _cd.materialCost,
-      laborHrs: _cd.laborHrs,
-      laborRate: _cd.laborRate,
-      costGroup: null,
-      costOverride: false,
-      gauge: document.getElementById('fpGauge') ? document.getElementById('fpGauge').value : '26',
-      systemSymbol: activeSystemSymbol || null
-    };
-    pageFittings[currentPage].push(f);
-    selectedFittingId = null;
-    drawMeasureOverlay();
-    updatePanel();
-    scheduleSave();
+    placeFittingAtPoint(pt);
   } else if (selectedHvacComponent) {
-    // Place HVAC component as a labeled marker
-    if (!pageFittings[currentPage]) pageFittings[currentPage] = [];
-    fittingIdCounter++;
-    const hvac = selectedHvacComponent;
-    const f = {
-      id: fittingIdCounter,
-      type: 'hvac_component',
-      hvacComponentId: hvac._symId || null,
-      hvacTag: hvac.tag || 'HVAC',
-      hvacType: hvac.type || '',
-      hvacCategory: hvac.category || '',
-      x: pt.x, y: pt.y,
-      rotation: 0,
-      mirrored: false,
-      sizeA: String(hvac.tonnage ? Math.max(24, hvac.tonnage * 4) : (hvac.size ? parseInt(hvac.size) || 24 : 24)),
-      sizeB: String(hvac.tonnage ? Math.max(16, hvac.tonnage * 2.5) : (hvac.size && hvac.size.includes('x') ? parseInt(hvac.size.split('x')[1]) || 16 : 16)),
-      label: hvac.tag || 'HVAC',
-      phase: 'rough',
-      materialCost: (hvac.pricing && hvac.pricing.materialCost) || null,
-      laborHrs: null,
-      laborRate: null,
-      costGroup: null,
-      costOverride: false,
-      gauge: '',
-      systemSymbol: activeSystemSymbol || null
-    };
-    pageFittings[currentPage].push(f);
-    selectedFittingId = null;
-    drawMeasureOverlay();
-    updatePanel();
-    scheduleSave();
+    placeHvacComponentAtPoint(pt);
   } else {
     selectedFittingId = null;
     drawMeasureOverlay();
