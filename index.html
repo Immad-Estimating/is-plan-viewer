@@ -10571,33 +10571,68 @@ function drawSpiralFittingSeams(type, D, D2) {
   mCtx.globalAlpha = 0.72;
   mCtx.setLineDash([]);
 
-  function seamAt(x, y, half, slope) {
-    const dx = half * 0.5;
+  function seamOnRun(x, y, half, angle) {
+    const ux = Math.cos(angle);
+    const uy = Math.sin(angle);
+    const nx = -uy;
+    const ny = ux;
+    const skew = half * 0.45;
     mCtx.beginPath();
-    mCtx.moveTo(x - dx, y - half);
-    mCtx.lineTo(x + dx, y + half);
+    mCtx.moveTo(x - nx * half - ux * skew, y - ny * half - uy * skew);
+    mCtx.lineTo(x + nx * half + ux * skew, y + ny * half + uy * skew);
     mCtx.stroke();
-    if (slope === -1) {
+  }
+
+  function seamAt(x, y, half) {
+    seamOnRun(x, y, half, 0);
+  }
+
+  function drawElbowSeams(sweep) {
+    const CLR = D * 1.5;
+    const innerR = D;
+    const outerR = D * 2;
+    const arcStart = -Math.PI / 2;
+    const pad = Math.max(2, D * 0.08);
+    const count = Math.max(1, Math.ceil(sweep / (Math.PI / 6)));
+    for (let i = 1; i <= count; i++) {
+      const a = arcStart + sweep * (i / (count + 1));
+      const rx = Math.cos(a);
+      const ry = Math.sin(a);
+      const tx = -Math.sin(a);
+      const ty = Math.cos(a);
+      const skew = D * 0.08;
       mCtx.beginPath();
-      mCtx.moveTo(x + dx, y - half);
-      mCtx.lineTo(x - dx, y + half);
+      mCtx.moveTo(rx * (innerR + pad) - tx * skew, CLR + ry * (innerR + pad) - ty * skew);
+      mCtx.lineTo(rx * (outerR - pad) + tx * skew, CLR + ry * (outerR - pad) + ty * skew);
       mCtx.stroke();
     }
   }
 
-  const mainXs = [-D * 0.9, -D * 0.25, D * 0.4, D * 1.05];
-  for (const x of mainXs) seamAt(x, 0, halfW, 1);
-
-  if (['tee', 'saddle45y', 'lateral', 'wye', 'reducer', 'eccReducer', 'transition'].includes(type)) {
-    seamAt(0, D * 0.9, halfB, 1);
-    seamAt(D * 0.45, D * 1.35, halfB, 1);
-  }
   if (type === '90el' || type === '45el' || type === '22el') {
-    seamAt(D * 1.25, D * 0.65, halfW, 1);
-    seamAt(D * 1.55, D * 1.25, halfW, 1);
+    const sweep = type === '90el' ? Math.PI / 2 : (type === '45el' ? Math.PI / 4 : Math.PI / 8);
+    seamAt(-D * 0.25, 0, halfW);
+    drawElbowSeams(sweep);
+    mCtx.restore();
+    return;
+  }
+
+  const mainXs = [-D * 0.9, -D * 0.25, D * 0.4, D * 0.95];
+  for (const x of mainXs) seamAt(x, 0, halfW);
+
+  if (type === 'tee') {
+    seamOnRun(0, D * 1.05, halfB, Math.PI / 2);
+  } else if (type === 'saddle45y') {
+    seamOnRun(D * 0.65, -D * 0.65, halfB, -Math.PI / 4);
+  } else if (type === 'lateral') {
+    seamOnRun(D * 0.65, D * 1.15, halfB, Math.PI / 4);
+  } else if (type === 'wye') {
+    seamOnRun(D * 0.65, -D * 0.85, halfB, -Math.PI / 6);
+    seamOnRun(D * 0.65, D * 0.85, halfB, Math.PI / 6);
+  } else if (type === 'reducer' || type === 'eccReducer' || type === 'transition') {
+    seamAt(0, 0, Math.min(halfW, halfB || halfW));
   }
   if (type === 'coupling') {
-    seamAt(0, 0, halfW * 1.15, -1);
+    seamOnRun(0, 0, halfW * 1.08, Math.PI / 2);
   }
 
   mCtx.restore();
