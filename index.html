@@ -7308,8 +7308,9 @@ function drawAutoHangersForMeasurement(m) {
 
 function drawHangerSymbol(mk, hangerKey, markerHalf, color, selected) {
   const angle = Math.atan2(mk.uy, mk.ux);
-  const span = markerHalf;
-  const cap = Math.max(4, span * 0.16);
+  const crossSpan = markerHalf;
+  const bandHalf = Math.max(3, crossSpan * 0.12);
+  const tab = Math.max(4, crossSpan * 0.18);
   const lw = selected ? 3 : 2;
   const family = (HANGER_DEFAULTS.types && HANGER_DEFAULTS.types[hangerKey] && HANGER_DEFAULTS.types[hangerKey].family) || '';
 
@@ -7323,61 +7324,78 @@ function drawHangerSymbol(mk, hangerKey, markerHalf, color, selected) {
   mCtx.lineJoin = 'round';
 
   if (hangerKey === 'hanger-strap' || family === 'strap') {
-    // Strap: continuous U band around the duct with small fastening tabs.
+    // Plan view: a narrow strap band crossing over the duct at this station.
+    mCtx.globalAlpha *= 0.22;
+    mCtx.fillRect(-bandHalf, -crossSpan, bandHalf * 2, crossSpan * 2);
+    mCtx.globalAlpha = selected ? 1 : 0.88;
     mCtx.beginPath();
-    mCtx.moveTo(-cap, -span);
-    mCtx.quadraticCurveTo(-span * 0.34, 0, -cap, span);
-    mCtx.moveTo(cap, -span);
-    mCtx.quadraticCurveTo(span * 0.34, 0, cap, span);
+    mCtx.moveTo(-bandHalf, -crossSpan);
+    mCtx.lineTo(-bandHalf, crossSpan);
+    mCtx.moveTo(bandHalf, -crossSpan);
+    mCtx.lineTo(bandHalf, crossSpan);
+    mCtx.moveTo(-tab, -crossSpan);
+    mCtx.lineTo(tab, -crossSpan);
+    mCtx.moveTo(-tab, crossSpan);
+    mCtx.lineTo(tab, crossSpan);
     mCtx.stroke();
-    mCtx.fillRect(-cap * 1.6, -span - cap * 0.55, cap * 3.2, cap * 0.8);
-    mCtx.fillRect(-cap * 1.6, span - cap * 0.25, cap * 3.2, cap * 0.8);
   } else if (hangerKey === 'hanger-trapeze' || family === 'trapeze') {
-    // Trapeze: channel under duct with two rods and clamp dots.
-    const rodX = Math.max(cap * 2.2, span * 0.36);
+    // Plan view: strut/channel crossbar with rod/anchor points outside duct edges.
+    const rodY = crossSpan + tab * 0.65;
+    const channelHalf = crossSpan + tab;
+    const channelThick = Math.max(3, bandHalf * 0.9);
+    mCtx.fillRect(-channelThick * 0.5, -channelHalf, channelThick, channelHalf * 2);
     mCtx.beginPath();
-    mCtx.moveTo(-rodX, -span);
-    mCtx.lineTo(-rodX, span * 0.72);
-    mCtx.moveTo(rodX, -span);
-    mCtx.lineTo(rodX, span * 0.72);
-    mCtx.moveTo(-span, span * 0.72);
-    mCtx.lineTo(span, span * 0.72);
+    mCtx.moveTo(0, -rodY);
+    mCtx.lineTo(0, rodY);
+    mCtx.moveTo(-tab * 0.75, -rodY);
+    mCtx.lineTo(tab * 0.75, -rodY);
+    mCtx.moveTo(-tab * 0.75, rodY);
+    mCtx.lineTo(tab * 0.75, rodY);
     mCtx.stroke();
-    mCtx.fillRect(-span, span * 0.72 - cap * 0.45, span * 2, cap * 0.9);
     mCtx.beginPath();
-    mCtx.arc(-rodX, -span, cap * 0.7, 0, Math.PI * 2);
-    mCtx.arc(rodX, -span, cap * 0.7, 0, Math.PI * 2);
+    mCtx.arc(0, -rodY, tab * 0.42, 0, Math.PI * 2);
+    mCtx.arc(0, rodY, tab * 0.42, 0, Math.PI * 2);
     mCtx.fill();
   } else if (hangerKey === 'hanger-threaded-rod' || family === 'rod') {
-    // Rod hanger: paired rods with small attachment plates.
-    const rodX = Math.max(cap * 1.8, span * 0.28);
+    // Plan view: paired rod pickup points on each side of the duct.
+    const rodY = crossSpan + tab * 0.35;
     mCtx.beginPath();
-    mCtx.moveTo(-rodX, -span);
-    mCtx.lineTo(-rodX, span);
-    mCtx.moveTo(rodX, -span);
-    mCtx.lineTo(rodX, span);
+    mCtx.moveTo(0, -rodY);
+    mCtx.lineTo(0, rodY);
     mCtx.stroke();
-    mCtx.fillRect(-rodX - cap, -span - cap * 0.5, cap * 2, cap);
-    mCtx.fillRect(rodX - cap, -span - cap * 0.5, cap * 2, cap);
+    mCtx.beginPath();
+    mCtx.arc(0, -rodY, tab * 0.45, 0, Math.PI * 2);
+    mCtx.arc(0, rodY, tab * 0.45, 0, Math.PI * 2);
+    mCtx.fill();
+    mCtx.fillRect(-bandHalf * 0.7, -crossSpan, bandHalf * 1.4, crossSpan * 2);
   } else if (family === 'clevis' || family === 'ring') {
-    // Clevis/ring: band around round duct.
+    // Plan view: round band/clamp centered on the run.
     mCtx.beginPath();
-    mCtx.ellipse(0, 0, span * 0.44, span * 0.82, 0, 0, Math.PI * 2);
+    mCtx.ellipse(0, 0, crossSpan * 0.34, crossSpan * 0.78, 0, 0, Math.PI * 2);
     mCtx.stroke();
     mCtx.beginPath();
-    mCtx.moveTo(0, -span);
-    mCtx.lineTo(0, -span * 0.46);
+    mCtx.arc(0, -crossSpan * 0.88, tab * 0.36, 0, Math.PI * 2);
+    mCtx.arc(0, crossSpan * 0.88, tab * 0.36, 0, Math.PI * 2);
+    mCtx.fill();
+  } else if (family === 'hardware') {
+    // Plan view hardware allowance: compact anchor/part marker at the station.
+    mCtx.beginPath();
+    mCtx.rect(-tab * 0.5, -tab * 0.5, tab, tab);
+    mCtx.moveTo(-tab * 0.75, 0);
+    mCtx.lineTo(tab * 0.75, 0);
+    mCtx.moveTo(0, -tab * 0.75);
+    mCtx.lineTo(0, tab * 0.75);
     mCtx.stroke();
   } else {
-    // Generic support: compact bracket with center pickup.
+    // Plan view generic support: crossbar through the duct with centered pickup.
     mCtx.beginPath();
-    mCtx.moveTo(-span * 0.75, 0);
-    mCtx.lineTo(span * 0.75, 0);
-    mCtx.moveTo(0, -span);
-    mCtx.lineTo(0, span);
+    mCtx.moveTo(0, -crossSpan);
+    mCtx.lineTo(0, crossSpan);
+    mCtx.moveTo(-tab, 0);
+    mCtx.lineTo(tab, 0);
     mCtx.stroke();
     mCtx.beginPath();
-    mCtx.arc(0, 0, cap, 0, Math.PI * 2);
+    mCtx.arc(0, 0, tab * 0.42, 0, Math.PI * 2);
     mCtx.fill();
   }
 
@@ -7385,7 +7403,7 @@ function drawHangerSymbol(mk, hangerKey, markerHalf, color, selected) {
     mCtx.strokeStyle = 'rgba(233,69,96,0.25)';
     mCtx.lineWidth = Math.max(6, lw * 2);
     mCtx.beginPath();
-    mCtx.arc(0, 0, span * 0.95, 0, Math.PI * 2);
+    mCtx.ellipse(0, 0, tab * 1.35, crossSpan + tab, 0, 0, Math.PI * 2);
     mCtx.stroke();
   }
 
