@@ -2799,11 +2799,12 @@ function getProjectRateTable() {
   };
 }
 
-function getCostDefaults(type, sizeA, sizeB) {
+function getCostDefaults(type, sizeA, sizeB, roundTypeOverride) {
   const rt = getProjectRateTable();
   // Build price book key: shape prefix + fitting type (e.g., rect-90el, spiral-tee)
   var shape = currentFittingShape || 'round';
-  var prefix = shape === 'round' ? 'spiral' : shape; // round fittings default to spiral
+  var roundTypeForCost = roundTypeOverride || roundDuctType || 'spiral';
+  var prefix = shape === 'round' ? roundTypeForCost : shape;
   var pbKey = prefix + '-' + type;
   // Special case: rectTap has no prefix
   if (type === 'rectTap') pbKey = 'rectTap';
@@ -5294,6 +5295,8 @@ async function saveCurrentPageData() {
   const fittings = (pageFittings[pageNum] || []).map(f => ({
     id: f.id, type: f.type, x: f.x, y: f.y,
     rotation: f.rotation, mirrored: f.mirrored || false, sizeA: f.sizeA, sizeB: f.sizeB, label: f.label,
+    shape: f.shape || null,
+    roundType: f.roundType || null,
     phase: f.phase || null,
     materialCost: f.materialCost != null ? f.materialCost : null,
     laborHrs: f.laborHrs != null ? f.laborHrs : null,
@@ -7678,11 +7681,14 @@ function drawMeasureOverlay() {
 
   // Draw fitting ghost preview
   if (fittingMode && selectedFittingType && fittingMousePos) {
+    const ghostShape = currentFittingShape || 'round';
     const ghost = {
       type: selectedFittingType,
       x: fittingMousePos.x, y: fittingMousePos.y,
       rotation: parseFloat(document.getElementById('fpRotation').value) || 0,
       mirrored: fittingPreMirrored,
+      shape: ghostShape,
+      roundType: ghostShape === 'round' ? roundDuctType : null,
       sizeA: document.getElementById('fpSizeA').value || '14',
       sizeB: document.getElementById('fpSizeB').value || ''
     };
@@ -8571,8 +8577,8 @@ window.editFittingCost = function(id) {
   var mc = f.materialCost;
   var lh = f.laborHrs;
   if (mc == null || lh == null) {
-    var shape = f.shape || currentFittingShape || 'round';
-    var prefix = shape === 'round' ? 'spiral' : shape;
+    var shape = getFittingShape(f);
+    var prefix = shape === 'round' ? (f.roundType || 'spiral') : shape;
     var pbKey = f.type === 'rectTap' ? 'rectTap' : prefix + '-' + f.type;
     var pb = getPriceBookEntry(pbKey, f.sizeA);
     if (mc == null && pb) mc = pb.materialCost;
@@ -9123,9 +9129,10 @@ function updatePanel() {
         html += `<div class="fitting-group-items">`;
         for (const f of items) {
           const dims = f.sizeA + (f.sizeB ? '/' + f.sizeB : '');
+          const subtype = getFittingShape(f) === 'round' ? ((f.roundType || 'spiral') === 'spiral' ? ' SPR' : ' SNP') : '';
           const sel = f.id === selectedFittingId ? ' style="background:rgba(233,69,96,0.15)"' : '';
           html += `<div class="fitting-item" id="fi-${f.id}"${sel}>`;
-          html += `<span>${dims} @ ${f.rotation}°</span>`;
+          html += `<span>${dims}${subtype} @ ${f.rotation}°</span>`;
           html += `<button class="meas-edit-btn" onclick="editFittingCost(${f.id})" title="Edit cost">💲</button>`;
           html += `<button class="fi-delete" onclick="deleteFitting(${f.id})" title="Delete">×</button>`;
           html += `</div>`;
@@ -9447,6 +9454,12 @@ function parseDimension(dimStr) {
     return Math.max(...dimStr.split('x').map(Number).filter(n => !isNaN(n))) || 14;
   }
   return parseFloat(dimStr) || 14;
+}
+
+function getFittingShape(f) {
+  if (f && f.shape) return f.shape;
+  if (f && typeof f.sizeA === 'string' && f.sizeA.indexOf('x') !== -1) return 'rect';
+  return 'round';
 }
 
 window.toggleFittingMode = function() {
@@ -9809,13 +9822,17 @@ function handleFittingClick(e) {
     if (placeSnap.snapped) { placeX += placeSnap.snapDx; placeY += placeSnap.snapDy; }
     const _sA = document.getElementById('fpSizeA').value || '14';
     const _sB = document.getElementById('fpSizeB').value || '';
-    const _cd = getCostDefaults(selectedFittingType, _sA, _sB);
+    const _shape = currentFittingShape || 'round';
+    const _roundType = _shape === 'round' ? roundDuctType : null;
+    const _cd = getCostDefaults(selectedFittingType, _sA, _sB, _roundType);
     const f = {
       id: fittingIdCounter,
       type: selectedFittingType,
       x: placeX, y: placeY,
       rotation: parseFloat(document.getElementById('fpRotation').value) || 0,
       mirrored: fittingPreMirrored,
+      shape: _shape,
+      roundType: _roundType,
       sizeA: _sA,
       sizeB: _sB,
       label: null,
@@ -10474,6 +10491,8 @@ function drawFitting(f, isSelected, isMultiSelected) {
   const D = inchesToPx(parseDimension(f.sizeA));
   const D2 = f.sizeB ? inchesToPx(parseDimension(f.sizeB)) : D * 0.7;
   const rot = (f.rotation || 0) * Math.PI / 180;
+  const isRoundFitting = getFittingShape(f) === 'round' && f.type !== 'hvac_component';
+  const isSpiralFitting = isRoundFitting && (f.roundType || 'spiral') === 'spiral';
 
   mCtx.save();
   mCtx.translate(f.x, f.y);
@@ -10503,6 +10522,7 @@ function drawFitting(f, isSelected, isMultiSelected) {
     case 'boot': drawBoot(D, D2); break;
     case 'hvac_component': drawHvacMarker(f); break;
   }
+  if (isSpiralFitting) drawSpiralFittingSeams(f.type, D, D2);
 
   mCtx.restore();
 
@@ -10522,7 +10542,8 @@ function drawFitting(f, isSelected, isMultiSelected) {
 
   // Label (suppressed for fittings inside vertical stacks - they use callout annotations instead)
   if (!f._noLabel) {
-    const labelText = f.label || (FITTING_NAMES[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : ''));
+    const roundPrefix = isRoundFitting ? ((f.roundType || 'spiral') === 'spiral' ? 'SPR ' : 'SNP ') : '';
+    const labelText = f.label || (roundPrefix + FITTING_NAMES[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : ''));
     const fontSize = Math.max(8, D * 0.3);
     mCtx.save();
     mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
@@ -10538,6 +10559,48 @@ function drawFitting(f, isSelected, isMultiSelected) {
     mCtx.fillText(labelText, f.x, labelY);
     mCtx.restore();
   }
+}
+
+function drawSpiralFittingSeams(type, D, D2) {
+  const halfW = D / 2;
+  const halfB = D2 / 2;
+  const seamColor = mCtx.strokeStyle;
+  mCtx.save();
+  mCtx.strokeStyle = seamColor;
+  mCtx.lineWidth = 1.1;
+  mCtx.globalAlpha = 0.72;
+  mCtx.setLineDash([]);
+
+  function seamAt(x, y, half, slope) {
+    const dx = half * 0.5;
+    mCtx.beginPath();
+    mCtx.moveTo(x - dx, y - half);
+    mCtx.lineTo(x + dx, y + half);
+    mCtx.stroke();
+    if (slope === -1) {
+      mCtx.beginPath();
+      mCtx.moveTo(x + dx, y - half);
+      mCtx.lineTo(x - dx, y + half);
+      mCtx.stroke();
+    }
+  }
+
+  const mainXs = [-D * 0.9, -D * 0.25, D * 0.4, D * 1.05];
+  for (const x of mainXs) seamAt(x, 0, halfW, 1);
+
+  if (['tee', 'saddle45y', 'lateral', 'wye', 'reducer', 'eccReducer', 'transition'].includes(type)) {
+    seamAt(0, D * 0.9, halfB, 1);
+    seamAt(D * 0.45, D * 1.35, halfB, 1);
+  }
+  if (type === '90el' || type === '45el' || type === '22el') {
+    seamAt(D * 1.25, D * 0.65, halfW, 1);
+    seamAt(D * 1.55, D * 1.25, halfW, 1);
+  }
+  if (type === 'coupling') {
+    seamAt(0, 0, halfW * 1.15, -1);
+  }
+
+  mCtx.restore();
 }
 
 function drawHvacMarker(f) {
