@@ -2762,6 +2762,7 @@ const FITTINGS_BY_SHAPE = {
 };
 let selectedFittingId = null;
 let selectedMeasId = null; // selected measurement for deletion/editing in idle mode
+let selectedHangerMeasId = null; // measurement whose auto hangers are selected
 let selectedEndpointMeasId = null; // measurement whose endpoint is selected
 let selectedEndpointIdx = null;    // which point index is selected
 let elevationInputActive = false;  // is elevation input currently showing
@@ -5644,8 +5645,12 @@ window.addEventListener('mousemove', (e) => {
         const fitHit = hitTestFitting(hpt.x, hpt.y);
         if (fitHit) { viewer.style.cursor = 'move'; }
         else {
-          const segHit = hitTestSegment(hpt.x, hpt.y, hr * 1.5);
-          viewer.style.cursor = segHit ? 'move' : '';
+          const hangerHit = hitTestAutoHanger(hpt.x, hpt.y, hr * 1.8);
+          if (hangerHit) { viewer.style.cursor = 'pointer'; }
+          else {
+            const segHit = hitTestSegment(hpt.x, hpt.y, hr * 1.5);
+            viewer.style.cursor = segHit ? 'move' : '';
+          }
         }
       }
     }
@@ -5802,6 +5807,7 @@ viewer.addEventListener('click', (e) => {
     const stackHit = hitTestStack(pt.x, pt.y);
     if (stackHit) {
       selectedMeasId = null;
+      selectedHangerMeasId = null;
       selectedFittingId = null;
       if (stackHit.type === 'closeBtn') {
         deleteStackItem(stackHit.itemId);
@@ -5828,7 +5834,22 @@ viewer.addEventListener('click', (e) => {
     const fitHit = hitTestFitting(pt.x, pt.y);
     if (fitHit) {
       selectedMeasId = null;
+      selectedHangerMeasId = null;
       selectedFittingId = fitHit.fittingId;
+      selectedStackId = null;
+      selectedStackItemId = null;
+      drawMeasureOverlay();
+      updatePanel();
+      return;
+    }
+    // Check auto hanger hit before endpoint/segment selection
+    const hangerHit = hitTestAutoHanger(pt.x, pt.y, hr * 1.8);
+    if (hangerHit) {
+      selectedFittingId = null;
+      selectedMeasId = hangerHit.measId;
+      selectedHangerMeasId = hangerHit.measId;
+      selectedEndpointMeasId = null;
+      selectedEndpointIdx = null;
       selectedStackId = null;
       selectedStackItemId = null;
       drawMeasureOverlay();
@@ -5839,6 +5860,7 @@ viewer.addEventListener('click', (e) => {
     const epClick = hitTestEndpoint(pt.x, pt.y, hr);
     if (epClick) {
       selectedFittingId = null;
+      selectedHangerMeasId = null;
       selectedMeasId = epClick.measId;
       selectedEndpointMeasId = epClick.measId;
       selectedEndpointIdx = epClick.pointIdx;
@@ -5850,6 +5872,7 @@ viewer.addEventListener('click', (e) => {
     const segHit = hitTestSegment(pt.x, pt.y, hr * 1.5);
     if (segHit) {
       selectedFittingId = null;
+      selectedHangerMeasId = null;
       selectedEndpointMeasId = null;
       selectedEndpointIdx = null;
       selectedMeasId = segHit.measId;
@@ -5858,8 +5881,9 @@ viewer.addEventListener('click', (e) => {
       return;
     }
     // Click on empty space: deselect
-    if (selectedMeasId || selectedFittingId || selectedEndpointMeasId || selectedStackId || selectedStackItemId) {
+    if (selectedMeasId || selectedHangerMeasId || selectedFittingId || selectedEndpointMeasId || selectedStackId || selectedStackItemId) {
       selectedMeasId = null;
+      selectedHangerMeasId = null;
       selectedFittingId = null;
       selectedEndpointMeasId = null;
       selectedEndpointIdx = null;
@@ -6072,6 +6096,7 @@ window.addEventListener('keydown', (e) => {
     if (ductDrawMode) { toggleDuctDraw(); return; }
     if (measureMode) { toggleMeasureMode(); return; }
     if (selectedFittingId) { selectedFittingId = null; drawMeasureOverlay(); updatePanel(); return; }
+    if (selectedHangerMeasId) { selectedHangerMeasId = null; drawMeasureOverlay(); updatePanel(); return; }
     if (selectedMeasId) { selectedMeasId = null; drawMeasureOverlay(); updatePanel(); return; }
   }
   else if (fittingMode && /^[1-9]$/.test(e.key)) {
@@ -6155,6 +6180,7 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     deleteMeasurement(selectedMeasId);
     selectedMeasId = null;
+    selectedHangerMeasId = null;
     return;
   }
   else if ((e.key === 'Delete' || e.key === 'Backspace') && measPoints.length > 0) {
@@ -6505,7 +6531,7 @@ window.toggleMeasureMode = function() {
   if (multiSelectModeOn) toggleMultiSelectMode();
   if (ductDrawMode) toggleDuctDraw();
   if (stackMode) toggleStackMode();
-  selectedMeasId = null; selectedFittingId = null;
+  selectedMeasId = null; selectedHangerMeasId = null; selectedFittingId = null;
   measureMode = !measureMode;
   const btn = document.getElementById('measureBtn');
   btn.classList.toggle('active', measureMode);
@@ -6942,6 +6968,24 @@ function hitTestSegment(pdfX, pdfY, hitDist) {
   return null;
 }
 
+function hitTestAutoHanger(pdfX, pdfY, hitRadius) {
+  const measurements = pageMeasurements[currentPage] || [];
+  for (let mi = measurements.length - 1; mi >= 0; mi--) {
+    const m = measurements[mi];
+    if (!m.duct) continue;
+    const markers = getAutoHangerMarkers(m);
+    for (let hi = markers.length - 1; hi >= 0; hi--) {
+      const mk = markers[hi];
+      const dx = pdfX - mk.x;
+      const dy = pdfY - mk.y;
+      if (Math.sqrt(dx * dx + dy * dy) <= hitRadius) {
+        return { measId: m.id, hangerIndex: mk.index, marker: mk };
+      }
+    }
+  }
+  return null;
+}
+
 // Hit-test: find if click is on a placed fitting (for drag move)
 function hitTestFitting(pdfX, pdfY) {
   const fittings = pageFittings[currentPage] || [];
@@ -7097,6 +7141,64 @@ function drawElevationLabels(measurements) {
   }
 }
 
+function drawAutoHangersForMeasurement(m) {
+  if (!m || !m.duct) return;
+  const markers = getAutoHangerMarkers(m);
+  if (markers.length === 0) return;
+  const selected = selectedHangerMeasId === m.id;
+  const preview = markers[0].preview;
+  const color = selected ? '#e94560' : '#ffaa00';
+  const halfW = Math.max(6, getDuctHalfWidthPx(m.duct));
+  const markerHalf = Math.max(halfW + 5, 10 * baseScale);
+
+  mCtx.save();
+  mCtx.setLineDash([]);
+  mCtx.strokeStyle = color;
+  mCtx.fillStyle = color;
+  mCtx.lineWidth = selected ? 3 : 2;
+  mCtx.globalAlpha = selected ? 1 : 0.88;
+
+  for (const mk of markers) {
+    const ax = mk.x + mk.nx * markerHalf;
+    const ay = mk.y + mk.ny * markerHalf;
+    const bx = mk.x - mk.nx * markerHalf;
+    const by = mk.y - mk.ny * markerHalf;
+    mCtx.beginPath();
+    mCtx.moveTo(ax, ay);
+    mCtx.lineTo(bx, by);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.arc(mk.x, mk.y, selected ? 5 : 4, 0, Math.PI * 2);
+    mCtx.fill();
+  }
+
+  if (selected) {
+    const first = markers[0];
+    const label = `${getHangerLabel(preview.rule.hangerKey)} ${m.duct.dims || ''} @ ${preview.rule.spacingFt}ft`;
+    const detail = preview.strapTotal ? `${markers.length} pcs • ${preview.strapTotal.toFixed(1)} LF strap • H=${preview.heightFt}ft` : `${markers.length} pcs • H=${preview.heightFt}ft`;
+    const text = `${label} | ${detail}`;
+    const fontSize = Math.max(12, 12 * baseScale);
+    mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    const tw = mCtx.measureText(text).width;
+    const pad = 6;
+    const lx = first.x + first.nx * (markerHalf + 12);
+    const ly = first.y + first.ny * (markerHalf + 12);
+    mCtx.globalAlpha = 0.95;
+    mCtx.fillStyle = 'rgba(22,33,62,0.95)';
+    mCtx.beginPath();
+    mCtx.roundRect(lx - pad, ly - fontSize - pad, tw + pad * 2, fontSize + pad * 2, 5);
+    mCtx.fill();
+    mCtx.strokeStyle = '#e94560';
+    mCtx.lineWidth = 1.5;
+    mCtx.stroke();
+    mCtx.fillStyle = '#ffffff';
+    mCtx.textBaseline = 'alphabetic';
+    mCtx.fillText(text, lx, ly);
+  }
+
+  mCtx.restore();
+}
+
 // Parse elevation change: "2' drop", "↓2'", "-2'", "2' rise", "↑4'", "+3'", "2'", etc.
 // Returns { isRise: bool, inches: number, label: string } or null
 function parseElevChange(str) {
@@ -7153,6 +7255,7 @@ function drawMeasureOverlay() {
     const isMultiSel = MultiSelect.isMeasSelected(m.id);
     const mColor = isSelected ? '#e94560' : isMultiSel ? '#ffd43b' : '#00ff88';
     drawMeasurementLine(m.points, m.distance.formatted, m.duct, mColor, false);
+    drawAutoHangersForMeasurement(m);
   }
 
   // Elevation labels on all endpoints that have elevation set
@@ -8288,6 +8391,50 @@ function getAutoHangerPreview(m) {
   return { rule, qty, heightFt, strapEach, strapTotal: strapEach * qty };
 }
 
+function pointAtDistanceOnPolyline(points, targetDist) {
+  if (!points || points.length < 2) return null;
+  let walked = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    if (segLen < 0.001) continue;
+    if (walked + segLen >= targetDist) {
+      const t = Math.max(0, Math.min(1, (targetDist - walked) / segLen));
+      const ux = dx / segLen, uy = dy / segLen;
+      return {
+        x: a.x + dx * t,
+        y: a.y + dy * t,
+        ux,
+        uy,
+        nx: -uy,
+        ny: ux,
+        distancePx: targetDist
+      };
+    }
+    walked += segLen;
+  }
+  const a = points[points.length - 2], b = points[points.length - 1];
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const segLen = Math.sqrt(dx * dx + dy * dy) || 1;
+  return { x: b.x, y: b.y, ux: dx / segLen, uy: dy / segLen, nx: -dy / segLen, ny: dx / segLen, distancePx: walked };
+}
+
+function getAutoHangerMarkers(m) {
+  const preview = getAutoHangerPreview(m);
+  if (!preview || !m.points || m.points.length < 2) return [];
+  const totalPx = computePolylineLength(m.points);
+  if (totalPx <= 0 || preview.qty <= 0) return [];
+  const markers = [];
+  // Evenly distribute the calculated count so visual spacing never exceeds the rule spacing.
+  for (let i = 0; i < preview.qty; i++) {
+    const targetPx = totalPx * ((i + 0.5) / preview.qty);
+    const pt = pointAtDistanceOnPolyline(m.points, targetPx);
+    if (pt) markers.push({ ...pt, index: i, preview });
+  }
+  return markers;
+}
+
 function getHangerTypeKeys() {
   return Object.keys((HANGER_DEFAULTS && HANGER_DEFAULTS.types) || {});
 }
@@ -8690,6 +8837,8 @@ window.deleteMeasurement = function(id) {
       break;
     }
   }
+  if (selectedMeasId === id) selectedMeasId = null;
+  if (selectedHangerMeasId === id) selectedHangerMeasId = null;
   drawMeasureOverlay();
   updatePanel();
   scheduleSave();
@@ -8699,6 +8848,8 @@ window.clearAllMeasurements = function() {
   for (const page in pageMeasurements) {
     pageMeasurements[page] = [];
   }
+  selectedMeasId = null;
+  selectedHangerMeasId = null;
   drawMeasureOverlay();
   updatePanel();
   scheduleSave();
@@ -10885,6 +11036,7 @@ async function init() {
       }
       selectedFittingId = null;
       selectedMeasId = null;
+      selectedHangerMeasId = null;
       drawMeasureOverlay();
       updatePanel();
       scheduleSave();
