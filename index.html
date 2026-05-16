@@ -7174,26 +7174,34 @@ function drawAutoHangersForMeasurement(m) {
 
   if (selected) {
     const first = markers[0];
-    const label = `${getHangerLabel(preview.rule.hangerKey)} ${m.duct.dims || ''} @ ${preview.rule.spacingFt}ft`;
-    const detail = preview.strapTotal ? `${markers.length} pcs • ${preview.strapTotal.toFixed(1)} LF strap • H=${preview.heightFt}ft` : `${markers.length} pcs • H=${preview.heightFt}ft`;
+    const label = `${getHangerLabel(preview.rule.hangerKey)} ${m.duct.dims || ''}`;
+    const detail = preview.strapTotal ? `${markers.length} @ ${preview.rule.spacingFt}ft • ${preview.strapTotal.toFixed(1)} LF` : `${markers.length} @ ${preview.rule.spacingFt}ft`;
     const text = `${label} | ${detail}`;
-    const fontSize = Math.max(12, 12 * baseScale);
-    mCtx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    const targetFontSize = Math.max(6, Math.min(annoSize, 10)) * baseScale;
+    const renderFontSize = Math.max(20, targetFontSize);
+    const labelScale = targetFontSize / renderFontSize;
+    mCtx.font = `bold ${renderFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
     const tw = mCtx.measureText(text).width;
-    const pad = 6;
+    const pad = 4 * (renderFontSize / 14);
     const lx = first.x + first.nx * (markerHalf + 12);
     const ly = first.y + first.ny * (markerHalf + 12);
-    mCtx.globalAlpha = 0.95;
+
+    mCtx.save();
+    mCtx.translate(lx, ly);
+    mCtx.scale(labelScale, labelScale);
+    mCtx.globalAlpha = Math.max(0.75, annoFillOpacity);
     mCtx.fillStyle = 'rgba(22,33,62,0.95)';
     mCtx.beginPath();
-    mCtx.roundRect(lx - pad, ly - fontSize - pad, tw + pad * 2, fontSize + pad * 2, 5);
+    mCtx.roundRect(-pad, -renderFontSize - pad, tw + pad * 2, renderFontSize + pad * 2, 4);
     mCtx.fill();
     mCtx.strokeStyle = '#e94560';
-    mCtx.lineWidth = 1.5;
+    mCtx.lineWidth = 1 / labelScale;
     mCtx.stroke();
+    mCtx.globalAlpha = annoTextOpacity;
     mCtx.fillStyle = '#ffffff';
     mCtx.textBaseline = 'alphabetic';
-    mCtx.fillText(text, lx, ly);
+    mCtx.fillText(text, 0, 0);
+    mCtx.restore();
   }
 
   mCtx.restore();
