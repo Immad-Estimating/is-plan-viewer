@@ -7260,7 +7260,9 @@ function drawAutoHangersForMeasurement(m) {
   if (selected) {
     const first = markers[0];
     const label = `${getHangerLabel(preview.rule.hangerKey)} ${m.duct.dims || ''}`;
-    const detail = preview.strapTotal ? `${markers.length} @ ${preview.rule.spacingFt}ft • ${preview.strapTotal.toFixed(1)} LF` : `${markers.length} @ ${preview.rule.spacingFt}ft`;
+    const detail = preview.wireTotal
+      ? `${markers.length} @ ${preview.rule.spacingFt}ft • wire ${preview.wireTotal.toFixed(1)} LF`
+      : (preview.strapTotal ? `${markers.length} @ ${preview.rule.spacingFt}ft • ${preview.strapTotal.toFixed(1)} LF` : `${markers.length} @ ${preview.rule.spacingFt}ft`);
     const text = `${label} | ${detail}`;
     const targetFontSize = Math.max(6, Math.min(annoSize, 10)) * baseScale;
     const renderFontSize = Math.max(20, targetFontSize);
@@ -7323,7 +7325,29 @@ function drawHangerSymbol(mk, hangerKey, markerHalf, color, selected) {
   mCtx.lineCap = 'round';
   mCtx.lineJoin = 'round';
 
-  if (hangerKey === 'hanger-strap' || family === 'strap') {
+  if (hangerKey === 'hanger-spiral-wire' || family === 'wire') {
+    // Plan view: exposed spiral wire has upper/lower pickup points and a light cable path across the duct.
+    const wireY = crossSpan + tab * 0.55;
+    mCtx.setLineDash([tab * 0.45, tab * 0.35]);
+    mCtx.beginPath();
+    mCtx.moveTo(0, -wireY);
+    mCtx.lineTo(0, wireY);
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+    mCtx.beginPath();
+    mCtx.arc(0, -wireY, tab * 0.5, 0, Math.PI * 2);
+    mCtx.arc(0, wireY, tab * 0.5, 0, Math.PI * 2);
+    mCtx.fill();
+    mCtx.beginPath();
+    mCtx.moveTo(-tab * 0.85, -wireY);
+    mCtx.lineTo(tab * 0.85, -wireY);
+    mCtx.moveTo(-tab * 0.85, wireY);
+    mCtx.lineTo(tab * 0.85, wireY);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.arc(0, 0, tab * 0.28, 0, Math.PI * 2);
+    mCtx.stroke();
+  } else if (hangerKey === 'hanger-strap' || family === 'strap') {
     // Plan view: a narrow strap band crossing over the duct at this station.
     mCtx.globalAlpha *= 0.22;
     mCtx.fillRect(-bandHalf, -crossSpan, bandHalf * 2, crossSpan * 2);
@@ -8536,6 +8560,8 @@ function getHangerLabel(hangerKey) {
 }
 
 function getHangerMaterialDefault(hangerKey) {
+  const saved = priceBookCache && priceBookCache[hangerKey];
+  if (saved && saved.materialCost != null) return saved.materialCost;
   const entry = HANGER_DEFAULTS.pricing && HANGER_DEFAULTS.pricing[hangerKey];
   if (!entry) return null;
   if (entry.materialUnit === 'LF' && entry.materialCostPerLf != null) return entry.materialCostPerLf;
@@ -8549,6 +8575,10 @@ function getHangerMaterialUnit(hangerKey) {
 
 function getStrapDefaults() {
   return (HANGER_DEFAULTS.takeoffDefaults && HANGER_DEFAULTS.takeoffDefaults.strap) || {};
+}
+
+function getSpiralWireDefaults() {
+  return (HANGER_DEFAULTS.takeoffDefaults && HANGER_DEFAULTS.takeoffDefaults.spiralWire) || {};
 }
 
 function parseHangerDuctSize(dims) {
@@ -8571,6 +8601,38 @@ function calculateStrapLengthEach(hangerKey, size, heightFt) {
   let wrapFt = 0;
   if (dims) wrapFt = dims.isRound ? (Math.PI * dims.max / 24) : (dims.max / 12);
   return Math.max(0, (2 * (h || 0) + wrapFt + fastenerAllowanceFt) * wasteFactor);
+}
+
+function calculateSpiralWireLengthEach(hangerKey, dropFt) {
+  if (hangerKey !== 'hanger-spiral-wire') return 0;
+  const defaults = getSpiralWireDefaults();
+  const drop = dropFt != null ? parseFloat(dropFt) : (defaults.defaultDropFt != null ? parseFloat(defaults.defaultDropFt) : 2);
+  const upperAllowanceFt = defaults.upperAllowanceFt != null ? parseFloat(defaults.upperAllowanceFt) : 0.25;
+  const lowerAllowanceFt = defaults.lowerAllowanceFt != null ? parseFloat(defaults.lowerAllowanceFt) : 0.25;
+  const wasteFactor = defaults.wasteFactor != null ? parseFloat(defaults.wasteFactor) : 1;
+  return Math.max(0, ((drop || 0) + upperAllowanceFt + lowerAllowanceFt) * wasteFactor);
+}
+
+function getHangerDefaultHeight(hangerKey) {
+  if (hangerKey === 'hanger-spiral-wire') {
+    const defaults = getSpiralWireDefaults();
+    return defaults.defaultDropFt != null ? defaults.defaultDropFt : 2;
+  }
+  const defaults = getStrapDefaults();
+  return defaults.defaultHangingHeightFt != null ? defaults.defaultHangingHeightFt : 2;
+}
+
+function isHeightEditableHanger(hangerKey) {
+  return hangerKey === 'hanger-strap' || hangerKey === 'hanger-spiral-wire';
+}
+
+function getHangerHeightLabel(hangerKey) {
+  return hangerKey === 'hanger-spiral-wire' ? 'wire drop' : 'hanging height';
+}
+
+function formatHangerHeightLabel(hangerKey) {
+  const label = getHangerHeightLabel(hangerKey);
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function findAutoHangerRuleForMeasurement(m) {
@@ -8596,10 +8658,10 @@ function getAutoHangerPreview(m) {
   if (!rule || !rule.hangerKey || !rule.spacingFt) return null;
   const lenFt = m.distance ? (m.distance.value || 0) : 0;
   const qty = Math.max(rule.minCount || 1, Math.ceil(lenFt / rule.spacingFt));
-  const defaults = getStrapDefaults();
-  const heightFt = m.hangerHeightFt != null ? m.hangerHeightFt : (defaults.defaultHangingHeightFt != null ? defaults.defaultHangingHeightFt : 2);
+  const heightFt = m.hangerHeightFt != null ? m.hangerHeightFt : getHangerDefaultHeight(rule.hangerKey);
   const strapEach = calculateStrapLengthEach(rule.hangerKey, m.duct && m.duct.dims, heightFt);
-  return { rule, qty, heightFt, strapEach, strapTotal: strapEach * qty };
+  const wireEach = calculateSpiralWireLengthEach(rule.hangerKey, heightFt);
+  return { rule, qty, heightFt, strapEach, strapTotal: strapEach * qty, wireEach, wireTotal: wireEach * qty };
 }
 
 function pointAtDistanceOnPolyline(points, targetDist) {
@@ -8666,8 +8728,8 @@ window.addManualHanger = function() {
   const size = prompt('Size/load class (optional):', '') || '';
   const spacingRaw = prompt('Spacing in feet (optional):', '');
   const spacingFt = spacingRaw ? parseFloat(spacingRaw) : null;
-  const defaultHeight = (getStrapDefaults().defaultHangingHeightFt != null ? getStrapDefaults().defaultHangingHeightFt : 2);
-  const heightRaw = hangerKey === 'hanger-strap' ? prompt('Hanging height in feet:', String(defaultHeight)) : '';
+  const defaultHeight = getHangerDefaultHeight(hangerKey);
+  const heightRaw = isHeightEditableHanger(hangerKey) ? prompt(`${formatHangerHeightLabel(hangerKey)} in feet:`, String(defaultHeight)) : '';
   const hangingHeightFt = heightRaw ? parseFloat(heightRaw) : null;
   const note = prompt('Note (optional):', '') || '';
   if (!pageHangers[currentPage]) pageHangers[currentPage] = [];
@@ -8697,12 +8759,14 @@ window.editMeasurementHangerHeight = function(id) {
   const m = findMeasurement(id);
   if (!m) return;
   const preview = getAutoHangerPreview(m);
+  if (!preview || !isHeightEditableHanger(preview.rule.hangerKey)) return;
   const current = m.hangerHeightFt != null ? m.hangerHeightFt : (preview ? preview.heightFt : 2);
-  const next = prompt('Hanging height in feet for auto hangers on this duct run:', String(current));
+  const heightLabel = formatHangerHeightLabel(preview.rule.hangerKey);
+  const next = prompt(`${heightLabel} in feet for auto hangers on this duct run:`, String(current));
   if (next === null) return;
   const val = parseFloat(next);
   if (!Number.isFinite(val) || val < 0) {
-    alert('Hanging height must be zero or greater.');
+    alert(heightLabel + ' must be zero or greater.');
     return;
   }
   m.hangerHeightFt = val;
@@ -8718,12 +8782,14 @@ window.editHangerHeight = function(id) {
     if (h) break;
   }
   if (!h) return;
-  const current = h.hangingHeightFt != null ? h.hangingHeightFt : (getStrapDefaults().defaultHangingHeightFt || 2);
-  const next = prompt('Hanging height in feet:', String(current));
+  if (!isHeightEditableHanger(h.hangerKey)) return;
+  const heightLabel = formatHangerHeightLabel(h.hangerKey);
+  const current = h.hangingHeightFt != null ? h.hangingHeightFt : getHangerDefaultHeight(h.hangerKey);
+  const next = prompt(`${heightLabel} in feet:`, String(current));
   if (next === null) return;
   const val = parseFloat(next);
   if (!Number.isFinite(val) || val < 0) {
-    alert('Hanging height must be zero or greater.');
+    alert(heightLabel + ' must be zero or greater.');
     return;
   }
   h.hangingHeightFt = val;
@@ -8759,14 +8825,26 @@ window.editHangerCost = function(id) {
   var unit = h.materialUnit || getHangerMaterialUnit(h.hangerKey);
   var matRate = h.materialCost != null ? h.materialCost : (getHangerMaterialDefault(h.hangerKey) || 0);
   var strapEach = unit === 'LF' ? calculateStrapLengthEach(h.hangerKey, h.size, h.hangingHeightFt) : 0;
+  var wireEach = calculateSpiralWireLengthEach(h.hangerKey, h.hangingHeightFt);
   var matQty = unit === 'LF' ? strapEach * qty : qty;
+  var materialText;
   var bd = HANGER_DEFAULTS.labor && HANGER_DEFAULTS.labor[h.hangerKey] ? HANGER_DEFAULTS.labor[h.hangerKey] : {};
   var hrsEa = h.laborHrs != null ? h.laborHrs : Object.values(bd).reduce((s, v) => s + (parseFloat(v) || 0), 0);
   var lr = h.laborRate != null ? h.laborRate : 45;
   var totalMat = matRate * matQty;
+  if (h.hangerKey === 'hanger-spiral-wire') {
+    var wireRate = getHangerMaterialDefault('hanger-wire-rope') || 0;
+    var upperRate = getHangerMaterialDefault('hanger-wire-upper-attachment') || 0;
+    var lowerRate = getHangerMaterialDefault('hanger-wire-lower-attachment') || 0;
+    var gripperRate = getHangerMaterialDefault('hanger-wire-locking-gripper') || 0;
+    totalMat = qty * ((wireEach * wireRate) + upperRate + lowerRate + gripperRate);
+    materialText = (wireEach * qty).toFixed(1) + ' LF wire + ' + qty + ' EA sets = $' + totalMat.toFixed(2);
+  } else {
+    materialText = (unit === 'LF' ? matQty.toFixed(1) + ' LF × $' + matRate.toFixed(2) : qty + ' EA × $' + matRate.toFixed(2)) + ' = $' + totalMat.toFixed(2);
+  }
   var totalHrs = hrsEa * qty;
   var htm = '<div class="meas-edit-inline" id="hc-edit-' + id + '" style="font-size:11px">';
-  htm += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Material</span><span style="color:#00ff88">' + (unit === 'LF' ? matQty.toFixed(1) + ' LF × $' + matRate.toFixed(2) : qty + ' EA × $' + matRate.toFixed(2)) + ' = $' + totalMat.toFixed(2) + '</span></div>';
+  htm += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Material</span><span style="color:#00ff88">' + materialText + '</span></div>';
   htm += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor</span><span style="color:#ffaa00">' + totalHrs.toFixed(2) + ' hrs</span></div>';
   htm += '<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #0f3460;font-weight:600"><span style="color:#e0e0e0">Total</span><span style="color:#e0e0e0">$' + (totalMat + totalHrs * lr).toFixed(2) + '</span></div>';
   htm += '</div>';
@@ -8899,7 +8977,10 @@ function updatePanel() {
       const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}${m.duct.flexColor ? ' ' + m.duct.flexColor : ''}${m.duct.dropInches ? ' ↓' + m.duct.dropInches + '"' : ''}</div>` : '';
       const flexDropInput = (m.duct && m.duct.type === 'flex') ? `<div style="display:flex;align-items:center;gap:4px;margin-top:3px;cursor:pointer" onclick="showFlexDropPopup(${m.id})" title="Click to set drop distance"><span style="font-size:11px;color:#00bfff">↓ ${m.duct.dropInches ? (m.duct.dropInches/12).toFixed(1) + ' ft drop' : 'Set drop'}</span></div>` : '';
       const hangerPreview = m.duct ? getAutoHangerPreview(m) : null;
-      const hangerInfo = hangerPreview ? `<div class="meas-duct" style="color:#ffaa00;cursor:pointer" onclick="editMeasurementHangerHeight(${m.id})" title="Click to edit hanging height">Hangers: ${hangerPreview.qty}× ${escapeHtml(getHangerLabel(hangerPreview.rule.hangerKey))} @ ${hangerPreview.rule.spacingFt} ft • height ${hangerPreview.heightFt} ft${hangerPreview.strapTotal ? ' • strap ' + hangerPreview.strapTotal.toFixed(1) + ' LF' : ''}</div>` : '';
+      const hangerDetail = hangerPreview
+        ? (hangerPreview.wireTotal ? ` • wire drop ${hangerPreview.heightFt} ft • wire ${hangerPreview.wireTotal.toFixed(1)} LF` : ` • height ${hangerPreview.heightFt} ft${hangerPreview.strapTotal ? ' • strap ' + hangerPreview.strapTotal.toFixed(1) + ' LF' : ''}`)
+        : '';
+      const hangerInfo = hangerPreview ? `<div class="meas-duct" style="color:#ffaa00;cursor:pointer" onclick="editMeasurementHangerHeight(${m.id})" title="Click to edit hanger height/drop">Hangers: ${hangerPreview.qty}× ${escapeHtml(getHangerLabel(hangerPreview.rule.hangerKey))} @ ${hangerPreview.rule.spacingFt} ft${hangerDetail}</div>` : '';
       // Elevation info + auto fittings
       let elevInfo = '';
       const elevChanges = m.points.filter(p => p.elevation && parseElevChange(p.elevation));
@@ -8980,13 +9061,16 @@ function updatePanel() {
         const size = h.size ? ` ${escapeHtml(h.size)}` : '';
         const spacing = h.spacingFt ? ` @ ${h.spacingFt} ft` : '';
         const unit = h.materialUnit || getHangerMaterialUnit(h.hangerKey);
-        const height = unit === 'LF' ? (h.hangingHeightFt != null ? h.hangingHeightFt : (getStrapDefaults().defaultHangingHeightFt || 2)) : null;
-        const strapEach = unit === 'LF' ? calculateStrapLengthEach(h.hangerKey, h.size, height) : 0;
-        const strapInfo = unit === 'LF' ? ` • height ${height} ft • strap ${(strapEach * (h.quantity || 1)).toFixed(1)} LF` : '';
+        const height = isHeightEditableHanger(h.hangerKey) ? (h.hangingHeightFt != null ? h.hangingHeightFt : getHangerDefaultHeight(h.hangerKey)) : null;
+        const strapEach = h.hangerKey === 'hanger-strap' ? calculateStrapLengthEach(h.hangerKey, h.size, height) : 0;
+        const wireEach = h.hangerKey === 'hanger-spiral-wire' ? calculateSpiralWireLengthEach(h.hangerKey, height) : 0;
+        const lengthInfo = h.hangerKey === 'hanger-spiral-wire'
+          ? ` • wire drop ${height} ft • wire ${(wireEach * (h.quantity || 1)).toFixed(1)} LF`
+          : (unit === 'LF' ? ` • height ${height} ft • strap ${(strapEach * (h.quantity || 1)).toFixed(1)} LF` : '');
         const note = h.note ? `<div class="meas-duct" style="color:#a0a0c0">${escapeHtml(h.note)}</div>` : '';
         html += `<div class="fitting-item" id="hi-${h.id}">`;
-        html += `<span>${label}${size} x ${h.quantity || 1}${spacing}${strapInfo}</span>`;
-        if (unit === 'LF') html += `<button class="meas-edit-btn" onclick="editHangerHeight(${h.id})" title="Edit hanging height">↕</button>`;
+        html += `<span>${label}${size} x ${h.quantity || 1}${spacing}${lengthInfo}</span>`;
+        if (isHeightEditableHanger(h.hangerKey)) html += `<button class="meas-edit-btn" onclick="editHangerHeight(${h.id})" title="Edit hanger height/drop">↕</button>`;
         html += `<button class="meas-edit-btn" onclick="editHangerCost(${h.id})" title="Edit cost">💲</button>`;
         html += `<button class="fi-delete" onclick="deleteHanger(${h.id})" title="Delete">×</button>`;
         html += `${note}</div>`;

@@ -389,6 +389,48 @@ function getHangerMaterialUnit(hangerKey) {
   return def && def.materialUnit ? def.materialUnit : 'EA';
 }
 
+function getHangerAssembly(hangerKey) {
+  const assembly = HANGER_DEFAULTS.assemblies && HANGER_DEFAULTS.assemblies[hangerKey];
+  return Array.isArray(assembly) ? assembly : null;
+}
+
+function getHangerComponentQuantity(component, h, wireLengthEach) {
+  if (!component) return 0;
+  if (component.quantity === 'wireLengthEach') return wireLengthEach;
+  const qty = parseFloat(component.quantity);
+  return Number.isFinite(qty) ? qty : 0;
+}
+
+function calculateHangerAssemblyMaterial(h, qty) {
+  if (h.hangerKey !== 'hanger-spiral-wire') return null;
+  const assembly = getHangerAssembly(h.hangerKey);
+  if (!assembly || assembly.length === 0) return null;
+  const wireLengthEach = calculateSpiralWireLengthEach(h);
+  let cost = 0;
+  let lfQty = 0;
+  let eaQty = 0;
+
+  for (const component of assembly) {
+    const componentKey = component.componentKey;
+    if (!componentKey) continue;
+    const eachQty = getHangerComponentQuantity(component, h, wireLengthEach);
+    if (eachQty <= 0) continue;
+    const componentUnit = getHangerMaterialUnit(componentKey);
+    const componentRate = getHangerMaterialRate(componentKey);
+    const totalQty = eachQty * qty;
+    cost += componentRate * totalQty;
+    if (componentUnit === 'LF') lfQty += totalQty;
+    else eaQty += totalQty;
+  }
+
+  return {
+    cost,
+    materialQty: lfQty > 0 ? lfQty : eaQty,
+    materialUnit: lfQty > 0 && eaQty > 0 ? 'LF+EA' : (lfQty > 0 ? 'LF' : 'EA'),
+    wireLengthEach
+  };
+}
+
 function getHangerLaborBreakdown(hangerKey) {
   const bd = getPriceBookLaborBreakdown(hangerKey);
   if (Object.keys(bd).length > 0) return bd;
@@ -398,11 +440,19 @@ function getHangerLaborBreakdown(hangerKey) {
 function buildHangerRow(h, page, drawingId, drawingName, labRate, source) {
   const qty = Math.max(0, parseFloat(h.quantity) || 0);
   const rate = h.laborRate || labRate;
-  const materialUnit = h.materialUnit || getHangerMaterialUnit(h.hangerKey);
-  const strapLengthEach = materialUnit === 'LF' ? calculateStrapLengthEach(h) : 0;
-  const materialQty = materialUnit === 'LF' ? strapLengthEach * qty : qty;
-  const matRate = h.materialCost != null ? h.materialCost : getHangerMaterialRate(h.hangerKey);
+  let materialUnit = h.materialUnit || getHangerMaterialUnit(h.hangerKey);
+  const strapLengthEach = h.hangerKey === 'hanger-strap' ? calculateStrapLengthEach(h) : 0;
+  const wireLengthEach = h.hangerKey === 'hanger-spiral-wire' ? calculateSpiralWireLengthEach(h) : 0;
+  let materialQty = materialUnit === 'LF' ? strapLengthEach * qty : qty;
+  let matRate = h.materialCost != null ? h.materialCost : getHangerMaterialRate(h.hangerKey);
   let matCost = matRate * materialQty;
+  const assemblyMaterial = h.materialCost == null ? calculateHangerAssemblyMaterial(h, qty) : null;
+  if (assemblyMaterial) {
+    materialUnit = assemblyMaterial.materialUnit;
+    materialQty = assemblyMaterial.materialQty;
+    matRate = null;
+    matCost = assemblyMaterial.cost;
+  }
   const bd = h.laborHrs != null ? { rough: h.laborHrs } : getHangerLaborBreakdown(h.hangerKey);
   const laborCatHrs = {};
   const laborCatCost = {};
@@ -452,6 +502,7 @@ function buildHangerRow(h, page, drawingId, drawingName, labRate, source) {
     _hangerMaterialQty: materialQty,
     _hangerHeightFt: h.hangingHeightFt != null ? h.hangingHeightFt : null,
     _strapLengthEachFt: strapLengthEach || null,
+    _wireLengthEachFt: wireLengthEach || null,
     _hangerSource: source || h.source || 'manual',
   };
 }
@@ -478,6 +529,22 @@ function calculateStrapLengthEach(h) {
     }
   }
   return Math.max(0, (2 * (heightFt || 0) + wrapFt + fastenerAllowanceFt) * wasteFactor);
+}
+
+function getSpiralWireDefaults() {
+  return (HANGER_DEFAULTS.takeoffDefaults && HANGER_DEFAULTS.takeoffDefaults.spiralWire) || {};
+}
+
+function calculateSpiralWireLengthEach(h) {
+  if (h.hangerKey !== 'hanger-spiral-wire') return 0;
+  const defaults = getSpiralWireDefaults();
+  const dropFt = h.hangingHeightFt != null
+    ? parseFloat(h.hangingHeightFt)
+    : (defaults.defaultDropFt != null ? parseFloat(defaults.defaultDropFt) : 2);
+  const upperAllowanceFt = defaults.upperAllowanceFt != null ? parseFloat(defaults.upperAllowanceFt) : 0.25;
+  const lowerAllowanceFt = defaults.lowerAllowanceFt != null ? parseFloat(defaults.lowerAllowanceFt) : 0.25;
+  const wasteFactor = defaults.wasteFactor != null ? parseFloat(defaults.wasteFactor) : 1;
+  return Math.max(0, ((dropFt || 0) + upperAllowanceFt + lowerAllowanceFt) * wasteFactor);
 }
 
 function parseDuctSizeForHanger(dims) {
