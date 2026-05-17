@@ -507,6 +507,69 @@ function buildHangerRow(h, page, drawingId, drawingName, labRate, source) {
   };
 }
 
+function getAutoCouplingSpacingFtForDuct(duct) {
+  if (!duct) return 0;
+  if (duct.type === 'spiral') return 10;
+  return 0;
+}
+
+function getAutoCouplingRoundTypeForDuct(duct) {
+  return duct && duct.type === 'round' ? 'snaplock' : 'spiral';
+}
+
+function buildAutoCouplingRowsForMeasurement(m, page, drawingId, drawingName, labRate) {
+  const spacingFt = getAutoCouplingSpacingFtForDuct(m.duct);
+  const lengthFt = m && m.distance ? (m.distance.value || 0) : 0;
+  if (!spacingFt || lengthFt <= spacingFt) return [];
+
+  const rows = [];
+  const roundType = getAutoCouplingRoundTypeForDuct(m.duct);
+  const baseKey = roundType + '-coupling';
+  const size = m.duct && m.duct.dims ? m.duct.dims : '';
+  const sizeKey = baseKey + '-' + size;
+  const gauge = m.gauge || '26';
+
+  for (let stationFt = spacingFt, idx = 0; stationFt < lengthFt - 0.001; stationFt += spacingFt, idx++) {
+    let matCost = 0;
+    const pbEntry = _priceBookCache && _priceBookCache[sizeKey];
+    if (pbEntry && pbEntry.materialCost != null) matCost = pbEntry.materialCost;
+    else if (SPIRAL_DEFAULTS[sizeKey] && SPIRAL_DEFAULTS[sizeKey][gauge] != null) matCost = SPIRAL_DEFAULTS[sizeKey][gauge];
+    else if (SNAPLOCK_DEFAULTS[sizeKey] && SNAPLOCK_DEFAULTS[sizeKey][gauge] != null) matCost = SNAPLOCK_DEFAULTS[sizeKey][gauge];
+
+    let bd = getPriceBookLaborBreakdown(sizeKey);
+    if (Object.keys(bd).length === 0) bd = getPriceBookLaborBreakdown(baseKey);
+
+    const laborCatHrs = {};
+    const laborCatCost = {};
+    let assignedCat = 'unassigned';
+    for (const cat of LABOR_CATEGORIES) {
+      const ch = bd[cat.key] || 0;
+      laborCatHrs[cat.key] = ch;
+      laborCatCost[cat.key] = ch * labRate;
+      if (ch > 0 && assignedCat === 'unassigned') assignedCat = cat.label;
+    }
+    const laborHrs = Object.values(laborCatHrs).reduce((s, v) => s + v, 0);
+    const laborCost = laborHrs * labRate;
+
+    rows.push({
+      _itemType: 'Coupling', _size: size || '?', _shape: roundType === 'spiral' ? 'Spiral' : 'Round',
+      _page: page, _drawingId: drawingId, _drawingName: drawingName,
+      _lengthFt: 0, _matCost: matCost, _laborHrs: laborHrs,
+      _laborCost: laborCost, _totalCost: matCost + laborCost,
+      _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
+      _hasOverride: false, _overrides: {},
+      _orig_laborHrs: laborHrs, _orig_materialCost: matCost,
+      _orig_laborCost: laborCost, _orig_totalCost: matCost + laborCost, _orig_lengthFt: 0,
+      _orig_laborCatHrs: { ...laborCatHrs },
+      phase: m.phase || null, costGroup: m.costGroup || null, gauge,
+      systemSymbol: m.systemSymbol || null,
+      _sourceType: 'auto-coupling', _sourceId: `${m.id}:coupling:${idx}`,
+      sourceMeasurementId: m.id, autoCouplingStationFt: stationFt,
+    });
+  }
+  return rows;
+}
+
 function getStrapDefaults() {
   return (HANGER_DEFAULTS.takeoffDefaults && HANGER_DEFAULTS.takeoffDefaults.strap) || {};
 }
@@ -706,6 +769,9 @@ function normalizeRows(allPageData, drawingNames) {
     const page = pd.pageNum || 0;
     const drawingId = pd.drawingId;
     const drawingName = drawingNames[drawingId] || `Drawing ${drawingId}`;
+    const persistedAutoCouplingSources = new Set((pd.fittings || [])
+      .filter(f => f.autoCoupling && f.sourceMeasurementId != null)
+      .map(f => String(f.sourceMeasurementId)));
 
     for (const m of (pd.measurements || [])) {
       if (!m.duct) continue;
@@ -803,6 +869,9 @@ function normalizeRows(allPageData, drawingNames) {
       const autoHanger = buildAutoHangerForMeasurement(m, lengthFt, hangerShape);
       if (autoHanger) {
         rows.push(buildHangerRow(autoHanger, page, drawingId, drawingName, labRate, 'auto'));
+      }
+      if (!persistedAutoCouplingSources.has(String(m.id))) {
+        rows.push(...buildAutoCouplingRowsForMeasurement(m, page, drawingId, drawingName, labRate));
       }
     }
 

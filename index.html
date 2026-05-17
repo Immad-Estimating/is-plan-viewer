@@ -1454,6 +1454,145 @@ function getDuctCostDefaults(ductConfig) {
   };
 }
 
+const AUTO_COUPLING_SPACING_FT = {
+  spiral: 10,
+};
+
+function getAutoCouplingSpacingFt(duct) {
+  if (!duct) return 0;
+  if (duct.type === 'spiral') return AUTO_COUPLING_SPACING_FT.spiral;
+  return 0;
+}
+
+function getAutoCouplingRoundType(duct) {
+  if (!duct) return 'spiral';
+  return duct.type === 'round' ? 'snaplock' : 'spiral';
+}
+
+function getAutoCouplingCostDefaults(duct, gauge) {
+  const rt = getProjectRateTable();
+  const roundType = getAutoCouplingRoundType(duct);
+  const dia = parseInt(duct && duct.dims, 10);
+  const baseKey = roundType + '-coupling';
+  const pb = getPriceBookEntry(baseKey, dia ? String(dia) : (duct ? duct.dims : null));
+  let mc = pb ? pb.materialCost : null;
+  let lh = pb ? pb.laborHrs : null;
+  if (mc == null && dia) mc = getMaterialForGauge(baseKey + '-' + dia, gauge || '26');
+  return {
+    phase: rt.defaultPhase || 'rough',
+    materialCost: mc,
+    laborHrs: lh,
+    laborRate: rt.laborRatePerHr || 45,
+    costGroup: null,
+    costOverride: false
+  };
+}
+
+function getPointAtRealDistanceOnMeasurement(m, stationFt) {
+  if (!m || !m.points || m.points.length < 2 || !m.distance || !m.distance.value) return null;
+  const totalFt = m.distance.value || 0;
+  if (totalFt <= 0 || stationFt <= 0 || stationFt >= totalFt) return null;
+  const totalPx = computePolylineLength(m.points);
+  if (totalPx <= 0) return null;
+  let remainingPx = totalPx * (stationFt / totalFt);
+  for (let i = 0; i < m.points.length - 1; i++) {
+    const a = m.points[i];
+    const b = m.points[i + 1];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    if (segLen <= 0) continue;
+    if (remainingPx <= segLen) {
+      const t = remainingPx / segLen;
+      return {
+        x: a.x + dx * t,
+        y: a.y + dy * t,
+        rotation: Math.atan2(dy, dx) * 180 / Math.PI
+      };
+    }
+    remainingPx -= segLen;
+  }
+  return null;
+}
+
+function buildAutoCouplingPlacements(m) {
+  const spacingFt = getAutoCouplingSpacingFt(m && m.duct);
+  if (!spacingFt || !m || !m.distance || !m.distance.value) return [];
+  const lengthFt = m.distance.value || 0;
+  const placements = [];
+  for (let stationFt = spacingFt; stationFt < lengthFt - 0.001; stationFt += spacingFt) {
+    const pt = getPointAtRealDistanceOnMeasurement(m, stationFt);
+    if (pt) placements.push({ ...pt, stationFt });
+  }
+  return placements;
+}
+
+function removeAutoCouplingsForMeasurement(page, measurementId) {
+  const fits = pageFittings[page] || [];
+  pageFittings[page] = fits.filter(f => !(f.autoCoupling && String(f.sourceMeasurementId) === String(measurementId)));
+}
+
+function refreshAutoCouplingsForMeasurement(m, page) {
+  if (!m || !m.id) return;
+  const placements = buildAutoCouplingPlacements(m);
+  if (!pageFittings[page]) pageFittings[page] = [];
+  const fits = pageFittings[page];
+  const existing = fits
+    .filter(f => f.autoCoupling && String(f.sourceMeasurementId) === String(m.id))
+    .sort((a, b) => (a.autoCouplingIndex || 0) - (b.autoCouplingIndex || 0));
+
+  for (let i = 0; i < placements.length; i++) {
+    const placement = placements[i];
+    let f = existing[i];
+    if (!f) {
+      f = { id: ++fittingIdCounter };
+      fits.push(f);
+    }
+    const defaults = getAutoCouplingCostDefaults(m.duct, m.gauge || '26');
+    Object.assign(f, {
+      type: 'coupling',
+      x: placement.x,
+      y: placement.y,
+      rotation: placement.rotation,
+      mirrored: false,
+      sizeA: m.duct.dims || '',
+      sizeB: '',
+      label: 'Auto Coupling',
+      shape: 'round',
+      roundType: getAutoCouplingRoundType(m.duct),
+      gauge: m.gauge || null,
+      systemSymbol: m.systemSymbol || null,
+      autoCoupling: true,
+      sourceMeasurementId: m.id,
+      autoCouplingIndex: i,
+      autoCouplingStationFt: placement.stationFt,
+    });
+    if (!f.costOverride && !f._overrides) {
+      f.phase = m.phase || defaults.phase;
+      f.materialCost = defaults.materialCost;
+      f.laborHrs = defaults.laborHrs;
+      f.laborRate = defaults.laborRate;
+      f.costGroup = m.costGroup || defaults.costGroup;
+      f.costOverride = false;
+    }
+  }
+
+  for (let i = placements.length; i < existing.length; i++) {
+    const stale = existing[i];
+    const idx = fits.indexOf(stale);
+    if (idx !== -1) fits.splice(idx, 1);
+  }
+}
+
+function refreshAutoCouplingsForPage(page) {
+  const measurements = pageMeasurements[page] || [];
+  const liveIds = new Set(measurements.map(m => String(m.id)));
+  if (pageFittings[page]) {
+    pageFittings[page] = pageFittings[page].filter(f => !f.autoCoupling || liveIds.has(String(f.sourceMeasurementId)));
+  }
+  for (const m of measurements) refreshAutoCouplingsForMeasurement(m, page);
+}
+
 async function loadProjectRateTable(projectId) {
   if (!projectId) return;
   const project = await idbGet('projects', projectId);
@@ -2283,6 +2422,7 @@ async function saveCurrentPageData() {
   const pageNum = currentPage;
   const key = `${activeDrawingId}-${pageNum}`;
   const scale = pageScales[pageNum] || null;
+  refreshAutoCouplingsForPage(pageNum);
   const measurements = (pageMeasurements[pageNum] || []).map(m => ({
     id: m.id,
     page: m.page,
@@ -2325,6 +2465,12 @@ async function saveCurrentPageData() {
     gauge: f.gauge || null,
     systemSymbol: f.systemSymbol || null,
     lined: f.lined || false,
+    ...(f.autoCoupling ? {
+      autoCoupling: true,
+      sourceMeasurementId: f.sourceMeasurementId,
+      autoCouplingIndex: f.autoCouplingIndex,
+      autoCouplingStationFt: f.autoCouplingStationFt,
+    } : {}),
     // HVAC component fields (persisted for compiler labor resolution)
     ...(f.type === 'hvac_component' ? {
       hvacComponentId: f.hvacComponentId || null,
@@ -2447,6 +2593,7 @@ async function loadPageDataForDrawing(drawingId) {
       }
     }
   }
+  for (const page in pageMeasurements) refreshAutoCouplingsForPage(page);
 }
 
 async function loadDrawingIntoViewer(projectId, drawingId) {
@@ -4358,6 +4505,7 @@ function finishMeasurement() {
     meas.laborHrsPerFt = _dcd.laborHrsPerFt;
     meas.laborRate = _dcd.laborRate;
     meas.gauge = document.getElementById('ddGauge') ? document.getElementById('ddGauge').value : '26';
+    refreshAutoCouplingsForMeasurement(meas, currentPage);
     const lastPt = meas.points[meas.points.length - 1];
     CommandRoll.update({ anchor: lastPt, duct: meas.duct });
     measPoints = [];
@@ -4924,6 +5072,7 @@ function drawMeasureOverlay() {
 
   const scale = getScaleForPage(currentPage);
 
+  refreshAutoCouplingsForPage(currentPage);
   const saved = pageMeasurements[currentPage] || [];
   for (const m of saved) {
     _currentRenderMeas = m;
@@ -6193,10 +6342,11 @@ function updatePanel() {
           const subtype = getFittingShape(f) === 'round' ? ((f.roundType || 'spiral') === 'spiral' ? ' SPR' : ' SNP') : '';
           const sel = f.id === selectedFittingId ? ' selected' : '';
           const labor = getFittingLaborSummary(f);
+          const autoLabel = f.autoCoupling ? ' Auto' : '';
           html += `<div class="fitting-item${sel}" id="fi-${f.id}" onclick="selectAnalysisFitting(${f.id})">`;
-          html += `<span>${dims}${subtype} @ ${f.rotation}°<span class="meas-labor">${formatLaborSummary(labor.hrs, labor.cost)}</span></span>`;
+          html += `<span>${dims}${subtype}${autoLabel} @ ${f.rotation}°<span class="meas-labor">${formatLaborSummary(labor.hrs, labor.cost)}</span></span>`;
           html += `<button class="meas-edit-btn" onclick="event.stopPropagation();editFittingCost(${f.id})" title="Edit cost">💲</button>`;
-          html += `<button class="fi-delete" onclick="event.stopPropagation();deleteFitting(${f.id})" title="Delete">×</button>`;
+          if (!f.autoCoupling) html += `<button class="fi-delete" onclick="event.stopPropagation();deleteFitting(${f.id})" title="Delete">×</button>`;
           html += `</div>`;
         }
         html += `</div></div>`;
@@ -6290,6 +6440,7 @@ window.deleteMeasurement = function(id) {
     const idx = pageMeasurements[page].findIndex(m => m.id === id);
     if (idx !== -1) {
       pageMeasurements[page].splice(idx, 1);
+      removeAutoCouplingsForMeasurement(page, id);
       break;
     }
   }
@@ -6303,6 +6454,7 @@ window.deleteMeasurement = function(id) {
 window.clearAllMeasurements = function() {
   for (const page in pageMeasurements) {
     pageMeasurements[page] = [];
+    if (pageFittings[page]) pageFittings[page] = pageFittings[page].filter(f => !f.autoCoupling);
   }
   selectedMeasId = null;
   selectedHangerMeasId = null;
