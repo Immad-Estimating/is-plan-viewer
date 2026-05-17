@@ -586,7 +586,7 @@
       </div>
     </span>
     <button id="measureBtn" onclick="toggleMeasureMode()" title="Measure (M)" class="tool-has-tip">📐 Measure<span class="tool-tip">Measure Tool<br><b>M</b> = toggle<br>Click points to measure<br><b>Enter</b> = finish line</span></button>
-    <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)" class="tool-has-tip">◎ Duct<span class="tool-tip">Duct Draw<br><b>D</b> = toggle<br>Draws measured duct runs<br>Auto-tags size &amp; gauge</span></button>
+    <button id="ductDrawBtn" onclick="toggleDuctDraw()" title="Duct Draw (D)" class="tool-has-tip">◎ Duct<span class="tool-tip">Duct Draw<br><b>D</b> = start / cycle type<br><b>Esc</b> = close<br>Draws measured duct runs<br>Auto-tags size &amp; gauge</span></button>
     <button id="fittingBtn" onclick="toggleFittingMode()" title="Insert Palette (T)" class="tool-has-tip">📌 Insert<span class="tool-tip">Insert Palette<br><b>T</b> = toggle<br><b>R</b> = rotate · <b>X</b> = mirror<br>Click canvas to place</span></button>
     <button id="stackBtn" onclick="toggleStackMode()" title="Vertical Stack (S)" class="tool-has-tip">📌 Stack<span class="tool-tip">Vertical Stack<br><b>S</b> = toggle<br>Click to place stack point<br>Add items from palette</span></button>
     <button id="panelBtn" onclick="togglePanel()" title="Analysis Panel" class="tool-has-tip">📊 Analysis<span class="tool-tip">Measurements Panel<br>View all duct runs, fittings,<br>stacks &amp; costs per page</span></button>
@@ -1284,6 +1284,8 @@ const FITTINGS_BY_SHAPE = {
     { type: '22el', label: '↗ 22.5°', title: '22.5° Elbow (3)' },
     { type: 'tee', label: '⊤ T-Wye', title: 'Tee-Wye (4)' },
     { type: 'saddle45y', label: '⑂ 45Y', title: 'Saddle Tap 45° Wye (5)' },
+    { type: 'spin-in', label: '◉ Spin', title: 'Spin-In / Round Tap' },
+    { type: 'volume-damper', label: '◌ VD', title: 'Round Volume Damper' },
     { type: 'lateral', label: '⑂ Lat', title: '45° Lateral (6)' },
     { type: 'wye', label: '⑃ Wye', title: 'Wye (7)' },
     { type: 'reducer', label: '⊃ Red', title: 'Concentric Reducer (8)' },
@@ -1297,6 +1299,7 @@ const FITTINGS_BY_SHAPE = {
     { type: '22el', label: '↗ 22.5°', title: '22.5° Elbow (3)' },
     { type: 'tee', label: '⊤ T-Wye', title: 'Tee-Wye (4)' },
     { type: 'rectTap', label: '⩩ Tap', title: 'Straight Rect Tap' },
+    { type: 'tapIncreasedArea', label: '▱ Inc Tap', title: 'Tap Increased Area' },
     { type: 'lateral', label: '⑂ Lat', title: '45° Lateral (6)' },
     { type: 'wye', label: '⑃ Wye', title: 'Wye (7)' },
     { type: 'sqwing', label: '┐ SqW', title: 'Square Wing Elbow' },
@@ -1341,6 +1344,7 @@ let dragFittingOrigPos = null; // {x,y} original fitting position
 let fittingDragRotate = false;
 let fittingDragStartAngle = 0;
 let suppressNextCanvasClick = false;
+let multiSelectMoveMode = null;
 const pageFittings = {};
 
 // ---- Cost & Labor Engine ----
@@ -2527,6 +2531,28 @@ viewer.addEventListener('mousedown', (e) => {
   if (_snipActive) return; // snip overlay handles its own events
   if (e.target.closest('.anno-controls') || e.target.closest('.duct-draw-bar') || e.target.closest('.fitting-palette') || e.target.closest('#stackPalette') || e.target.closest('.ms-panel') || e.target.closest('#flexDropPopup')) return;
 
+  if (multiSelectMoveMode) {
+    if (e.ctrlKey) {
+      isPanning = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+      viewer.classList.add('grabbing');
+      e.preventDefault();
+      return;
+    }
+    const pt = screenToPdf(e.clientX, e.clientY);
+    if (isNearMultiSelectedItems(pt)) {
+      multiSelectMoveMode.dragging = true;
+      multiSelectMoveMode.lastPt = pt;
+      e.preventDefault();
+      viewer.classList.add('grabbing');
+      viewer.style.cursor = 'move';
+      return;
+    }
+    e.preventDefault();
+    return;
+  }
+
   // Multi-select: Shift+Click/Drag OR persistent select mode (Q)
   if ((e.shiftKey || multiSelectModeOn) && !measureMode && !fittingMode && !stackMode) {
     if (MultiSelect.onShiftMouseDown(e, screenToPdf)) {
@@ -2655,6 +2681,34 @@ viewer.addEventListener('mousedown', (e) => {
 
 window.addEventListener('mousemove', (e) => {
   // Multi-select drag
+  if (multiSelectMoveMode) {
+    if (isPanning) {
+      panX = e.clientX - startX;
+      panY = e.clientY - startY;
+      applyTransform();
+      drawMeasureOverlay();
+      return;
+    }
+    const pt = screenToPdf(e.clientX, e.clientY);
+    if (!multiSelectMoveMode.dragging) {
+      viewer.style.cursor = isNearMultiSelectedItems(pt) ? 'grab' : 'crosshair';
+      return;
+    }
+    if (!multiSelectMoveMode.lastPt) {
+      multiSelectMoveMode.lastPt = pt;
+      return;
+    }
+    const dx = pt.x - multiSelectMoveMode.lastPt.x;
+    const dy = pt.y - multiSelectMoveMode.lastPt.y;
+    if (dx || dy) {
+      moveMultiSelectedItemsBy(dx, dy);
+      multiSelectMoveMode.lastPt = pt;
+      drawMeasureOverlay();
+      updatePanel();
+    }
+    return;
+  }
+
   if (e.shiftKey || multiSelectModeOn) MultiSelect.onShiftMouseMove(e, screenToPdf);
 
   // Stack dragging
@@ -2840,6 +2894,13 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('mouseup', (e) => {
+  if (multiSelectMoveMode?.dragging) {
+    e.preventDefault();
+    viewer.classList.remove('grabbing');
+    finishMultiSelectMoveMode({ suppressClick: true });
+    return;
+  }
+
   // Multi-select release
   MultiSelect.onShiftMouseUp(e, screenToPdf);
 
@@ -2906,6 +2967,11 @@ window.addEventListener('mouseup', (e) => {
 
 viewer.addEventListener('click', (e) => {
   if (!pdfDoc) return;
+  if (multiSelectMoveMode) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
   if (suppressNextCanvasClick) {
     suppressNextCanvasClick = false;
     e.preventDefault();
@@ -3185,6 +3251,154 @@ function clonePlain(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
+function getMultiSelectMoveSnapshot() {
+  const measIds = MultiSelect.getSelectedMeasIds();
+  const fitIds = MultiSelect.getSelectedFitIds();
+  const stackIds = MultiSelect.getSelectedStackIds();
+  return {
+    measurements: (pageMeasurements[currentPage] || [])
+      .filter(m => measIds.has(m.id))
+      .map(m => ({ id: m.id, points: clonePlain(m.points || []), labelOffset: clonePlain(m.labelOffset || null), hangerLabelOffset: clonePlain(m.hangerLabelOffset || null) })),
+    fittings: (pageFittings[currentPage] || [])
+      .filter(f => fitIds.has(f.id))
+      .map(f => ({ id: f.id, x: f.x, y: f.y })),
+    stacks: (pageStacks[currentPage] || [])
+      .filter(s => stackIds.has(s.id))
+      .map(s => ({ id: s.id, x: s.x, y: s.y, items: clonePlain(s.items || []) })),
+  };
+}
+
+function restoreMultiSelectMoveSnapshot(snapshot) {
+  if (!snapshot) return;
+  const meas = pageMeasurements[currentPage] || [];
+  for (const saved of snapshot.measurements || []) {
+    const m = meas.find(item => item.id === saved.id);
+    if (!m) continue;
+    m.points = clonePlain(saved.points || []);
+    m.labelOffset = clonePlain(saved.labelOffset || null);
+    m.hangerLabelOffset = clonePlain(saved.hangerLabelOffset || null);
+  }
+  const fits = pageFittings[currentPage] || [];
+  for (const saved of snapshot.fittings || []) {
+    const f = fits.find(item => item.id === saved.id);
+    if (!f) continue;
+    f.x = saved.x;
+    f.y = saved.y;
+  }
+  const stacks = pageStacks[currentPage] || [];
+  for (const saved of snapshot.stacks || []) {
+    const s = stacks.find(item => item.id === saved.id);
+    if (!s) continue;
+    s.x = saved.x;
+    s.y = saved.y;
+    s.items = clonePlain(saved.items || []);
+  }
+}
+
+function getMultiSelectedBounds() {
+  const measIds = MultiSelect.getSelectedMeasIds();
+  const fitIds = MultiSelect.getSelectedFitIds();
+  const stackIds = MultiSelect.getSelectedStackIds();
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const include = (x, y) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  };
+  for (const m of (pageMeasurements[currentPage] || [])) {
+    if (!measIds.has(m.id)) continue;
+    for (const p of (m.points || [])) include(p.x, p.y);
+  }
+  for (const f of (pageFittings[currentPage] || [])) {
+    if (fitIds.has(f.id)) include(f.x, f.y);
+  }
+  for (const s of (pageStacks[currentPage] || [])) {
+    if (!stackIds.has(s.id)) continue;
+    include(s.x, s.y);
+    for (const item of (s.items || [])) {
+      if (item.callout) include(item.callout.x, item.callout.y);
+    }
+  }
+  if (!Number.isFinite(minX)) return null;
+  return { minX, minY, maxX, maxY };
+}
+
+function isNearMultiSelectedItems(pt) {
+  const bounds = getMultiSelectedBounds();
+  if (!bounds) return false;
+  const displayScale = currentScale / baseScale;
+  const pad = 36 / Math.max(displayScale, 0.001);
+  return pt.x >= bounds.minX - pad &&
+    pt.x <= bounds.maxX + pad &&
+    pt.y >= bounds.minY - pad &&
+    pt.y <= bounds.maxY + pad;
+}
+
+function moveMultiSelectedItemsBy(dx, dy) {
+  const measIds = MultiSelect.getSelectedMeasIds();
+  const fitIds = MultiSelect.getSelectedFitIds();
+  const stackIds = MultiSelect.getSelectedStackIds();
+  for (const m of (pageMeasurements[currentPage] || [])) {
+    if (!measIds.has(m.id)) continue;
+    if (m.points) m.points.forEach(p => { p.x += dx; p.y += dy; });
+  }
+  for (const f of (pageFittings[currentPage] || [])) {
+    if (!fitIds.has(f.id)) continue;
+    f.x += dx;
+    f.y += dy;
+  }
+  for (const s of (pageStacks[currentPage] || [])) {
+    if (!stackIds.has(s.id)) continue;
+    s.x += dx;
+    s.y += dy;
+    if (s.items) s.items.forEach(item => {
+      if (item.callout) {
+        item.callout.x += dx;
+        item.callout.y += dy;
+      }
+    });
+  }
+}
+
+function beginMultiSelectMoveMode() {
+  if (MultiSelect.getSelectionCount() <= 0) return;
+  exitDrawModes();
+  multiSelectMoveMode = {
+    snapshot: getMultiSelectMoveSnapshot(),
+    dragging: false,
+    lastPt: null,
+  };
+  viewer.style.cursor = 'crosshair';
+  if (typeof showToast === 'function') showToast('Move armed: click-hold near selection to drag, release to place, Esc to cancel');
+}
+
+function finishMultiSelectMoveMode(opts = {}) {
+  if (!multiSelectMoveMode) return;
+  multiSelectMoveMode = null;
+  viewer.style.cursor = multiSelectModeOn ? 'crosshair' : '';
+  viewer.classList.remove('grabbing');
+  if (opts.suppressClick) suppressNextCanvasClick = true;
+  drawMeasureOverlay();
+  updatePanel();
+  scheduleSave();
+}
+
+function cancelMultiSelectMoveMode() {
+  if (!multiSelectMoveMode) return false;
+  restoreMultiSelectMoveSnapshot(multiSelectMoveMode.snapshot);
+  multiSelectMoveMode = null;
+  viewer.style.cursor = multiSelectModeOn ? 'crosshair' : '';
+  viewer.classList.remove('grabbing');
+  drawMeasureOverlay();
+  updatePanel();
+  return true;
+}
+
 function tryStartCtrlDuplicateDrag(e, pt, hitR) {
   if (!e.ctrlKey || e.shiftKey || measureMode || fittingMode || stackMode) return false;
 
@@ -3451,6 +3665,11 @@ window.addEventListener('keydown', (e) => {
   if (currentRoute.view !== 'viewer') return;
   if (!pdfDoc) return;
 
+  if (e.key === 'Escape' && cancelMultiSelectMoveMode()) {
+    e.preventDefault();
+    return;
+  }
+
   if (handleCommandRollFinishKey(e)) return;
   if (handleCommandRollTransformKey(e)) return;
   if (CommandRoll.isActive() && CommandRoll.handleKeyDown(e)) return;
@@ -3527,7 +3746,11 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); window.toggleMultiSelectMode(); }
   else if (e.key === 'l' || e.key === 'L') { e.preventDefault(); window.toggleLassoMode(); }
   else if (e.key === 'm' || e.key === 'M') { e.preventDefault(); window.toggleMeasureMode(); }
-  else if (e.key === 'd' || e.key === 'D') { e.preventDefault(); window.toggleDuctDraw(); }
+  else if (e.key === 'd' || e.key === 'D') {
+    e.preventDefault();
+    if (ductDrawMode) cycleDuctDrawType();
+    else window.toggleDuctDraw();
+  }
   else if ((e.key === 'e' || e.key === 'E') && selectedEndpointMeasId != null && selectedEndpointIdx != null && !elevationInputActive) {
     e.preventDefault();
     showElevationInput();
@@ -4021,6 +4244,25 @@ window.toggleDuctDraw = function() {
   }
 };
 
+const DUCT_DRAW_TYPE_ORDER = ['spiral', 'round', 'rect', 'oval', 'flex'];
+
+function cycleDuctDrawType() {
+  const sel = document.getElementById('ddType');
+  if (!sel) return;
+  endActiveDuctPathForCommandRoll();
+  const current = sel.value || 'spiral';
+  const idx = DUCT_DRAW_TYPE_ORDER.indexOf(current);
+  const next = DUCT_DRAW_TYPE_ORDER[(idx + 1 + DUCT_DRAW_TYPE_ORDER.length) % DUCT_DRAW_TYPE_ORDER.length];
+  sel.value = next;
+  ddTypeChanged();
+  const cfg = getDuctDrawConfig();
+  if (CommandRoll.isActive()) {
+    CommandRoll.start({ anchor: getCommandRollStartAnchor(), duct: cfg });
+  }
+  drawMeasureOverlay();
+  if (typeof showToast === 'function') showToast(`Duct type: ${cfg.symbol} ${next}`);
+}
+
 var _ddFlexColor = 'black';
 window.ddTypeChanged = function() {
   const t = document.getElementById('ddType').value;
@@ -4318,6 +4560,16 @@ function getFittingConnPoints(f) {
       points.push(r(0, 0));
       break;
     }
+    case 'tapIncreasedArea': {
+      // Increased-area tap is placed at the expanded tap opening center.
+      points.push(r(0, 0));
+      break;
+    }
+    case 'spin-in': {
+      // Spin-ins are placed at the cut/opening center of a round main.
+      points.push(r(0, 0));
+      break;
+    }
     case 'endcap': {
       // drawEndCap: single opening at x=0
       points.push(r(0, 0));
@@ -4328,6 +4580,13 @@ function getFittingConnPoints(f) {
       const cLen = D * 1.2;
       points.push(r(-cLen/2, 0)); // left opening
       points.push(r(cLen/2, 0));  // right opening
+      break;
+    }
+    case 'volume-damper': {
+      // Inline round damper with two duct connections.
+      const vdLen = D * 1.2;
+      points.push(r(-vdLen/2, 0));
+      points.push(r(vdLen/2, 0));
       break;
     }
     default:
@@ -4779,7 +5038,7 @@ function drawMeasureOverlay() {
       shape: ghostShape,
       roundType: ghostShape === 'round' ? roundDuctType : null,
       sizeA: document.getElementById('fpSizeA').value || '14',
-      sizeB: document.getElementById('fpSizeB').value || ''
+      sizeB: selectedFittingType === 'tapIncreasedArea' ? '' : (document.getElementById('fpSizeB').value || '')
     };
     mCtx.globalAlpha = 0.5;
     drawFitting(ghost, false);
@@ -6239,7 +6498,7 @@ const FITTING_NAMES = {
   'tee': 'Tee-Wye', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral', 'boot': 'Boot',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
   'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
-  'rectTap': 'Rect Tap', 'flex-conn': 'Flex Connector', 'plenum': 'Plenum',
+  'rectTap': 'Rect Tap', 'tapIncreasedArea': 'Tap Increased Area', 'spin-in': 'Spin-In', 'volume-damper': 'Volume Damper', 'flex-conn': 'Flex Connector', 'plenum': 'Plenum',
   'hvac_component': 'HVAC Component'
 };
 
@@ -6390,10 +6649,34 @@ function getCommandRollFields(type) {
   return [{ key: 'sizeA', label: 'Size' }];
 }
 
+function applyCommandRollSizeToDuctDraw(size, shape) {
+  const raw = String(size || '').trim();
+  if (!raw) return;
+  const ductType = document.getElementById('ddType')?.value;
+  const isRectDuct = ductType === 'rect' || ductType === 'oval' || shape === 'rect' || shape === 'oval' || raw.toLowerCase().includes('x');
+  if (isRectDuct) {
+    const parts = raw.toLowerCase().split('x').map(v => v.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      document.getElementById('ddW').value = parts[0];
+      document.getElementById('ddH').value = parts[1];
+    }
+    return;
+  }
+  document.getElementById('ddDiam').value = raw;
+}
+
 function applyCommandRollFieldOverride(command, field, value) {
   if (!command || !command.id) return;
   if (!commandRollFieldOverrides[command.id]) commandRollFieldOverrides[command.id] = {};
   commandRollFieldOverrides[command.id][field] = value;
+  if (field === 'sizeA') {
+    applyCommandRollSizeToDuctDraw(value, command.shape);
+  } else if (field === 'sizeB' && ['reducer','eccReducer'].includes(command.type)) {
+    applyCommandRollSizeToDuctDraw(value, command.shape);
+  }
+  if (CommandRoll.isActive()) {
+    CommandRoll.update({ anchor: getCommandRollStartAnchor(), duct: getDuctDrawConfig() });
+  }
   drawMeasureOverlay();
 }
 
@@ -6416,7 +6699,7 @@ function buildCommandRollCommands(ctx = {}) {
     const commandId = `fitting-${shape}-${item.type}`;
     const overrides = commandRollFieldOverrides[commandId] || {};
     const commandSizeA = overrides.sizeA || sizeA;
-    const commandSizeB = overrides.sizeB != null
+    const commandSizeB = getCommandRollNeedsSizeB(item.type) && overrides.sizeB != null
       ? overrides.sizeB
       : getCommandRollDefaultSizeB(item.type, commandSizeA, shape);
     commands.push({
@@ -6462,16 +6745,7 @@ function applyCommandRollReducerSize(command) {
   if (!['reducer','eccReducer'].includes(command.type)) return;
   const nextSize = String(command.sizeB || '').trim();
   if (!nextSize) return;
-  const ductType = document.getElementById('ddType')?.value;
-  if (ductType === 'rect' || ductType === 'oval') {
-    const parts = nextSize.toLowerCase().split('x').map(v => v.trim()).filter(Boolean);
-    if (parts.length >= 2) {
-      document.getElementById('ddW').value = parts[0];
-      document.getElementById('ddH').value = parts[1];
-    }
-  } else {
-    document.getElementById('ddDiam').value = nextSize;
-  }
+  applyCommandRollSizeToDuctDraw(nextSize, command.shape);
 }
 
 function executeCommandRollCommand(command, ctx = {}) {
@@ -6568,7 +6842,7 @@ function placeFittingAtPoint(pt, opts = {}) {
   const _shape = opts.shape || currentFittingShape || 'round';
   const _roundType = opts.roundType != null ? opts.roundType : (_shape === 'round' ? roundDuctType : null);
   const _sA = opts.sizeA || document.getElementById('fpSizeA').value || '14';
-  const _sB = opts.sizeB != null ? opts.sizeB : (document.getElementById('fpSizeB').value || '');
+  const _sB = getCommandRollNeedsSizeB(type) ? (opts.sizeB != null ? opts.sizeB : (document.getElementById('fpSizeB').value || '')) : '';
   const _cd = getCostDefaults(type, _sA, _sB, _roundType);
   const f = {
     id: fittingIdCounter,
@@ -6710,6 +6984,11 @@ window.clearAllFittings = function() {
 // Vertical Stack System
 // =====================================================
 
+const stackPaletteSizeContinuity = {
+  byType: {},
+  byShape: {},
+};
+
 window.toggleStackMode = function() {
   if (multiSelectModeOn) toggleMultiSelectMode();
   stackMode = !stackMode;
@@ -6731,6 +7010,66 @@ window.toggleStackMode = function() {
 function hideStackPalette() {
   const el = document.getElementById('stackPalette');
   if (el) el.remove();
+}
+
+function getStackPaletteSizeKey(shape, type) {
+  return `${shape || 'round'}:${type || 'fitting'}`;
+}
+
+function setStackPaletteInputValue(id, value) {
+  const input = document.getElementById(id);
+  if (input && value !== undefined && value !== null) input.value = value;
+}
+
+function splitStackRectSize(sizeA, sizeB) {
+  const rawA = String(sizeA || '');
+  if (rawA.includes('x')) {
+    const [w, h] = rawA.split('x').map(v => v.trim());
+    return { w: w || '24', h: h || sizeB || '12' };
+  }
+  return { w: rawA || '24', h: sizeB || '12' };
+}
+
+function getStackPaletteSizeMemory(shape, type) {
+  return stackPaletteSizeContinuity.byType[getStackPaletteSizeKey(shape, type)] ||
+    stackPaletteSizeContinuity.byShape[shape] ||
+    null;
+}
+
+function rememberStackPaletteSize(shape, type, sizeA, sizeB, riseDrop) {
+  const payload = { sizeA: sizeA || '', sizeB: sizeB || '', riseDrop: riseDrop || '' };
+  stackPaletteSizeContinuity.byType[getStackPaletteSizeKey(shape, type)] = payload;
+  stackPaletteSizeContinuity.byShape[shape] = payload;
+}
+
+function applyStackPaletteSizeContinuity() {
+  const type = window._stackPaletteType;
+  const shape = window._stackPaletteShape || 'round';
+  if (!type) return;
+  const remembered = getStackPaletteSizeMemory(shape, type);
+  if (!remembered) return;
+
+  if (type === 'flexrun') {
+    setStackPaletteInputValue('spFlexDiam', remembered.sizeA);
+    setStackPaletteInputValue('spFlexRise', remembered.riseDrop);
+    return;
+  }
+
+  if (type === 'ductrun') {
+    if (shape === 'round') {
+      setStackPaletteInputValue('spDuctDiam', remembered.sizeA);
+      setStackPaletteInputValue('spDuctRiseRound', remembered.riseDrop);
+    } else {
+      const rect = splitStackRectSize(remembered.sizeA, remembered.sizeB);
+      setStackPaletteInputValue('spDuctW', rect.w);
+      setStackPaletteInputValue('spDuctH', rect.h);
+      setStackPaletteInputValue('spDuctRiseRect', remembered.riseDrop);
+    }
+    return;
+  }
+
+  setStackPaletteInputValue('spSizeA', remembered.sizeA);
+  setStackPaletteInputValue('spSizeB', remembered.sizeB);
 }
 
 function showStackPalette(stack) {
@@ -6831,8 +7170,13 @@ window.setStackPaletteShape = function(shape) {
   // Update sizeA default for shape change
   const spA = document.getElementById('spSizeA');
   if (spA) {
+    const remembered = stackPaletteSizeContinuity.byShape[shape];
     spA.placeholder = isRect ? '24x12' : '14';
-    if (isRect && !spA.value.includes('x')) spA.value = '24x12';
+    if (remembered?.sizeA) {
+      spA.value = remembered.sizeA;
+      const spB = document.getElementById('spSizeB');
+      if (spB) spB.value = remembered.sizeB || '';
+    } else if (isRect && !spA.value.includes('x')) spA.value = '24x12';
     else if (!isRect && spA.value.includes('x')) spA.value = '14';
   }
   renderStackPaletteGrid();
@@ -6923,6 +7267,7 @@ window.selectStackPaletteType = function(type) {
     spBLabel.style.display = needsB ? '' : 'none';
     spBLabel.textContent = isPlenumType ? 'L:' : (isReducerType ? 'Out:' : 'Br:');
   }
+  applyStackPaletteSizeContinuity();
 };
 
 window.addStackItemFromPalette = function(stackId) {
@@ -6947,7 +7292,7 @@ window.addStackItemFromPalette = function(stackId) {
     }
   } else {
     sizeA = document.getElementById('spSizeA').value || '14';
-    sizeB = document.getElementById('spSizeB').value || '';
+    sizeB = getCommandRollNeedsSizeB(type) ? (document.getElementById('spSizeB').value || '') : '';
   }
 
   const stacks = pageStacks[currentPage] || [];
@@ -6964,6 +7309,7 @@ window.addStackItemFromPalette = function(stackId) {
     id: stackItemIdCounter,
     type: type,
     shape: type === 'flexrun' ? 'flex' : shape,
+    roundType: shape === 'round' ? roundDuctType : null,
     sizeA: sizeA,
     sizeB: sizeB,
     riseDrop: riseDrop,
@@ -6973,6 +7319,7 @@ window.addStackItemFromPalette = function(stackId) {
   };
   if (type === 'flexrun') stackItem.flexColor = _spFlexColor;
   stack.items.push(stackItem);
+  rememberStackPaletteSize(stackItem.shape, type, sizeA, sizeB, riseDrop);
 
   drawMeasureOverlay();
   updatePanel();
@@ -7019,6 +7366,175 @@ window.clearAllStacks = function() {
   updatePanel();
   scheduleSave();
 };
+
+function getStackItemDims(item) {
+  const rawA = String(item.sizeA || '').toLowerCase();
+  const aParts = rawA.includes('x') ? rawA.split('x').map(v => parseFloat(v.trim())) : [];
+  const rawB = String(item.sizeB || '').toLowerCase();
+  const bParts = rawB.includes('x') ? rawB.split('x').map(v => parseFloat(v.trim())) : [];
+  const mainW = aParts.length >= 2 ? (aParts[0] || 24) : (parseFloat(item.sizeA) || 14);
+  const mainH = aParts.length >= 2 ? (aParts[1] || 12) : mainW;
+  const branchW = bParts.length >= 2 ? (bParts[0] || mainW) : (parseFloat(item.sizeB) || mainW);
+  const branchH = bParts.length >= 2 ? (bParts[1] || mainH) : branchW;
+  return {
+    mainW: inchesToPx(mainW),
+    mainH: inchesToPx(mainH),
+    branchW: inchesToPx(branchW),
+    branchH: inchesToPx(branchH),
+  };
+}
+
+function drawStackOpeningTopView(shape, dims) {
+  const hw = dims.mainW / 2;
+  const hh = dims.mainH / 2;
+  if (shape === 'round') {
+    const r = dims.mainW / 2;
+    mCtx.beginPath();
+    mCtx.arc(0, 0, r, 0, Math.PI * 2);
+    mCtx.stroke();
+    return r;
+  }
+  if (shape === 'oval') {
+    mCtx.beginPath();
+    mCtx.ellipse(0, 0, hw, hh || hw * 0.6, 0, 0, Math.PI * 2);
+    mCtx.stroke();
+    return Math.max(hw, hh);
+  }
+  mCtx.strokeRect(-hw, -hh, dims.mainW, dims.mainH);
+  return Math.max(hw, hh);
+}
+
+function drawStackBranchTopView(angle, length, width, offset = 0) {
+  const half = Math.max(3, width / 2);
+  mCtx.save();
+  mCtx.rotate(angle);
+  mCtx.beginPath();
+  mCtx.moveTo(offset, -half);
+  mCtx.lineTo(offset + length, -half);
+  mCtx.lineTo(offset + length, half);
+  mCtx.lineTo(offset, half);
+  mCtx.closePath();
+  mCtx.stroke();
+  mCtx.restore();
+}
+
+function drawStackFittingTopView(item, stack, color, selected) {
+  const shape = item.shape || (String(item.sizeA || '').includes('x') ? 'rect' : 'round');
+  const dims = getStackItemDims(item);
+  const isRound = shape === 'round';
+  const radius = Math.max(6, drawStackOpeningTopView(shape, dims));
+  const bw = isRound ? dims.branchW : Math.min(dims.branchW, dims.branchH || dims.branchW);
+  const branchLen = Math.max(radius * 1.15, bw * 1.6);
+  const branchOffset = radius * 0.45;
+  const type = item.type;
+
+  if (selected) {
+    mCtx.setLineDash([4, 3]);
+    mCtx.beginPath();
+    mCtx.arc(0, 0, radius + 5, 0, Math.PI * 2);
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+  }
+
+  if (type === '90el') {
+    drawStackBranchTopView(0, branchLen, bw, branchOffset);
+    mCtx.beginPath();
+    mCtx.arc(0, 0, radius * 0.55, -Math.PI / 2, 0);
+    mCtx.stroke();
+  } else if (type === '45el' || type === '22el') {
+    drawStackBranchTopView(type === '45el' ? -Math.PI / 4 : -Math.PI / 8, branchLen, bw, branchOffset);
+  } else if (type === 'tee') {
+    drawStackBranchTopView(0, branchLen, bw, branchOffset);
+    drawStackBranchTopView(Math.PI, branchLen, bw, branchOffset);
+  } else if (type === 'wye') {
+    drawStackBranchTopView(-Math.PI / 5, branchLen, bw, branchOffset);
+    drawStackBranchTopView(Math.PI / 5, branchLen, bw, branchOffset);
+  } else if (type === 'lateral' || type === 'saddle45y') {
+    drawStackBranchTopView(-Math.PI / 4, branchLen, bw, branchOffset);
+  } else if (type === 'rectTap' || type === 'spin-in') {
+    drawStackBranchTopView(0, branchLen * 0.75, bw, branchOffset);
+    mCtx.beginPath();
+    mCtx.moveTo(radius * 0.25, -bw * 0.45);
+    mCtx.lineTo(radius * 0.25, bw * 0.45);
+    mCtx.stroke();
+  } else if (type === 'volume-damper') {
+    const r = isRound ? radius : Math.min(dims.mainW, dims.mainH) / 2;
+    mCtx.beginPath();
+    mCtx.moveTo(-r * 0.65, 0);
+    mCtx.lineTo(r * 0.65, 0);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.moveTo(0, -r * 0.85);
+    mCtx.lineTo(0, r * 0.85);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.arc(0, 0, Math.max(3, r * 0.16), 0, Math.PI * 2);
+    mCtx.stroke();
+  } else if (type === 'tapIncreasedArea') {
+    mCtx.beginPath();
+    mCtx.moveTo(radius * 0.2, -bw * 0.55);
+    mCtx.lineTo(radius + branchLen * 0.75, -bw * 0.35);
+    mCtx.lineTo(radius + branchLen * 0.75, bw * 0.35);
+    mCtx.lineTo(radius * 0.2, bw * 0.55);
+    mCtx.closePath();
+    mCtx.stroke();
+  } else if (type === 'reducer' || type === 'eccReducer') {
+    const scale = type === 'eccReducer' ? 0.55 : 0;
+    mCtx.beginPath();
+    if (isRound) {
+      mCtx.arc(scale, 0, Math.max(3, dims.branchW / 2), 0, Math.PI * 2);
+    } else {
+      mCtx.rect(-dims.branchW / 2 + scale, -dims.branchH / 2, dims.branchW, dims.branchH);
+    }
+    mCtx.stroke();
+  } else if (type === 'transition') {
+    mCtx.beginPath();
+    mCtx.rect(-dims.branchW / 2, -dims.branchH / 2, dims.branchW, dims.branchH);
+    mCtx.stroke();
+  } else if (type === 'endcap') {
+    mCtx.beginPath();
+    mCtx.moveTo(-radius * 0.65, -radius * 0.65);
+    mCtx.lineTo(radius * 0.65, radius * 0.65);
+    mCtx.moveTo(radius * 0.65, -radius * 0.65);
+    mCtx.lineTo(-radius * 0.65, radius * 0.65);
+    mCtx.stroke();
+  } else if (type === 'sqwing') {
+    const hw = dims.mainW / 2;
+    const hh = dims.mainH / 2;
+    const outletLen = Math.max(dims.mainW * 0.75, dims.mainH * 1.1);
+    const outletEnd = hw + outletLen;
+
+    // Square-vane elbow in top view: stack opening turns to a horizontal outlet.
+    mCtx.beginPath();
+    mCtx.moveTo(-hw, -hh);
+    mCtx.lineTo(hw, -hh);
+    mCtx.lineTo(outletEnd, -hh);
+    mCtx.lineTo(outletEnd, hh);
+    mCtx.lineTo(hw, hh);
+    mCtx.lineTo(-hw, hh);
+    mCtx.closePath();
+    mCtx.stroke();
+
+    // Outlet end cap.
+    mCtx.beginPath();
+    mCtx.moveTo(outletEnd, -hh);
+    mCtx.lineTo(outletEnd, hh);
+    mCtx.stroke();
+
+    // Turning vanes, seen from above inside the square elbow throat.
+    const vaneCount = 3;
+    for (let i = 1; i <= vaneCount; i++) {
+      const t = i / (vaneCount + 1);
+      const y = -hh + dims.mainH * t;
+      mCtx.beginPath();
+      mCtx.moveTo(hw * 0.15, y);
+      mCtx.quadraticCurveTo(hw + outletLen * 0.22, y, hw + outletLen * 0.48, y * 0.55);
+      mCtx.stroke();
+    }
+  } else if (type === 'boot' || type === 'plenum' || type === 'flex-conn') {
+    mCtx.strokeRect(-dims.branchW / 2, -dims.branchH / 2, dims.branchW, dims.branchH);
+  }
+}
 
 function drawStack(stack) {
   const isStackSelected = selectedStackId === stack.id;
@@ -7130,8 +7646,18 @@ function drawStack(stack) {
       }
       mCtx.restore();
     } else {
-      const miniF = { type: item.type, x: stack.x, y: stack.y, rotation: item.rotation || 0, mirrored: item.mirrored || false, sizeA: item.sizeA, sizeB: item.sizeB, label: '', _noLabel: true };
-      drawFitting(miniF, isItemSelected);
+      const fittingColor = isItemSelected ? '#e94560' : isMultiSel ? '#ffd43b' : '#00ff88';
+      mCtx.save();
+      mCtx.translate(stack.x, stack.y);
+      mCtx.rotate(((item.rotation || 0) * Math.PI) / 180);
+      if (item.mirrored) mCtx.scale(1, -1);
+      mCtx.strokeStyle = fittingColor;
+      mCtx.lineWidth = 2.5;
+      mCtx.lineJoin = 'round';
+      mCtx.lineCap = 'round';
+      mCtx.setLineDash([]);
+      drawStackFittingTopView(item, stack, fittingColor, isItemSelected);
+      mCtx.restore();
     }
 
     // Callout box
@@ -7306,6 +7832,7 @@ async function init() {
     drawOverlay: () => { drawMeasureOverlay(); _syncSelectionToCompiler(); },
     updatePanel: updatePanel,
     getProjectSystemSymbols: () => projectSystemSymbols,
+    onMoveRequest: beginMultiSelectMoveMode,
     deleteItems: (measIds, fitIds, stackIds) => {
       const page = currentPage;
       if (measIds.size > 0 && pageMeasurements[page]) {

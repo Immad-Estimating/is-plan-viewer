@@ -103,7 +103,7 @@ const FITTING_NAMES = {
   'tee': 'Tee-Wye', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral', 'boot': 'Boot',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
   'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
-  'rectTap': 'Rect Tap'
+  'rectTap': 'Rect Tap', 'tapIncreasedArea': 'Tap Increased Area', 'spin-in': 'Spin-In', 'volume-damper': 'Volume Damper'
 };
 
 const LABOR_CATEGORIES = [
@@ -860,7 +860,7 @@ function normalizeRows(allPageData, drawingNames) {
 
       const shape = inferFittingShape(f);
 
-      const prefix = shape === 'rect' ? 'rect' : 'spiral';
+      const prefix = shape === 'rect' ? 'rect' : (f.roundType || 'spiral');
       // rectTap already has 'rect' prefix baked in — don't double-prefix
       const baseKey = f.type === 'rectTap' ? 'rectTap' : prefix + '-' + f.type;
       // Boot uses WxH key; other fittings use single size
@@ -878,6 +878,9 @@ function normalizeRows(allPageData, drawingNames) {
       }
       if (!matCost && SNAPLOCK_DEFAULTS[sizeKey] && SNAPLOCK_DEFAULTS[sizeKey]['26'] != null) {
         matCost = SNAPLOCK_DEFAULTS[sizeKey]['26'];
+      }
+      if (!matCost && SPIRAL_DEFAULTS[sizeKey] && SPIRAL_DEFAULTS[sizeKey]['26'] != null) {
+        matCost = SPIRAL_DEFAULTS[sizeKey]['26'];
       }
       // Saddle tap fallback: check spiral and snaplock tap defaults
       if (!matCost && SPIRAL_TAP_DEFAULTS[sizeKey] && SPIRAL_TAP_DEFAULTS[sizeKey]['26'] != null) {
@@ -1036,12 +1039,16 @@ function normalizeRows(allPageData, drawingNames) {
     for (const s of (pd.stacks || [])) {
       for (const it of (s.items || [])) {
         const shape = it.shape || 'round';
+        const stRoundType = shape === 'round' ? (it.roundType || 'spiral') : null;
         const ec = {}; for (const c of LABOR_CATEGORIES) ec[c.key] = 0;
         let stMatCost = 0;
         let stLengthFt = 0;
         const stGauge = it.gauge || '26';
+        const stIsDuct = it.type === 'ductrun' || it.type === 'flexrun';
+        const stIsFlex = it.type === 'flexrun';
+        let stLinerPerFt = 0;
 
-        if (it.type === 'ductrun' || it.type === 'flexrun') {
+        if (stIsDuct) {
           // Vertical duct run: parse rise/drop as length
           const rd = it.riseDrop ? parseFloat(String(it.riseDrop).replace(/[^\d.]/g, '')) : 0;
           stLengthFt = rd || 0;
@@ -1053,10 +1060,15 @@ function normalizeRows(allPageData, drawingNames) {
               const wPerLF = (perim / 12) * getGaugeWeightPerSF(stGauge);
               stMatCost = wPerLF * (getCompilerShopSettings().sheetMetalPricePerLb || 0) * stLengthFt;
               // Liner
-              const _lo = LINER_OPTIONS[LINER_OPTIONS.length - 1];
-              const _le = _priceBookCache ? _priceBookCache[_lo.key] : null;
-              const _lsf = (_le && _le.materialCost != null) ? _le.materialCost : 0;
-              if (_lsf > 0) stMatCost += (perim / 12) * _lsf * stLengthFt;
+              if (it.lined) {
+                const _lo = (it.linerThickness || it.liner)
+                  ? (LINER_OPTIONS.find(o => o.thickness === (it.linerThickness || it.liner)) || LINER_OPTIONS[0])
+                  : LINER_OPTIONS[LINER_OPTIONS.length - 1];
+                const _le = _priceBookCache ? _priceBookCache[_lo.key] : null;
+                const _lsf = (_le && _le.materialCost != null) ? _le.materialCost : 0;
+                stLinerPerFt = (perim / 12) * _lsf;
+                if (_lsf > 0) stMatCost += stLinerPerFt * stLengthFt;
+              }
               // Shop OH by perim class
               let pcM = 168;
               for (const pc of RECT_PERIM_CLASSES) { if (perim <= pc.maxPerim) { pcM = pc.maxPerim; break; } }
@@ -1064,7 +1076,7 @@ function normalizeRows(allPageData, drawingNames) {
             } else {
               // Round/flex duct
               const dia = parseFloat(it.sizeA) || 14;
-              const sizeKey = (it.type === 'flexrun' ? 'flex-' + (it.flexColor || 'black') : 'duct-spiral') + '-' + Math.round(dia);
+              const sizeKey = (stIsFlex ? 'flex-' + (it.flexColor || 'black') : (stRoundType === 'snaplock' ? 'duct-snaplock' : 'duct-spiral')) + '-' + Math.round(dia);
               const pbE = _priceBookCache && _priceBookCache[sizeKey];
               if (pbE && pbE.materialCost != null) stMatCost = pbE.materialCost * stLengthFt;
               else if (SPIRAL_DEFAULTS[sizeKey] && SPIRAL_DEFAULTS[sizeKey]['26'] != null) stMatCost = SPIRAL_DEFAULTS[sizeKey]['26'] * stLengthFt;
@@ -1073,7 +1085,7 @@ function normalizeRows(allPageData, drawingNames) {
           }
         } else {
           // Stack fitting: same pricing logic as canvas fittings
-          const prefix = shape === 'rect' ? 'rect' : 'spiral';
+          const prefix = shape === 'rect' ? 'rect' : (stRoundType || 'spiral');
           const stBaseKey = it.type === 'rectTap' ? 'rectTap' : prefix + '-' + it.type;
           const mainDims = parseRectDims(it.sizeA);
           const branchDims = parseRectDims(it.sizeB);
@@ -1085,7 +1097,6 @@ function normalizeRows(allPageData, drawingNames) {
             const mw = findMinWidthClass(mainDims.W, mainDims.H);
             const mwE = _priceBookCache && (_priceBookCache[stBaseKey + '-mw' + mw + '-g' + stGauge] || _priceBookCache[stBaseKey + '-mw' + mw]);
             stMatCost = (mwE && mwE.materialCost != null) ? mwE.materialCost : (RECT_FLEX_CONN_DEFAULTS[mw] || 0);
-            stMatCost = (mwE && mwE.materialCost != null) ? mwE.materialCost : (0[mw] || 0);
           } else if (shape === 'rect' && RECT_FITTING_SA[stBaseKey] && mainDims) {
             const sa = calcRectFittingSA(stBaseKey, mainDims.W, mainDims.H,
               branchDims ? branchDims.W : undefined, branchDims ? branchDims.H : undefined);
@@ -1126,9 +1137,9 @@ function normalizeRows(allPageData, drawingNames) {
         }
 
         // Stack item labor: build key for all item types
-        const stLabBaseKey = (it.type === 'ductrun' || it.type === 'flexrun')
-          ? (it.type === 'flexrun' ? 'flex-' + (it.flexColor || 'black') : (shape === 'rect' ? 'duct-rect' : 'duct-spiral'))
-          : (it.type === 'rectTap' ? 'rectTap' : (shape === 'rect' ? 'rect' : 'spiral') + '-' + it.type);
+        const stLabBaseKey = stIsDuct
+          ? (stIsFlex ? 'flex-' + (it.flexColor || 'black') : (shape === 'rect' ? 'duct-rect' : shape === 'oval' ? 'duct-oval' : 'duct-round'))
+          : (it.type === 'rectTap' ? 'rectTap' : (shape === 'rect' ? 'rect' : (stRoundType || 'spiral')) + '-' + it.type);
         const stSizeKey = (it.type === 'boot' && it.sizeA && it.sizeB)
           ? stLabBaseKey + '-' + it.sizeA + 'x' + it.sizeB
           : stLabBaseKey + '-' + (it.sizeA || '');
@@ -1146,23 +1157,59 @@ function normalizeRows(allPageData, drawingNames) {
         let stLabCat = 'unassigned';
         for (const cat of LABOR_CATEGORIES) {
           const ch = stBd[cat.key] || 0;
-          const mult = (it.type === 'ductrun' || it.type === 'flexrun') ? stLengthFt : 1;
+          const mult = stIsDuct ? stLengthFt : 1;
           stLabCatHrs[cat.key] = ch * mult;
           stLabCatCost[cat.key] = ch * mult * labRate;
           if (ch > 0 && stLabCat === 'unassigned') stLabCat = cat.label;
         }
-        const stLabHrs = Object.values(stLabCatHrs).reduce((s, v) => s + v, 0);
+        let stLabHrs = Object.values(stLabCatHrs).reduce((s, v) => s + v, 0);
+        if (stLabHrs === 0 && it.laborHrsPerFt && stIsDuct) {
+          stLabHrs = it.laborHrsPerFt * stLengthFt;
+          stLabCatHrs.rough = stLabHrs;
+          stLabCatCost.rough = stLabHrs * labRate;
+          stLabCat = 'Rough';
+        } else if (stLabHrs === 0 && it.laborHrs && !stIsDuct) {
+          stLabHrs = it.laborHrs;
+          stLabCatHrs.rough = stLabHrs;
+          stLabCatCost.rough = stLabHrs * labRate;
+          stLabCat = 'Rough';
+        }
+        const stOrigLengthFt = stLengthFt;
+        const stOrigLabHrs = stLabHrs;
+        const stOrigMatCost = stMatCost;
+        const stOrigLabCost = stLabHrs * labRate;
+        const stOrigTotal = stMatCost + stOrigLabCost;
+        const stOrigLabCatHrs = { ...stLabCatHrs };
+        const stOvr = it._overrides || {};
+        if (stOvr.lengthFt != null) stLengthFt = stOvr.lengthFt;
+        if (stOvr.laborHrs != null) stLabHrs = stOvr.laborHrs;
+        if (stOvr.materialCost != null) stMatCost = stOvr.materialCost;
+        for (const cat of LABOR_CATEGORIES) {
+          if (stOvr['laborCat_' + cat.key] != null) {
+            stLabCatHrs[cat.key] = stOvr['laborCat_' + cat.key];
+            stLabCatCost[cat.key] = stOvr['laborCat_' + cat.key] * labRate;
+          }
+        }
         const stLabCost = stLabHrs * labRate;
+        const stTotalCost = (stOvr.totalCost != null) ? stOvr.totalCost : (stMatCost + stLabCost);
+        const stHasOvr = Object.keys(stOvr).length > 0;
+        const stFlexLabel = stIsFlex ? ('Flex ' + capitalize(it.flexColor || 'black')) : null;
+        const stDuctShapeLabel = stIsFlex ? stFlexLabel : (shape === 'round' && stRoundType === 'spiral' ? 'Spiral' : capitalize(shape));
 
         rows.push({
-          _itemType: it.type === 'ductrun' ? 'Vert. Duct' : (it.type === 'flexrun' ? 'Vert. Flex' : (FITTING_NAMES[it.type] || it.type)),
-          _size: it.sizeA + (it.sizeB ? '×' + it.sizeB : ''), _shape: capitalize(shape),
+          _itemType: stIsDuct ? (stIsFlex ? 'Flex Duct' : 'Duct Run') : (FITTING_NAMES[it.type] || it.type),
+          _size: it.sizeA + (it.sizeB ? '×' + it.sizeB : ''), _shape: stIsDuct ? stDuctShapeLabel : capitalize(shape),
           _page: page, _drawingId: drawingId, _drawingName: drawingName,
-          _lengthFt: stLengthFt, _matCost: stMatCost, _laborHrs: stLabHrs, _laborCost: stLabCost, _totalCost: stMatCost + stLabCost,
+          _lengthFt: stLengthFt, _matCost: stMatCost, _laborHrs: stLabHrs, _laborCost: stLabCost, _totalCost: stTotalCost,
           _laborCatHrs: stLabCatHrs, _laborCatCost: stLabCatCost, _laborCatLabel: stLabCat,
-          phase: null, costGroup: null, gauge: stGauge,
-          systemSymbol: null,
+          _hasOverride: stHasOvr, _overrides: stOvr,
+          _orig_laborHrs: stOrigLabHrs, _orig_materialCost: stOrigMatCost,
+          _orig_laborCost: stOrigLabCost, _orig_totalCost: stOrigTotal, _orig_lengthFt: stOrigLengthFt,
+          _orig_laborCatHrs: stOrigLabCatHrs,
+          phase: it.phase || null, costGroup: it.costGroup || null, gauge: stGauge,
+          systemSymbol: it.systemSymbol || null,
           _sourceType: 'stack', _sourceId: it.id, _sourceStackId: s.id,
+          _lined: !!it.lined, _linerPerFt: stLinerPerFt,
         });
       }
     }

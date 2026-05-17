@@ -671,9 +671,12 @@ export function installTakeoffRenderer(ctx = {}) {
       case 'eccReducer': drawReducer(D, D2, true); break;
       case 'endcap': drawEndCap(D); break;
       case 'coupling': drawCoupling(D); break;
+      case 'volume-damper': drawVolumeDamper(D); break;
       case 'transition': drawTransition(D, D2); break;
       case 'sqwing': drawSquareWing(D); break;
       case 'rectTap': drawRectTap(D, D2); break;
+      case 'tapIncreasedArea': drawTapIncreasedArea(f.sizeA, D); break;
+      case 'spin-in': drawSpinIn(D); break;
       case 'boot': drawBoot(D, D2); break;
       case 'hvac_component': drawHvacMarker(f); break;
     }
@@ -792,6 +795,13 @@ export function installTakeoffRenderer(ctx = {}) {
       return;
     }
   
+    if (type === 'volume-damper') {
+      seamAt(-D * 0.32, 0, halfW * 0.72);
+      seamAt(D * 0.32, 0, halfW * 0.72);
+      mCtx.restore();
+      return;
+    }
+  
     if (type === 'reducer' || type === 'eccReducer') {
       const len = Math.abs(D - D2) * 1.5 || D;
       const xLimit = len * 0.22;
@@ -825,7 +835,15 @@ export function installTakeoffRenderer(ctx = {}) {
       mCtx.restore();
       return;
     }
-  
+
+    if (type === 'spin-in') {
+      // Spin-ins are a collar/opening symbol; keep spiral detail inside the collar only.
+      seamOnRun(-D * 0.18, 0, halfW * 0.55, Math.PI / 2);
+      seamOnRun(D * 0.18, 0, halfW * 0.55, Math.PI / 2);
+      mCtx.restore();
+      return;
+    }
+
     const mainXs = [-D * 0.9, -D * 0.25, D * 0.4, D * 0.95];
     for (const x of mainXs) seamAt(x, 0, halfW);
   
@@ -1283,7 +1301,78 @@ export function installTakeoffRenderer(ctx = {}) {
     mCtx.lineTo(gap / 2, halfB);
     mCtx.stroke();
   }
-  
+
+  function drawTapIncreasedArea(sizeA, fallbackD) {
+    // CAD-style increased-area tap: rectangular throat with right-side trapezoid transition.
+    const parts = String(sizeA || '').toLowerCase().split('x').map(v => parseFloat(v)).filter(Number.isFinite);
+    const w = inchesToPx(parts[0] || parseDimension(sizeA) || fallbackD);
+    const h = inchesToPx(parts[1] || parts[0] || parseDimension(sizeA) || fallbackD);
+    const leftX = -w * 0.5;
+    const topRightX = w * 0.55;
+    const throatRightX = w * 0.25;
+    const topY = -h * 0.5;
+    const shoulderY = -h * 0.18;
+    const bottomY = h * 0.5;
+
+    // Top duct/reference line, extended past the fitting like the CAD symbol.
+    mCtx.beginPath();
+    mCtx.moveTo(leftX - w * 0.45, topY);
+    mCtx.lineTo(topRightX + w * 0.35, topY);
+    mCtx.stroke();
+
+    // Rectangular throat and right trapezoid increase. The overall height is the inserted H.
+    mCtx.beginPath();
+    mCtx.moveTo(leftX, topY);
+    mCtx.lineTo(topRightX, topY);
+    mCtx.lineTo(throatRightX, shoulderY);
+    mCtx.lineTo(throatRightX, bottomY);
+    mCtx.lineTo(leftX, bottomY);
+    mCtx.lineTo(leftX, topY);
+    mCtx.stroke();
+
+    // Interior throat line that makes the fitting read as a tap, not a generic polygon.
+    mCtx.beginPath();
+    mCtx.moveTo(leftX, shoulderY);
+    mCtx.lineTo(throatRightX, shoulderY);
+    mCtx.stroke();
+  }
+
+  function drawSpinIn(D) {
+    // Round spin-in: collar ring over a straight tap cut, matching rect tap scale cues.
+    const r = D / 2;
+    const gap = Math.max(3, D * 0.18);
+    const plateHalf = r * 0.92;
+
+    // Cut plates, similar to straight rectangular tap symbol.
+    mCtx.beginPath();
+    mCtx.moveTo(-gap, -plateHalf);
+    mCtx.lineTo(-gap, plateHalf);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.moveTo(gap, -plateHalf);
+    mCtx.lineTo(gap, plateHalf);
+    mCtx.stroke();
+
+    // Scaled round collar/turn-in flange.
+    mCtx.beginPath();
+    mCtx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.arc(0, 0, r * 0.42, 0, Math.PI * 2);
+    mCtx.stroke();
+
+    // Small tabs show the spin-lock engagement points.
+    const tab = r * 0.22;
+    mCtx.beginPath();
+    mCtx.moveTo(-tab, -r * 0.72);
+    mCtx.lineTo(tab, -r * 0.72);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.moveTo(-tab, r * 0.72);
+    mCtx.lineTo(tab, r * 0.72);
+    mCtx.stroke();
+  }
+
   function drawSaddle45Y(D, branchD) {
     // SMACNA Saddle Tap 45° Wye - branch takeoff on main duct.
     // D = main duct diameter, branchD = branch diameter (0/empty/same → branch = D)
@@ -1611,6 +1700,40 @@ export function installTakeoffRenderer(ctx = {}) {
     mCtx.lineTo(bandW, sleeveH);
     mCtx.lineTo(bandW, -sleeveH);
     mCtx.closePath();
+    mCtx.stroke();
+  }
+  
+  function drawVolumeDamper(D) {
+    const halfW = D / 2;
+    const len = D * 1.25;
+    const bladeR = halfW * 0.82;
+  
+    // Inline round duct sleeve.
+    mCtx.beginPath();
+    mCtx.moveTo(-len / 2, -halfW);
+    mCtx.lineTo(len / 2, -halfW);
+    mCtx.lineTo(len / 2, halfW);
+    mCtx.lineTo(-len / 2, halfW);
+    mCtx.closePath();
+    mCtx.stroke();
+  
+    // Damper blade and shaft, scaled to duct diameter.
+    mCtx.beginPath();
+    mCtx.moveTo(-bladeR, 0);
+    mCtx.lineTo(bladeR, 0);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.moveTo(0, -halfW * 0.9);
+    mCtx.lineTo(0, halfW * 0.9);
+    mCtx.stroke();
+    mCtx.beginPath();
+    mCtx.arc(0, 0, Math.max(3, D * 0.08), 0, Math.PI * 2);
+    mCtx.stroke();
+  
+    // Handle/lever cue outside the sleeve.
+    mCtx.beginPath();
+    mCtx.moveTo(0, -halfW * 0.9);
+    mCtx.lineTo(D * 0.22, -halfW * 1.24);
     mCtx.stroke();
   }
   

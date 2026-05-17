@@ -41,6 +41,7 @@ let _updatePanel = null;
 let _getProjectSystemSymbols = null;
 let _deleteItems = null; // callback: (measIds, fitIds, stackIds) => void
 let _pasteItems = null; // callback: (clipboard, offsetX, offsetY) => void
+let _onMoveRequest = null; // callback: () => void
 
 // ── CSS ───────────────────────────────────────────────
 const CSS = `
@@ -73,6 +74,8 @@ const CSS = `
 .ms-delete-btn:hover { background: #c73550; }
 .ms-copy-btn { background: #0f3460; color: #4dabf7; border: 1px solid #4dabf7; padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; }
 .ms-copy-btn:hover { background: #1a4080; color: #74c0fc; }
+.ms-move-btn { background: #1a1a2e; color: #ffd43b; border: 1px solid #ffd43b; padding: 5px 12px; border-radius: 5px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.ms-move-btn:hover { background: rgba(255,212,59,0.12); color: #ffe066; }
 
 /* Mode indicator */
 .ms-mode-badge { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 55; border-radius: 6px; padding: 4px 14px; font-size: 11px; font-weight: 600; pointer-events: none; white-space: nowrap; display: none; }
@@ -343,6 +346,7 @@ function updatePanelContent() {
   html += `</select></div>`;
 
   html += `<div class="ms-panel-actions">`;
+  html += `<button class="ms-move-btn" onclick="event.stopPropagation(); window._msMoveSel()" title="Move selected items, then click canvas to place">↔ Move ${count}</button>`;
   html += `<button class="ms-delete-btn" onclick="event.stopPropagation(); window._msDeleteSel()" title="Delete selected items (Del)">🗑 Delete ${count}</button>`;
   html += `<button class="ms-copy-btn" onclick="event.stopPropagation(); window._msCopySel()" title="Copy selected items (Ctrl+C)">📋 Copy ${count}</button>`;
   if (_clipboard) html += `<button class="ms-copy-btn" onclick="event.stopPropagation(); window._msPasteSel()" title="Paste copied items (Ctrl+V)" style="color:#00ff88;border-color:#00ff88">📋 Paste</button>`;
@@ -515,6 +519,7 @@ const MultiSelect = {
     _getProjectSystemSymbols = opts.getProjectSystemSymbols;
     _deleteItems = opts.deleteItems || null;
     _pasteItems = opts.pasteItems || null;
+    _onMoveRequest = opts.onMoveRequest || null;
     _enabled = true;
   },
 
@@ -673,6 +678,9 @@ window._msCopySel = function() {
 };
 window._msPasteSel = function() {
   pasteClipboard();
+};
+window._msMoveSel = function() {
+  if (_onMoveRequest && getSelectionCount() > 0) _onMoveRequest();
 };
 
 export default MultiSelect;

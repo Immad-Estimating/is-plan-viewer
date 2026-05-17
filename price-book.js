@@ -89,6 +89,7 @@ export function installPriceBook(ctx = {}) {
           { key: 'rect-22el', label: '22.5\u00b0 Elbow' },
           { key: 'rect-tee', label: 'Tee-Wye' },
           { key: 'rectTap', label: 'Straight Tap' },
+          { key: 'rect-tapIncreasedArea', label: 'Tap Increased Area' },
           { key: 'rect-wye', label: 'Wye' },
           { key: 'rect-lateral', label: '45\u00b0 Lateral' },
           { key: 'rect-reducer', label: 'Reducer' },
