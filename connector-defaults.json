@@ -1,0 +1,227 @@
+{
+  "_meta": {
+    "version": "0.1.0",
+    "lastUpdated": "2026-05-17",
+    "description": "Connector and joint product defaults for IS Plan Viewer. These are seed construction-standard rules for consumables applied to duct and fitting joints. Project/company overrides and the future Standards tool should take priority.",
+    "units": {
+      "jointLength": "LF",
+      "coverageLength": "LF per material unit",
+      "materialCost": "$ per material unit",
+      "labor": "hrs per application unit"
+    }
+  },
+  "takeoffDefaults": {
+    "activeStandard": "smacna-seal-class-c-seed",
+    "defaultWasteFactor": 1.1,
+    "roundJointLengthFormula": "circumferenceFt",
+    "rectJointLengthFormula": "perimeterFt",
+    "ovalJointLengthFormula": "approxOvalPerimeterFt",
+    "showInCompiler": true,
+    "showInCanvas": false,
+    "description": "Connector quantities are calculated from duct/fitting connection joints and are intended to be reviewed in the future standalone Construction Standards tool."
+  },
+  "products": {
+    "water-based-duct-mastic": {
+      "label": "Water Based Duct Mastic",
+      "family": "sealant",
+      "materialUnit": "gal",
+      "applicationUnit": "LF-joint",
+      "materialCost": 38,
+      "coveragePerUnit": 250,
+      "wasteFactor": 1.1,
+      "laborHrsPerApplicationUnit": 0,
+      "displayColor": "#f8f9fa",
+      "description": "Liquid mastic applied around duct or fitting joints. Coverage should be verified against product data and project specifications."
+    },
+    "foil-scrim-kraft-tape": {
+      "label": "Foil Scrim Kraft Tape",
+      "family": "tape",
+      "materialUnit": "roll",
+      "applicationUnit": "LF-joint",
+      "materialCost": 18,
+      "coveragePerUnit": 150,
+      "wasteFactor": 1.1,
+      "laborHrsPerApplicationUnit": 0,
+      "displayColor": "#b197fc",
+      "description": "Pressure-sensitive tape for listed duct joint applications where allowed by construction standard."
+    },
+    "butyl-gasket-tape": {
+      "label": "Butyl Gasket Tape",
+      "family": "gasket",
+      "materialUnit": "roll",
+      "applicationUnit": "LF-joint",
+      "materialCost": 32,
+      "coveragePerUnit": 50,
+      "wasteFactor": 1.08,
+      "laborHrsPerApplicationUnit": 0,
+      "displayColor": "#4dabf7",
+      "description": "Gasket tape applied along flanged or sealed rectangular joint perimeters."
+    },
+    "rect-s-cleat-slip": {
+      "label": "S-Cleat Slip",
+      "family": "rectangular-joint-hardware",
+      "materialUnit": "LF",
+      "applicationUnit": "LF-joint",
+      "materialCost": 1.25,
+      "coveragePerUnit": 1,
+      "wasteFactor": 1.05,
+      "laborHrsPerApplicationUnit": 0,
+      "displayColor": "#c74343",
+      "description": "S-cleat slip connector used on opposing sides of simple rectangular duct slip-and-drive joints."
+    },
+    "rect-drive-cleat": {
+      "label": "Drive Cleat",
+      "family": "rectangular-joint-hardware",
+      "materialUnit": "LF",
+      "applicationUnit": "LF-joint",
+      "materialCost": 1.1,
+      "coveragePerUnit": 1,
+      "wasteFactor": 1.05,
+      "laborHrsPerApplicationUnit": 0,
+      "displayColor": "#1f6b4a",
+      "description": "Drive cleat connector used on the remaining sides of simple rectangular duct slip-and-drive joints."
+    },
+    "sheet-metal-screws": {
+      "label": "Fasteners (Screws/Rivets)",
+      "family": "fastener",
+      "materialUnit": "EA",
+      "applicationUnit": "EA",
+      "materialCost": 0.08,
+      "coveragePerUnit": 1,
+      "wasteFactor": 1.05,
+      "laborHrsPerApplicationUnit": 0,
+      "displayColor": "#b08d35",
+      "description": "Fastener allowance for mechanical connections where the selected standard requires screws."
+    }
+  },
+  "jointCountDefaults": {
+    "fittings": {
+      "90el": 2,
+      "45el": 2,
+      "22el": 2,
+      "tee": 3,
+      "saddle45y": 1,
+      "lateral": 2,
+      "wye": 3,
+      "reducer": 2,
+      "eccReducer": 2,
+      "endcap": 1,
+      "coupling": 2,
+      "transition": 2,
+      "sqwing": 2,
+      "rectTap": 1,
+      "tapIncreasedArea": 1,
+      "spin-in": 1,
+      "volume-damper": 2,
+      "boot": 2,
+      "flex-conn": 2,
+      "plenum": 1
+    },
+    "duct": {
+      "spiral": {
+        "standardLengthFt": 10,
+        "jointPolicy": "standard-length-coupling",
+        "jointsPerCoupling": 2
+      },
+      "round": {
+        "standardLengthFt": 5,
+        "jointPolicy": "standard-length-snaplock",
+        "jointsPerJoint": 1
+      },
+      "rect": {
+        "standardLengthFt": 4,
+        "jointPolicy": "standard-length-slip-drive",
+        "jointsPerJoint": 1
+      },
+      "oval": {
+        "standardLengthFt": 10,
+        "jointPolicy": "standard-length-oval",
+        "jointsPerJoint": 1
+      },
+      "flex": {
+        "standardLengthFt": null,
+        "jointPolicy": "none"
+      }
+    }
+  },
+  "standards": {
+    "smacna-seal-class-c-seed": {
+      "label": "SMACNA Seed - Seal Class C",
+      "source": "SMACNA-style seed default",
+      "description": "Starter rule set for connector material takeoff. Quantities and allowed products must be reviewed against the actual project specification before use.",
+      "rules": [
+        {
+          "id": "round-spiral-joint-mastic",
+          "label": "Round/Oval/Spiral Joint Mastic",
+          "product": "water-based-duct-mastic",
+          "appliesToShapes": ["spiral", "round", "oval"],
+          "appliesToJointTypes": ["duct-fitting", "fitting-fitting", "duct-duct"],
+          "quantityFormula": "jointLengthFt / coveragePerUnit * wasteFactor",
+          "jointLengthFormula": "circumferenceFt",
+          "enabled": true
+        },
+        {
+          "id": "rect-joint-mastic",
+          "label": "Rectangular Joint Mastic",
+          "product": "water-based-duct-mastic",
+          "appliesToShapes": ["rect"],
+          "appliesToJointTypes": ["duct-fitting", "fitting-fitting", "duct-duct"],
+          "quantityFormula": "jointLengthFt / coveragePerUnit * wasteFactor",
+          "jointLengthFormula": "perimeterFt",
+          "enabled": true
+        },
+        {
+          "id": "rect-joint-tape",
+          "label": "Rectangular Joint Tape",
+          "product": "foil-scrim-kraft-tape",
+          "appliesToShapes": ["rect"],
+          "appliesToJointTypes": ["slip-drive", "duct-fitting", "fitting-fitting", "duct-duct"],
+          "quantityFormula": "jointLengthFt / coveragePerUnit * wasteFactor",
+          "jointLengthFormula": "perimeterFt",
+          "enabled": false,
+          "notes": "Use only where the project specification allows a listed tape closure/sealing system. Not a default replacement for mastic in higher SMACNA seal classes."
+        },
+        {
+          "id": "rect-s-cleat-slip",
+          "label": "Rectangular S-Cleats (Slip)",
+          "product": "rect-s-cleat-slip",
+          "appliesToShapes": ["rect"],
+          "appliesToJointTypes": ["slip-drive", "duct-fitting", "fitting-fitting", "duct-duct"],
+          "quantityFormula": "jointLengthFt / coveragePerUnit * wasteFactor",
+          "jointLengthFormula": "opposingSidesFt",
+          "enabled": true
+        },
+        {
+          "id": "rect-drive-cleat",
+          "label": "Rectangular Drive Cleats",
+          "product": "rect-drive-cleat",
+          "appliesToShapes": ["rect"],
+          "appliesToJointTypes": ["slip-drive", "duct-fitting", "fitting-fitting", "duct-duct"],
+          "quantityFormula": "jointLengthFt / coveragePerUnit * wasteFactor",
+          "jointLengthFormula": "opposingSidesFt",
+          "enabled": true
+        },
+        {
+          "id": "rect-flange-gasket",
+          "label": "Rectangular Flange Gasket",
+          "product": "butyl-gasket-tape",
+          "appliesToShapes": ["rect"],
+          "appliesToJointTypes": ["flange"],
+          "quantityFormula": "jointLengthFt / coveragePerUnit * wasteFactor",
+          "jointLengthFormula": "perimeterFt",
+          "enabled": false
+        },
+        {
+          "id": "mechanical-fastener-allowance",
+          "label": "Mechanical Fastener Allowance",
+          "product": "sheet-metal-screws",
+          "appliesToShapes": ["spiral", "round", "rect", "oval"],
+          "appliesToJointTypes": ["duct-fitting", "duct-duct", "fitting-fitting"],
+          "quantityFormula": "ceil(jointLengthFt / spacingFt) * wasteFactor",
+          "spacingFt": 0.5,
+          "enabled": false
+        }
+      ]
+    }
+  }
+}

@@ -6,7 +6,8 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_DEFAULTS, HANGER_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_DEFAULTS, HANGER_DEFAULTS, CONNECTOR_DEFAULTS, loadConnectorDefaults } from './price-defaults.js';
+import { calculateConnectorApplicationsForItem } from './connector-rules.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -509,7 +510,11 @@ function buildHangerRow(h, page, drawingId, drawingName, labRate, source) {
 
 function getAutoCouplingSpacingFtForDuct(duct) {
   if (!duct) return 0;
-  if (duct.type === 'spiral') return 10;
+  if (duct.type === 'spiral') {
+    const spiralDefaults = CONNECTOR_DEFAULTS.jointCountDefaults && CONNECTOR_DEFAULTS.jointCountDefaults.duct && CONNECTOR_DEFAULTS.jointCountDefaults.duct.spiral;
+    const standardLengthFt = spiralDefaults && parseFloat(spiralDefaults.standardLengthFt);
+    return standardLengthFt > 0 ? standardLengthFt : 10;
+  }
   return 0;
 }
 
@@ -568,6 +573,91 @@ function buildAutoCouplingRowsForMeasurement(m, page, drawingId, drawingName, la
     });
   }
   return rows;
+}
+
+function buildConnectorRows(applications, context, labRate) {
+  return applications.map((app) => {
+    const connectorKey = `${context.sourceType}:${context.sourceId}:${app.ruleId}:${app.productKey}`;
+    const ovr = (context.connectorOverrides && context.connectorOverrides[connectorKey]) || {};
+    const hasOverride = Object.keys(ovr).length > 0;
+    let laborHrs = app.laborHrs || 0;
+    let materialCost = app.materialCost || 0;
+    const laborCost = laborHrs * labRate;
+    const laborCatHrs = {};
+    const laborCatCost = {};
+    for (const cat of LABOR_CATEGORIES) {
+      laborCatHrs[cat.key] = 0;
+      laborCatCost[cat.key] = 0;
+    }
+    if (laborHrs > 0) {
+      laborCatHrs.rough = laborHrs;
+      laborCatCost.rough = laborCost;
+    }
+    const origLaborHrs = laborHrs;
+    const origMaterialCost = materialCost;
+    const origLaborCost = laborCost;
+    const origTotalCost = materialCost + laborCost;
+    const origLaborCatHrs = { ...laborCatHrs };
+    if (ovr.laborHrs != null) laborHrs = ovr.laborHrs;
+    if (ovr.materialCost != null) materialCost = ovr.materialCost;
+    for (const cat of LABOR_CATEGORIES) {
+      if (ovr['laborCat_' + cat.key] != null) {
+        laborCatHrs[cat.key] = ovr['laborCat_' + cat.key];
+        laborCatCost[cat.key] = ovr['laborCat_' + cat.key] * labRate;
+      }
+    }
+    const finalLaborCost = ovr.laborCost != null ? ovr.laborCost : laborHrs * labRate;
+    const finalTotalCost = ovr.totalCost != null ? ovr.totalCost : materialCost + finalLaborCost;
+    const perLfText = app.costPerJointFt ? ` / $${app.costPerJointFt.toFixed(3)}/LF` : '';
+    const qtyText = `${(app.materialQty || 0).toFixed(3)} ${app.materialUnit || ''}`.trim();
+    const jointText = `${app.jointCount || 0} joints / ${(app.totalJointLengthFt || 0).toFixed(2)} LF joint`;
+    return {
+      _itemType: 'Connector Product',
+      _size: `${qtyText} (${jointText}${perLfText})`,
+      _shape: app.productLabel || app.productKey || 'Connector',
+      _page: context.page, _drawingId: context.drawingId, _drawingName: context.drawingName,
+      _lengthFt: 0, _matCost: materialCost, _laborHrs: laborHrs,
+      _laborCost: finalLaborCost, _totalCost: finalTotalCost,
+      _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost,
+      _laborCatLabel: laborHrs > 0 ? 'Rough' : 'unassigned',
+      _hasOverride: hasOverride, _overrides: ovr,
+      _orig_laborHrs: origLaborHrs, _orig_materialCost: origMaterialCost,
+      _orig_laborCost: origLaborCost, _orig_totalCost: origTotalCost, _orig_lengthFt: 0,
+      _orig_laborCatHrs: origLaborCatHrs,
+      phase: context.phase || null, costGroup: context.costGroup || 'connectors', gauge: context.gauge || null,
+      systemSymbol: context.systemSymbol || null,
+      _sourceType: 'connector',
+      _sourceId: connectorKey,
+      _connectorSourceType: context.sourceType,
+      _connectorSourceId: context.sourceId,
+      _connectorParentMeasurementId: context.parentMeasurementId || null,
+      _connectorKey: connectorKey,
+      _sourceStackId: context.sourceStackId || null,
+      _connectorRuleId: app.ruleId,
+      _connectorRuleLabel: app.ruleLabel,
+      _connectorProductKey: app.productKey,
+      _connectorFamily: app.family,
+      _connectorMaterialQty: app.materialQty || 0,
+      _connectorMaterialUnit: app.materialUnit || '',
+      _connectorJointCount: app.jointCount || 0,
+      _connectorJointLengthFt: app.jointLengthFt || 0,
+      _connectorTotalJointLengthFt: app.totalJointLengthFt || 0,
+      _connectorQtyPerJoint: app.qtyPerJoint || 0,
+      _connectorQtyPerJointFt: app.qtyPerJointFt || 0,
+      _connectorCostPerJoint: app.costPerJoint || 0,
+      _connectorCostPerJointFt: app.costPerJointFt || 0,
+      _connectorMaterialCostRate: app.materialCostRate || 0,
+      _connectorCoveragePerUnit: app.coveragePerUnit || 0,
+      _connectorWasteFactor: app.wasteFactor || 0,
+      _connectorStandardLabel: app.standardLabel || '',
+    };
+  });
+}
+
+function addConnectorRows(rows, item, context, labRate, options) {
+  if (!CONNECTOR_DEFAULTS.takeoffDefaults || CONNECTOR_DEFAULTS.takeoffDefaults.showInCompiler === false) return;
+  const apps = calculateConnectorApplicationsForItem(item, CONNECTOR_DEFAULTS, options || {});
+  if (apps.length > 0) rows.push(...buildConnectorRows(apps, context, labRate));
 }
 
 function getStrapDefaults() {
@@ -873,6 +963,22 @@ function normalizeRows(allPageData, drawingNames) {
       if (!persistedAutoCouplingSources.has(String(m.id))) {
         rows.push(...buildAutoCouplingRowsForMeasurement(m, page, drawingId, drawingName, labRate));
       }
+      if (!persistedAutoCouplingSources.has(String(m.id))) {
+        addConnectorRows(rows, {
+          ...m,
+          kind: 'duct',
+          lengthFt,
+        }, {
+          page, drawingId, drawingName,
+          sourceType: 'measurement',
+          sourceId: m.id,
+          phase: m.phase,
+          costGroup: m.costGroup,
+          gauge: m.gauge,
+          systemSymbol: m.systemSymbol,
+          connectorOverrides: pd.connectorOverrides || {},
+        }, labRate);
+      }
     }
 
     for (const f of (pd.fittings || [])) {
@@ -1098,6 +1204,21 @@ function normalizeRows(allPageData, drawingNames) {
         systemSymbol: f.systemSymbol || null,
         _sourceType: 'fitting', _sourceId: f.id,
       });
+      addConnectorRows(rows, {
+        ...f,
+        kind: 'fitting',
+        shape: shape === 'round' && f.roundType === 'spiral' ? 'spiral' : shape,
+      }, {
+        page, drawingId, drawingName,
+        sourceType: 'fitting',
+        sourceId: f.id,
+        parentMeasurementId: f.sourceMeasurementId || null,
+        phase: f.phase,
+        costGroup: f.costGroup,
+        gauge: f.gauge,
+        systemSymbol: f.systemSymbol,
+        connectorOverrides: pd.connectorOverrides || {},
+      }, labRate);
     }
 
     for (const h of (pd.hangers || [])) {
@@ -1280,6 +1401,32 @@ function normalizeRows(allPageData, drawingNames) {
           _sourceType: 'stack', _sourceId: it.id, _sourceStackId: s.id,
           _lined: !!it.lined, _linerPerFt: stLinerPerFt,
         });
+        const connectorShape = stIsDuct
+          ? (stIsFlex ? 'flex' : (shape === 'round' && stRoundType === 'spiral' ? 'spiral' : shape))
+          : (shape === 'round' && stRoundType === 'spiral' ? 'spiral' : shape);
+        const connectorItem = stIsDuct
+          ? {
+              ...it,
+              kind: 'duct',
+              duct: {
+                type: connectorShape,
+                shape: connectorShape,
+                dims: shape === 'rect' || shape === 'oval' ? (it.sizeA + 'x' + it.sizeB) : it.sizeA,
+              },
+              lengthFt: stLengthFt,
+            }
+          : { ...it, kind: 'fitting', shape: connectorShape, roundType: stRoundType };
+        addConnectorRows(rows, connectorItem, {
+          page, drawingId, drawingName,
+          sourceType: 'stack',
+          sourceId: it.id,
+          sourceStackId: s.id,
+          phase: it.phase,
+          costGroup: it.costGroup,
+          gauge: stGauge,
+          systemSymbol: it.systemSymbol,
+          connectorOverrides: pd.connectorOverrides || {},
+        }, labRate);
       }
     }
   }
@@ -1797,6 +1944,7 @@ function _saveGrandAdj() {
 
 async function loadCompilerData() {
   if (!_projectId) { _rows = []; return; }
+  await loadConnectorDefaults();
   await loadPriceBook();
   await loadProjectRate(_projectId);
   _loadGrandAdj();
@@ -1825,6 +1973,12 @@ async function loadCompilerData() {
       if (r._sourceType === 'measurement' && _selMeasIds && _selMeasIds.has(r._sourceId)) return true;
       if (r._sourceType === 'fitting' && _selFitIds && _selFitIds.has(r._sourceId)) return true;
       if (r._sourceType === 'stack' && _selStackIds && _selStackIds.has(r._sourceStackId)) return true;
+      if (r._sourceType === 'connector') {
+        if (r._connectorSourceType === 'measurement' && _selMeasIds && _selMeasIds.has(r._connectorSourceId)) return true;
+        if (r._connectorParentMeasurementId != null && _selMeasIds && _selMeasIds.has(r._connectorParentMeasurementId)) return true;
+        if (r._connectorSourceType === 'fitting' && _selFitIds && _selFitIds.has(r._connectorSourceId)) return true;
+        if (r._connectorSourceType === 'stack' && _selStackIds && _selStackIds.has(r._sourceStackId)) return true;
+      }
       return false;
     });
   }
@@ -2081,6 +2235,15 @@ async function _writeOverrideToSource(row) {
           }
         }
         if (changed) break;
+      }
+    } else if (row._sourceType === 'connector') {
+      const key = row._connectorKey || row._sourceId;
+      if (key && String(pd.pageNum || 0) === String(row._page || 0)) {
+        if (!pd.connectorOverrides) pd.connectorOverrides = {};
+        if (isEmpty) delete pd.connectorOverrides[key];
+        else pd.connectorOverrides[key] = { ...ovr };
+        if (Object.keys(pd.connectorOverrides).length === 0) delete pd.connectorOverrides;
+        changed = true;
       }
     }
     if (changed) {

@@ -552,6 +552,77 @@ export const HANGER_DEFAULTS = {
   autoRules: [],
   assemblies: {},
 };
+let _connectorsLoaded = false;
+const CONNECTOR_STORAGE_KEY = 'isplan_connector_defaults_override';
+let CONNECTOR_SEED_DEFAULTS = null;
+export const CONNECTOR_DEFAULTS = {
+  _meta: {},
+  takeoffDefaults: {},
+  products: {},
+  jointCountDefaults: { fittings: {}, duct: {} },
+  standards: {},
+};
+
+function deepMerge(target, source) {
+  if (!source || typeof source !== 'object') return target;
+  for (const key of Object.keys(source)) {
+    const value = source[key];
+    if (key === 'rules' && Array.isArray(target[key]) && Array.isArray(value)) {
+      const merged = target[key].map(rule => ({ ...rule }));
+      for (const savedRule of value) {
+        const idx = merged.findIndex(rule => rule && savedRule && rule.id === savedRule.id);
+        if (idx >= 0) merged[idx] = deepMerge(merged[idx], savedRule);
+        else merged.push(savedRule);
+      }
+      target[key] = merged;
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      if (!target[key] || typeof target[key] !== 'object' || Array.isArray(target[key])) target[key] = {};
+      deepMerge(target[key], value);
+    } else {
+      target[key] = value;
+    }
+  }
+  return target;
+}
+
+function cloneDefaults(obj) {
+  return JSON.parse(JSON.stringify(obj || {}));
+}
+
+function normalizeConnectorDuctDefaults(defaults) {
+  const duct = defaults.jointCountDefaults && defaults.jointCountDefaults.duct;
+  if (!duct) return;
+  if (!duct.spiral) duct.spiral = {};
+  if (!duct.round) duct.round = {};
+  if (!duct.rect) duct.rect = {};
+  if (!duct.oval) duct.oval = {};
+  if (!duct.spiral.standardLengthFt) duct.spiral.standardLengthFt = 10;
+  if (!duct.spiral.jointPolicy) duct.spiral.jointPolicy = 'standard-length-coupling';
+  if (!duct.spiral.jointsPerCoupling) duct.spiral.jointsPerCoupling = 2;
+  if (duct.round.standardLengthFt == null || duct.round.jointPolicy === 'none') {
+    duct.round.standardLengthFt = 5;
+    duct.round.jointPolicy = 'standard-length-snaplock';
+    duct.round.jointsPerJoint = duct.round.jointsPerJoint || 1;
+  }
+  if (duct.rect.standardLengthFt == null || duct.rect.jointPolicy === 'deferred-slip-drive') {
+    duct.rect.standardLengthFt = 4;
+    duct.rect.jointPolicy = 'standard-length-slip-drive';
+    duct.rect.jointsPerJoint = duct.rect.jointsPerJoint || 1;
+  }
+  if (duct.oval.standardLengthFt == null || duct.oval.jointPolicy === 'deferred') {
+    duct.oval.standardLengthFt = 10;
+    duct.oval.jointPolicy = 'standard-length-oval';
+    duct.oval.jointsPerJoint = duct.oval.jointsPerJoint || 1;
+  }
+  const standards = defaults.standards || {};
+  for (const standard of Object.values(standards)) {
+    for (const rule of ((standard && standard.rules) || [])) {
+      if (rule.id === 'round-spiral-joint-mastic' && Array.isArray(rule.appliesToShapes) && !rule.appliesToShapes.includes('oval')) {
+        rule.appliesToShapes.push('oval');
+      }
+    }
+  }
+}
 
 export async function loadLaborDefaults() {
   if (_laborLoaded) return;
@@ -589,6 +660,57 @@ export async function loadHangerDefaults() {
     }
     _hangersLoaded = true;
   } catch (e) { console.warn('Could not load hangers-defaults.json:', e); }
+}
+
+export async function loadConnectorDefaults() {
+  if (_connectorsLoaded) return;
+  try {
+    const resp = await fetch('./connector-defaults.json');
+    if (!resp.ok) return;
+    const cj = await resp.json();
+    CONNECTOR_DEFAULTS._meta = cj._meta || {};
+    CONNECTOR_DEFAULTS.takeoffDefaults = cj.takeoffDefaults || {};
+    CONNECTOR_DEFAULTS.products = cj.products || {};
+    CONNECTOR_DEFAULTS.jointCountDefaults = cj.jointCountDefaults || { fittings: {}, duct: {} };
+    CONNECTOR_DEFAULTS.standards = cj.standards || {};
+    CONNECTOR_SEED_DEFAULTS = cloneDefaults(CONNECTOR_DEFAULTS);
+    try {
+      const saved = localStorage.getItem(CONNECTOR_STORAGE_KEY);
+      if (saved) deepMerge(CONNECTOR_DEFAULTS, JSON.parse(saved));
+    } catch (e) { console.warn('Could not load connector standards overrides:', e); }
+    normalizeConnectorDuctDefaults(CONNECTOR_DEFAULTS);
+    _connectorsLoaded = true;
+  } catch (e) { console.warn('Could not load connector-defaults.json:', e); }
+}
+
+export function saveConnectorDefaultsOverride(patch) {
+  deepMerge(CONNECTOR_DEFAULTS, patch || {});
+  try {
+    const existing = JSON.parse(localStorage.getItem(CONNECTOR_STORAGE_KEY) || '{}');
+    deepMerge(existing, patch || {});
+    localStorage.setItem(CONNECTOR_STORAGE_KEY, JSON.stringify(existing));
+  } catch (e) { console.warn('Could not save connector standards overrides:', e); }
+}
+
+export function replaceConnectorDefaultsSection(sectionKey, value) {
+  CONNECTOR_DEFAULTS[sectionKey] = cloneDefaults(value);
+  try {
+    const existing = JSON.parse(localStorage.getItem(CONNECTOR_STORAGE_KEY) || '{}');
+    existing[sectionKey] = cloneDefaults(value);
+    localStorage.setItem(CONNECTOR_STORAGE_KEY, JSON.stringify(existing));
+  } catch (e) { console.warn('Could not replace connector standards override:', e); }
+}
+
+export function resetConnectorDefaultsOverride() {
+  try { localStorage.removeItem(CONNECTOR_STORAGE_KEY); } catch (e) { /* non-critical */ }
+}
+
+export function getConnectorDefaultsSnapshot() {
+  return cloneDefaults(CONNECTOR_DEFAULTS);
+}
+
+export function getConnectorSeedDefaultsSnapshot() {
+  return cloneDefaults(CONNECTOR_SEED_DEFAULTS || CONNECTOR_DEFAULTS);
 }
 
 // ── Spiral Saddle Tap pricing (exposed, $/EA by branch×main) ─────────

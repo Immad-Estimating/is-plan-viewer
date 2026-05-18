@@ -60,6 +60,82 @@
   .toolbar .zoom-display { font-size: 13px; min-width: 50px; text-align: center; color: #a0a0c0; }
   .toolbar .separator { width: 1px; height: 24px; background: #0f3460; }
   .toolbar .page-info { font-size: 13px; color: #a0a0c0; }
+  .cs-shell { display: grid; grid-template-columns: minmax(360px, 1.12fr) minmax(300px, 0.88fr); gap: 14px; color: #e0e0e0; }
+  .cs-left, .cs-right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .cs-hero, .cs-pane { background: linear-gradient(145deg, rgba(16,24,43,0.96), rgba(13,19,36,0.92)); border: 1px solid rgba(116,192,252,0.16); border-radius: 16px; box-shadow: 0 18px 46px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05); overflow: hidden; }
+  .cs-hero-head, .cs-pane-head { width: 100%; background: linear-gradient(135deg, rgba(116,192,252,0.12), rgba(233,69,96,0.08)); border: 0; border-bottom: 1px solid rgba(116,192,252,0.12); color: #fff; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; text-align: left; cursor: pointer; }
+  .cs-pane-head:hover { background: linear-gradient(135deg, rgba(116,192,252,0.18), rgba(255,212,59,0.08)); }
+  .cs-title { display: block; font-weight: 800; font-size: 13px; letter-spacing: 0.2px; }
+  .cs-subtitle { display: block; color: #93a4bd; font-size: 11px; margin-top: 2px; font-weight: 500; }
+  .cs-caret { color: #ffd43b; font-size: 16px; padding-left: 12px; }
+  .cs-pane-body, .cs-hero-body { padding: 12px; }
+  .cs-preview-switcher { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 8px; margin-bottom: 10px; }
+  .cs-preview-switcher button { background: rgba(8,14,27,0.78); border: 1px solid rgba(116,192,252,0.16); border-radius: 12px; color: #93a4bd; cursor: pointer; padding: 9px 10px; text-align: left; }
+  .cs-preview-switcher button:hover { border-color: rgba(255,212,59,0.45); background: rgba(116,192,252,0.12); }
+  .cs-preview-switcher button.active { background: linear-gradient(135deg, rgba(255,212,59,0.22), rgba(116,192,252,0.14)); border-color: #ffd43b; color: #fff; box-shadow: 0 0 0 1px rgba(255,212,59,0.15); }
+  .cs-preview-switcher b { display: block; font-size: 12px; }
+  .cs-preview-switcher span { display: block; color: #93a4bd; font-size: 10px; margin-top: 2px; }
+  .cs-model-stage { position: relative; min-height: 360px; background: #e6e7e9; border: 1px solid rgba(116,192,252,0.16); border-radius: 16px; overflow: hidden; }
+  .cs-joint-svg { width: 100%; height: 360px; display: block; }
+  .cs-reference-image-view { position: relative; min-height: 360px; background: #e6e7e9; }
+  .cs-reference-image-view img { display: block; width: 100%; height: 360px; object-fit: cover; object-position: center; }
+  .cs-reference-color-key { position: absolute; left: 12px; right: 12px; bottom: 46px; display: flex; gap: 8px; flex-wrap: wrap; pointer-events: none; }
+  .cs-reference-color-key span { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.78); color: #1f2937; border: 1px solid rgba(31,41,55,0.12); border-radius: 999px; padding: 6px 9px; font-size: 10px; font-weight: 800; box-shadow: 0 8px 18px rgba(0,0,0,0.12); }
+  .cs-reference-color-key i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.22); }
+  .cs-reference-caption { position: absolute; left: 12px; bottom: 12px; max-width: calc(100% - 24px); background: rgba(8,14,27,0.78); color: #e5edf8; border-left: 3px solid #ffd43b; border-radius: 10px; padding: 7px 10px; font-size: 11px; backdrop-filter: blur(8px); }
+  .cs-layer-strip { position: absolute; left: 14px; bottom: 14px; right: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .cs-layer-chip { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border-radius: 999px; background: rgba(6,12,24,0.78); border: 1px solid rgba(255,255,255,0.08); color: #d8e6f7; font-size: 11px; backdrop-filter: blur(8px); }
+  .cs-layer-dot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 16px currentColor; }
+  .cs-preview-note, .cs-muted { color: #93a4bd; font-size: 11px; line-height: 1.4; }
+  .cs-standard-manager { background: linear-gradient(145deg, rgba(16,24,43,0.96), rgba(13,19,36,0.92)); border: 1px solid rgba(116,192,252,0.16); border-radius: 16px; padding: 12px; box-shadow: 0 18px 46px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05); }
+  .cs-section-kicker { color: #ffd43b; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 9px; }
+  .cs-standards-list { display: grid; gap: 8px; margin-bottom: 12px; }
+  .cs-standard-card { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; text-align: left; background: rgba(8,14,27,0.72); border: 1px solid rgba(116,192,252,0.12); color: #d8e6f7; border-radius: 12px; padding: 9px 10px; cursor: pointer; }
+  .cs-standard-card.active { border-color: #ffd43b; background: linear-gradient(135deg, rgba(255,212,59,0.16), rgba(116,192,252,0.08)); }
+  .cs-standard-card b { display: block; font-size: 12px; color: #fff; }
+  .cs-standard-card small { display: block; color: #93a4bd; font-size: 10px; line-height: 1.35; margin-top: 2px; }
+  .cs-radio-dot { color: #ffd43b; font-size: 13px; line-height: 1; }
+  .cs-standard-detail { display: grid; gap: 8px; border-top: 1px solid rgba(116,192,252,0.12); padding-top: 10px; }
+  .cs-standard-detail label { color: #93a4bd; font-size: 10px; display: flex; flex-direction: column; gap: 4px; }
+  .cs-standard-detail input, .cs-standard-detail textarea { background: #0b1222; border: 1px solid rgba(116,192,252,0.18); color: #fff; border-radius: 8px; padding: 7px 8px; font-size: 11px; width: 100%; resize: vertical; }
+  .cs-standard-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+  .cs-standard-actions button { background: #0f3460; color: #d8e6f7; border: 1px solid rgba(116,192,252,0.22); border-radius: 8px; padding: 7px 9px; font-size: 10px; font-weight: 800; cursor: pointer; }
+  .cs-standard-actions button:hover { border-color: #ffd43b; color: #fff; }
+  .cs-standard-actions button.danger { background: rgba(233,69,96,0.16); border-color: rgba(233,69,96,0.42); color: #ffb3c1; }
+  .cs-active-components { margin-top: 10px; background: rgba(8,14,27,0.52); border: 1px solid rgba(116,192,252,0.1); border-radius: 12px; padding: 10px; }
+  .cs-active-components b { display: block; color: #fff; font-size: 12px; margin-bottom: 5px; }
+  .cs-active-components ul { margin: 0; padding-left: 16px; color: #d8e6f7; font-size: 11px; line-height: 1.55; }
+  .cs-active-components li span { color: #93a4bd; margin-left: 4px; }
+  .cs-empty { color: #93a4bd; background: rgba(8,14,27,0.55); border: 1px dashed rgba(116,192,252,0.18); border-radius: 12px; padding: 14px; font-size: 12px; }
+  .cs-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 10px; }
+  .cs-product-card, .cs-rule-card { background: rgba(8,14,27,0.72); border: 1px solid rgba(116,192,252,0.12); border-radius: 14px; padding: 11px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+  .cs-product-card.active-product, .cs-rule-card.active-product { border-color: color-mix(in srgb, var(--cs-accent), transparent 35%); box-shadow: 0 0 0 1px color-mix(in srgb, var(--cs-accent), transparent 62%), 0 12px 28px rgba(0,0,0,0.22); }
+  .cs-product-name { color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; gap: 7px; margin-bottom: 2px; }
+  .cs-color-swatch { width: 12px; height: 12px; border-radius: 50%; background: var(--cs-accent); box-shadow: 0 0 16px var(--cs-accent); }
+  .cs-product-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .cs-product-fields label, .cs-joint-grid label, .cs-duct-policy label { color: #93a4bd; font-size: 10px; display: flex; flex-direction: column; gap: 3px; }
+  .cs-product-fields input, .cs-joint-grid input, .cs-duct-policy input { background: #0b1222; border: 1px solid rgba(116,192,252,0.18); color: #fff; border-radius: 8px; padding: 7px 8px; font-size: 11px; width: 100%; }
+  .cs-product-fields input[type="color"] { height: 31px; padding: 3px; cursor: pointer; }
+  .cs-rule-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .cs-rule-tabs button { background: #0b1222; color: #93a4bd; border: 1px solid rgba(116,192,252,0.16); border-radius: 999px; padding: 6px 11px; cursor: pointer; font-size: 11px; }
+  .cs-rule-tabs button.active { color: #08101e; background: #ffd43b; border-color: #ffd43b; font-weight: 800; }
+  .cs-rule-card { display: grid; gap: 9px; }
+  .cs-rule-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .cs-rule-check { color: #fff; font-weight: 800; font-size: 12px; line-height: 1.25; }
+  .cs-rule-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cs-pill { color: #cfe8ff; background: rgba(116,192,252,0.12); border: 1px solid rgba(116,192,252,0.14); border-radius: 999px; padding: 4px 7px; font-size: 10px; }
+  .cs-application-sample { display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: end; background: rgba(8,14,27,0.58); border: 1px solid rgba(116,192,252,0.14); border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+  .cs-application-sample label { color: #93a4bd; font-size: 10px; display: flex; flex-direction: column; gap: 4px; }
+  .cs-application-sample input { background: #0b1222; border: 1px solid rgba(116,192,252,0.18); color: #fff; border-radius: 8px; padding: 7px 8px; font-size: 11px; width: 100%; }
+  .cs-application-sample span { color: #cfe8ff; font-size: 11px; line-height: 1.35; }
+  .cs-application-math { display: grid; gap: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 8px; }
+  .cs-application-math div { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .cs-application-math b { color: #fff; font-size: 10px; }
+  .cs-application-math span { color: #cfe8ff; font-size: 10px; text-align: right; }
+  .cs-joint-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(86px, 1fr)); gap: 8px; }
+  .cs-duct-policy { margin-top: 12px; border-top: 1px solid rgba(116,192,252,0.12); padding-top: 10px; display: grid; grid-template-columns: 1fr 92px 92px; gap: 8px; align-items: center; }
+  .cs-duct-policy b { display: block; font-size: 12px; color: #fff; }
+  .cs-duct-policy span { color: #93a4bd; font-size: 10px; }
   .page-name-editable { font-size: 13px; color: #e0e0e0; cursor: pointer; padding: 2px 6px; border-radius: 3px; border: 1px solid transparent; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .page-name-editable:hover { border-color: #0f3460; }
   .page-name-editable:empty::before { content: '+ Name'; color: #555; font-style: italic; }
@@ -592,6 +668,7 @@
     <button id="panelBtn" onclick="togglePanel()" title="Analysis Panel" class="tool-has-tip">📊 Analysis<span class="tool-tip">Measurements Panel<br>View all duct runs, fittings,<br>stacks &amp; costs per page</span></button>
     <button id="compilerBtn" onclick="toggleCompiler()" title="Compiler" class="tool-has-tip">⚙️ Compiler<span class="tool-tip">Takeoff Compiler<br>Group, filter &amp; aggregate<br>all items across drawings</span></button>
     <button onclick="openPriceBook()" title="Global Price Book" class="tool-has-tip">💲 Prices<span class="tool-tip">Global Price Book<br>Set material costs &amp; labor<br>rates for all item types</span></button>
+    <button onclick="openConnectorStandards()" title="Connector Standards" class="tool-has-tip">🔩 Standards<span class="tool-tip">Connector Standards<br>Edit joint rules, coverage,<br>costs &amp; application quantities</span></button>
     <button onclick="openHVACLibrary()" title="HVAC Component Library" class="tool-has-tip">📚 Library<span class="tool-tip">HVAC Component Library<br>Master catalog of equipment,<br>fans, grilles &amp; more</span></button>
 
   </div>
@@ -902,6 +979,19 @@
   </div>
 </div>
 
+<!-- ===== CONNECTOR STANDARDS PANEL ===== -->
+<div id="connectorStandardsPanel" style="display:none;position:fixed;z-index:300;background:#16213e;border:1px solid #0f3460;border-radius:12px;box-shadow:0 14px 42px rgba(0,0,0,0.65);flex-direction:column;overflow:hidden;min-width:560px;min-height:430px;width:720px;height:620px">
+  <div id="csTitleBar" style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:linear-gradient(135deg,#0f3460,#111b33);cursor:move;user-select:none;border-radius:12px 12px 0 0;flex-shrink:0">
+    <span style="font-weight:700;font-size:14px;color:#ffd43b">🔩 Connector Standards / Applications</span>
+    <button onclick="closeConnectorStandards()" style="background:none;border:none;color:#a0a0c0;cursor:pointer;font-size:18px;padding:0 4px;line-height:1" title="Close">×</button>
+  </div>
+  <div style="padding:8px 12px 0;color:#a0a0c0;font-size:11px;line-height:1.35;flex-shrink:0">Review and edit how mastic, tape, gaskets, and fasteners apply to duct and fitting joints. Changes refresh the compiler when it is open.</div>
+  <div id="connectorStandardsContent" style="overflow-y:auto;flex:1;padding:12px"></div>
+  <div id="csResizeHandle" style="position:absolute;bottom:0;right:0;width:16px;height:16px;cursor:nwse-resize;opacity:0.45" title="Drag to resize">
+    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M14 14L8 14L14 8Z" fill="#a0a0c0"/><path d="M14 14L11 14L14 11Z" fill="#666"/></svg>
+  </div>
+</div>
+
 <!-- ===== HVAC LIBRARY PANEL ===== -->
 <div id="hvacLibraryPanel" style="display:none;position:fixed;z-index:300;background:#16213e;border:1px solid #0f3460;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.6);flex-direction:column;overflow:hidden;min-width:480px;min-height:400px;width:600px;height:520px">
   <div id="hlTitleBar" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#0f3460;cursor:move;user-select:none;border-radius:10px 10px 0 0;flex-shrink:0">
@@ -978,7 +1068,8 @@ import { installInsertPalette } from './insert-palette.js';
 import { installProjectShell } from './project-shell.js';
 import { installBackupRestore } from './backup-restore.js';
 import { installCommandRoll } from './command-roll.js';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS, LABOR_RATES, LABOR_DEFAULT_RATE, HANGER_DEFAULTS, loadLaborDefaults, loadHangerDefaults } from './price-defaults.js';
+import { installConnectorStandards } from './connector-standards.js?v=flex-image-preview';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS, LABOR_RATES, LABOR_DEFAULT_RATE, HANGER_DEFAULTS, CONNECTOR_DEFAULTS, loadLaborDefaults, loadHangerDefaults, loadConnectorDefaults } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -1460,7 +1551,11 @@ const AUTO_COUPLING_SPACING_FT = {
 
 function getAutoCouplingSpacingFt(duct) {
   if (!duct) return 0;
-  if (duct.type === 'spiral') return AUTO_COUPLING_SPACING_FT.spiral;
+  if (duct.type === 'spiral') {
+    const spiralDefaults = CONNECTOR_DEFAULTS.jointCountDefaults && CONNECTOR_DEFAULTS.jointCountDefaults.duct && CONNECTOR_DEFAULTS.jointCountDefaults.duct.spiral;
+    const standardLengthFt = spiralDefaults && parseFloat(spiralDefaults.standardLengthFt);
+    return standardLengthFt > 0 ? standardLengthFt : AUTO_COUPLING_SPACING_FT.spiral;
+  }
   return 0;
 }
 
@@ -2268,6 +2363,13 @@ const PriceBook = installPriceBook({
   getHangerLabel,
 });
 
+const ConnectorStandards = installConnectorStandards({
+  showToast,
+  refreshCompiler,
+  getCompilerState: () => ({ activePanelTab: _activePanelTab, compilerInited: _compilerInited }),
+  escapeHtml,
+});
+
 const priceBookCache = new Proxy({}, {
   get: function(_target, prop) {
     const cache = PriceBook.getCache();
@@ -2422,6 +2524,7 @@ async function saveCurrentPageData() {
   const pageNum = currentPage;
   const key = `${activeDrawingId}-${pageNum}`;
   const scale = pageScales[pageNum] || null;
+  const existingPageData = await idbGet('pageData', key);
   refreshAutoCouplingsForPage(pageNum);
   const measurements = (pageMeasurements[pageNum] || []).map(m => ({
     id: m.id,
@@ -2519,6 +2622,7 @@ async function saveCurrentPageData() {
     fittings,
     stacks,
     hangers,
+    ...(existingPageData && existingPageData.connectorOverrides ? { connectorOverrides: existingPageData.connectorOverrides } : {}),
     pageName: pageNames[pageNum] || '',
     annoSize: annoSize,
     annoTextOpacity: annoTextOpacity,
@@ -7959,6 +8063,7 @@ async function init() {
   await openDB();
   await loadLaborDefaults();
   await loadHangerDefaults();
+  await loadConnectorDefaults();
   await loadPriceBook();
   await loadQuickbaseProjects();
   await HVACLibrary.init();
