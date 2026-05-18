@@ -235,6 +235,31 @@ export function installCommandRoll(ctx = {}) {
     return commands[selectedIdx] || null;
   }
 
+  function getFieldInputs() {
+    return el ? Array.from(el.querySelectorAll('[data-cr-field]')) : [];
+  }
+
+  function getFocusedFieldIndex(inputs = getFieldInputs()) {
+    return inputs.findIndex(input => input === document.activeElement);
+  }
+
+  function focusField(index = 0) {
+    const inputs = getFieldInputs();
+    if (!inputs.length) return false;
+    const safeIndex = Math.max(0, Math.min(inputs.length - 1, index));
+    inputs[safeIndex].focus();
+    inputs[safeIndex].select();
+    return true;
+  }
+
+  function blurField() {
+    if (el && el.contains(document.activeElement)) {
+      document.activeElement.blur();
+      return true;
+    }
+    return false;
+  }
+
   function executeSelected(opts = {}) {
     const cmd = getSelectedCommand();
     if (!cmd) return false;
@@ -282,6 +307,31 @@ export function installCommandRoll(ctx = {}) {
 
   function handleKeyDown(e) {
     if (!active) return false;
+    if (e.key === 'Tab') {
+      const inputs = getFieldInputs();
+      if (!inputs.length) return false;
+      e.preventDefault();
+      e.stopPropagation();
+      const focusedIdx = getFocusedFieldIndex(inputs);
+      if (focusedIdx < 0) return focusField(e.shiftKey ? inputs.length - 1 : 0);
+      const nextIdx = focusedIdx + (e.shiftKey ? -1 : 1);
+      if (nextIdx >= 0 && nextIdx < inputs.length) return focusField(nextIdx);
+      inputs[focusedIdx].blur();
+      return true;
+    }
+    if (el && el.contains(document.activeElement)) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.activeElement.blur();
+        return true;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        document.activeElement.blur();
+        return true;
+      }
+      return false;
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
       stop();
@@ -321,6 +371,8 @@ export function installCommandRoll(ctx = {}) {
     isActive: () => active,
     getSelectedCommand,
     executeSelected,
+    focusField,
+    blurField,
     handleWheel,
     handleKeyDown,
   };

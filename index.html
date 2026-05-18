@@ -649,6 +649,12 @@
     <button onclick="nextPage()" title="Next Page">▶</button>
     <button onclick="deleteCurrentSheet()" title="Delete this sheet" style="font-size:12px;padding:4px 8px;color:#a0a0c0">🗑️</button>
     <div class="separator"></div>
+    <button id="undoBtn" onclick="undoLastCommand()" title="Undo (Ctrl+Z)" disabled>Undo</button>
+    <button id="redoBtn" onclick="redoLastCommand()" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" disabled>Redo</button>
+    <label title="Undo history depth" style="display:flex;align-items:center;gap:4px;font-size:11px;color:#a0a0c0">History
+      <input id="undoDepthInput" type="number" min="1" max="10" step="1" value="3" onchange="setUndoHistoryDepth(this.value)" style="width:42px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;border-radius:4px;padding:3px 4px;font-size:11px">
+    </label>
+    <div class="separator"></div>
     <select id="sysSymbolSelect" onchange="setActiveSystemSymbol(this.value)" title="Active System Symbol" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 8px;border-radius:4px;font-size:11px;max-width:120px;cursor:pointer">
       <option value="">No System</option>
     </select>
@@ -2367,6 +2373,8 @@ const ConnectorStandards = installConnectorStandards({
   showToast,
   refreshCompiler,
   getCompilerState: () => ({ activePanelTab: _activePanelTab, compilerInited: _compilerInited }),
+  beginHistoryCommand: label => window.ISPlanHistory?.beginCommand(label),
+  commitHistoryCommand: () => window.ISPlanHistory?.commitCommand(),
   escapeHtml,
 });
 
@@ -2510,6 +2518,7 @@ const sidePanel = document.getElementById('sidePanel');
 let saveTimer = null;
 function scheduleSave() {
   if (!activeDrawingId) return;
+  recordUndoMutation('Takeoff change');
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     await saveCurrentPageData();
@@ -2520,8 +2529,11 @@ function scheduleSave() {
 }
 
 async function saveCurrentPageData() {
+  return savePageDataFromMemory(currentPage);
+}
+
+async function savePageDataFromMemory(pageNum = currentPage) {
   if (!activeDrawingId) return;
-  const pageNum = currentPage;
   const key = `${activeDrawingId}-${pageNum}`;
   const scale = pageScales[pageNum] || null;
   const existingPageData = await idbGet('pageData', key);
@@ -2720,6 +2732,7 @@ async function loadDrawingIntoViewer(projectId, drawingId) {
 
     // Load page data
     await loadPageDataForDrawing(drawingId);
+    resetUndoHistory();
 
     // Load PDF from blob
     const arrayBuffer = await drawing.pdfBlob.arrayBuffer();
@@ -3499,8 +3512,276 @@ function getMeasureClickPoint(e) {
 }
 
 function clonePlain(obj) {
-  return JSON.parse(JSON.stringify(obj));
+  return obj == null ? obj : JSON.parse(JSON.stringify(obj));
 }
+
+const UNDO_SETTINGS_KEY = 'isplan_undo_settings';
+const CONNECTOR_DEFAULTS_STORAGE_KEY = 'isplan_connector_defaults_override';
+let undoStack = [];
+let redoStack = [];
+let undoBaselineSnapshot = null;
+let undoPendingCommand = null;
+let isApplyingHistory = false;
+
+function getUndoHistoryDepth() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(UNDO_SETTINGS_KEY) || '{}');
+    const n = parseInt(saved.depth, 10);
+    return Math.min(10, Math.max(1, Number.isFinite(n) ? n : 3));
+  } catch (e) {
+    return 3;
+  }
+}
+
+function setUndoHistoryDepth(value) {
+  const depth = Math.min(10, Math.max(1, parseInt(value, 10) || 3));
+  localStorage.setItem(UNDO_SETTINGS_KEY, JSON.stringify({ depth }));
+  undoStack = undoStack.slice(-depth);
+  redoStack = redoStack.slice(-depth);
+  const input = document.getElementById('undoDepthInput');
+  if (input) input.value = depth;
+  updateUndoRedoControls();
+}
+window.setUndoHistoryDepth = setUndoHistoryDepth;
+
+function captureUndoSnapshot() {
+  return {
+    currentPage,
+    pageScales: clonePlain(pageScales),
+    pageMeasurements: clonePlain(pageMeasurements),
+    pageFittings: clonePlain(pageFittings),
+    pageStacks: clonePlain(pageStacks),
+    pageHangers: clonePlain(pageHangers),
+    pageNames: clonePlain(pageNames),
+    counters: { measureIdCounter, fittingIdCounter, stackIdCounter, stackItemIdCounter, hangerIdCounter },
+    selection: { selectedFittingId, selectedMeasId, selectedHangerMeasId, selectedManualHangerId, selectedEndpointMeasId, selectedEndpointIdx, selectedStackId, selectedStackItemId },
+    connectorDefaults: clonePlain(CONNECTOR_DEFAULTS),
+    connectorDefaultsOverride: localStorage.getItem(CONNECTOR_DEFAULTS_STORAGE_KEY),
+  };
+}
+
+function snapshotEquals(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function replaceMapContents(target, source) {
+  for (const key in target) delete target[key];
+  Object.assign(target, clonePlain(source || {}));
+}
+
+function getSnapshotPages(snapshot) {
+  return new Set([
+    ...Object.keys(snapshot?.pageMeasurements || {}),
+    ...Object.keys(snapshot?.pageFittings || {}),
+    ...Object.keys(snapshot?.pageStacks || {}),
+    ...Object.keys(snapshot?.pageHangers || {}),
+    ...Object.keys(snapshot?.pageScales || {}),
+    ...Object.keys(snapshot?.pageNames || {}),
+    String(snapshot?.currentPage || currentPage),
+  ]);
+}
+
+function restoreConnectorDefaultsFromSnapshot(snapshot) {
+  for (const key of Object.keys(CONNECTOR_DEFAULTS)) delete CONNECTOR_DEFAULTS[key];
+  Object.assign(CONNECTOR_DEFAULTS, clonePlain(snapshot.connectorDefaults || {}));
+  if (snapshot.connectorDefaultsOverride == null) localStorage.removeItem(CONNECTOR_DEFAULTS_STORAGE_KEY);
+  else localStorage.setItem(CONNECTOR_DEFAULTS_STORAGE_KEY, snapshot.connectorDefaultsOverride);
+}
+
+async function persistLoadedPageDataFromMemory(snapshot) {
+  const pages = new Set([
+    ...Object.keys(snapshot?.pageMeasurements || {}),
+    ...Object.keys(snapshot?.pageFittings || {}),
+    ...Object.keys(snapshot?.pageStacks || {}),
+    ...Object.keys(snapshot?.pageHangers || {}),
+    ...Object.keys(snapshot?.pageScales || {}),
+    ...Object.keys(snapshot?.pageNames || {}),
+    ...Object.keys(pageMeasurements || {}),
+    ...Object.keys(pageFittings || {}),
+    ...Object.keys(pageStacks || {}),
+    ...Object.keys(pageHangers || {}),
+    String(currentPage),
+  ]);
+  for (const page of pages) await savePageDataFromMemory(parseInt(page, 10) || currentPage);
+}
+
+async function restoreUndoSnapshot(snapshot) {
+  if (!snapshot) return;
+  isApplyingHistory = true;
+  try {
+    const beforePage = currentPage;
+    const needsPdfRender = String(beforePage) !== String(snapshot.currentPage || beforePage);
+    replaceMapContents(pageScales, snapshot.pageScales);
+    replaceMapContents(pageMeasurements, snapshot.pageMeasurements);
+    replaceMapContents(pageFittings, snapshot.pageFittings);
+    replaceMapContents(pageStacks, snapshot.pageStacks);
+    replaceMapContents(pageHangers, snapshot.pageHangers);
+    replaceMapContents(pageNames, snapshot.pageNames);
+    measureIdCounter = snapshot.counters?.measureIdCounter || 0;
+    fittingIdCounter = snapshot.counters?.fittingIdCounter || 0;
+    stackIdCounter = snapshot.counters?.stackIdCounter || 0;
+    stackItemIdCounter = snapshot.counters?.stackItemIdCounter || 0;
+    hangerIdCounter = snapshot.counters?.hangerIdCounter || 0;
+    window._measIdCounter = measureIdCounter;
+    currentPage = snapshot.currentPage || currentPage;
+    selectedFittingId = snapshot.selection?.selectedFittingId || null;
+    selectedMeasId = snapshot.selection?.selectedMeasId || null;
+    selectedHangerMeasId = snapshot.selection?.selectedHangerMeasId || null;
+    selectedManualHangerId = snapshot.selection?.selectedManualHangerId || null;
+    selectedEndpointMeasId = snapshot.selection?.selectedEndpointMeasId || null;
+    selectedEndpointIdx = snapshot.selection?.selectedEndpointIdx ?? null;
+    selectedStackId = snapshot.selection?.selectedStackId || null;
+    selectedStackItemId = snapshot.selection?.selectedStackItemId || null;
+    restoreConnectorDefaultsFromSnapshot(snapshot);
+    for (const page of getSnapshotPages(snapshot)) refreshAutoCouplingsForPage(page);
+    if (needsPdfRender) await renderPage();
+    drawMeasureOverlay();
+    updateScaleLabel();
+    updatePageNameDisplay();
+    updatePanel();
+    await persistLoadedPageDataFromMemory(snapshot);
+    if (_activePanelTab === 'comp' && _compilerInited && sidePanel.classList.contains('open')) refreshCompiler();
+  } finally {
+    isApplyingHistory = false;
+    undoBaselineSnapshot = captureUndoSnapshot();
+    updateUndoRedoControls();
+  }
+}
+
+function pushUndoEntry(entry) {
+  if (!entry) return;
+  const depth = getUndoHistoryDepth();
+  undoStack.push({ ...entry, at: Date.now() });
+  undoStack = undoStack.slice(-depth);
+  redoStack = [];
+  updateUndoRedoControls();
+}
+
+function recordUndoMutation(label = 'Takeoff change') {
+  if (isApplyingHistory || !activeDrawingId) return;
+  const after = captureUndoSnapshot();
+  if (!undoBaselineSnapshot) {
+    undoBaselineSnapshot = after;
+    updateUndoRedoControls();
+    return;
+  }
+  if (snapshotEquals(undoBaselineSnapshot, after)) return;
+  pushUndoEntry({ type: 'app', label, before: undoBaselineSnapshot, after });
+  undoBaselineSnapshot = after;
+}
+
+function beginUndoCommand(label = 'Change') {
+  if (isApplyingHistory) return;
+  undoPendingCommand = { label, before: captureUndoSnapshot() };
+}
+
+function commitUndoCommand() {
+  if (!undoPendingCommand || isApplyingHistory) return;
+  const after = captureUndoSnapshot();
+  if (!snapshotEquals(undoPendingCommand.before, after)) {
+    pushUndoEntry({ type: 'app', label: undoPendingCommand.label, before: undoPendingCommand.before, after });
+    undoBaselineSnapshot = after;
+  }
+  undoPendingCommand = null;
+}
+
+function resetUndoHistory() {
+  undoStack = [];
+  redoStack = [];
+  undoPendingCommand = null;
+  undoBaselineSnapshot = captureUndoSnapshot();
+  const input = document.getElementById('undoDepthInput');
+  if (input) input.value = getUndoHistoryDepth();
+  updateUndoRedoControls();
+}
+
+function updateUndoRedoControls() {
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  if (undoBtn) {
+    undoBtn.disabled = undoStack.length === 0;
+    undoBtn.title = undoStack.length ? `Undo: ${undoStack[undoStack.length - 1].label}` : 'Undo (Ctrl+Z)';
+  }
+  if (redoBtn) {
+    redoBtn.disabled = redoStack.length === 0;
+    redoBtn.title = redoStack.length ? `Redo: ${redoStack[redoStack.length - 1].label}` : 'Redo (Ctrl+Y / Ctrl+Shift+Z)';
+  }
+}
+
+async function restoreStoredDrawingSnapshot(snapshot) {
+  const drawingIds = snapshot?.drawingIds || (snapshot?.drawingId ? [snapshot.drawingId] : []);
+  if (drawingIds.length === 0) return;
+  const nextByDrawing = snapshot.pageDataByDrawing || { [drawingIds[0]]: snapshot.pageData || [] };
+  for (const drawingId of drawingIds) {
+    const existing = await idbGetAllByIndex('pageData', 'drawingId', drawingId);
+    const nextRows = nextByDrawing[drawingId] || [];
+    const nextIds = new Set(nextRows.map(pd => pd.id));
+    for (const pd of existing) {
+      if (!nextIds.has(pd.id)) await idbDelete('pageData', pd.id);
+    }
+    for (const pd of nextRows) await idbPut('pageData', clonePlain(pd));
+  }
+  if (drawingIds.map(String).includes(String(activeDrawingId))) {
+    const beforePage = currentPage;
+    await loadPageDataForDrawing(activeDrawingId);
+    if (String(beforePage) !== String(currentPage)) await renderPage();
+    drawMeasureOverlay();
+    updatePanel();
+    if (_activePanelTab === 'comp' && _compilerInited && sidePanel.classList.contains('open')) refreshCompiler();
+    undoBaselineSnapshot = captureUndoSnapshot();
+  }
+}
+
+async function applyHistoryEntry(entry, direction) {
+  if (!entry) return;
+  isApplyingHistory = true;
+  try {
+    if (entry.type === 'stored') await restoreStoredDrawingSnapshot(direction === 'undo' ? entry.before : entry.after);
+    else await restoreUndoSnapshot(direction === 'undo' ? entry.before : entry.after);
+  } finally {
+    isApplyingHistory = false;
+    updateUndoRedoControls();
+  }
+}
+
+async function undoLastCommand() {
+  const entry = undoStack.pop();
+  if (!entry) return;
+  redoStack.push(entry);
+  await applyHistoryEntry(entry, 'undo');
+  showToast(`Undid ${entry.label || 'change'}`);
+}
+window.undoLastCommand = undoLastCommand;
+
+async function redoLastCommand() {
+  const entry = redoStack.pop();
+  if (!entry) return;
+  undoStack.push(entry);
+  await applyHistoryEntry(entry, 'redo');
+  showToast(`Redid ${entry.label || 'change'}`);
+}
+window.redoLastCommand = redoLastCommand;
+
+window.ISPlanHistory = {
+  beginCommand: beginUndoCommand,
+  commitCommand: commitUndoCommand,
+  async beginStoredDrawingCommand(label, drawingId) {
+    if (!drawingId || isApplyingHistory) return null;
+    const drawingIds = Array.isArray(drawingId) ? drawingId.filter(Boolean) : [drawingId];
+    const pageDataByDrawing = {};
+    for (const id of drawingIds) pageDataByDrawing[id] = clonePlain(await idbGetAllByIndex('pageData', 'drawingId', id) || []);
+    return { label, drawingIds, before: { drawingIds, pageDataByDrawing } };
+  },
+  async commitStoredDrawingCommand(tx) {
+    if (!tx || isApplyingHistory) return;
+    const pageDataByDrawing = {};
+    for (const id of tx.drawingIds || []) pageDataByDrawing[id] = clonePlain(await idbGetAllByIndex('pageData', 'drawingId', id) || []);
+    const after = { drawingIds: tx.drawingIds || [], pageDataByDrawing };
+    if (snapshotEquals(tx.before, after)) return;
+    pushUndoEntry({ type: 'stored', label: tx.label || 'Stored change', before: tx.before, after });
+  },
+  refreshControls: updateUndoRedoControls,
+};
 
 function getMultiSelectMoveSnapshot() {
   const measIds = MultiSelect.getSelectedMeasIds();
@@ -3853,6 +4134,47 @@ function handleCommandRollTransformKey(e) {
   return false;
 }
 
+function getDuctDrawDimensionInputs() {
+  const type = document.getElementById('ddType')?.value;
+  if (type === 'rect' || type === 'oval') {
+    return [document.getElementById('ddW'), document.getElementById('ddH')].filter(Boolean);
+  }
+  return [document.getElementById('ddDiam')].filter(Boolean);
+}
+
+function handleDuctDrawDimensionTab(e) {
+  if (!ductDrawMode) return false;
+  const inputs = getDuctDrawDimensionInputs();
+  if (!inputs.length) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  const focusedIdx = inputs.findIndex(input => input === document.activeElement);
+  if (focusedIdx < 0) {
+    const input = inputs[e.shiftKey ? inputs.length - 1 : 0];
+    input.focus();
+    input.select();
+    return true;
+  }
+  const nextIdx = focusedIdx + (e.shiftKey ? -1 : 1);
+  if (nextIdx >= 0 && nextIdx < inputs.length) {
+    inputs[nextIdx].focus();
+    inputs[nextIdx].select();
+    return true;
+  }
+  inputs[focusedIdx].blur();
+  return true;
+}
+
+function handleActiveTakeoffTab(e) {
+  if (e.key !== 'Tab') return false;
+  if (!ductDrawMode && !CommandRoll.isActive()) return false;
+  if (CommandRoll.isActive()) {
+    const command = CommandRoll.getSelectedCommand();
+    if (command && command.action !== 'continue' && CommandRoll.handleKeyDown(e)) return true;
+  }
+  return handleDuctDrawDimensionTab(e);
+}
+
 // Mouse wheel zoom
 viewer.addEventListener('wheel', (e) => {
   if (!pdfDoc) return;
@@ -3887,19 +4209,33 @@ viewer.addEventListener('wheel', (e) => {
 window.addEventListener('keydown', (e) => {
   // Ctrl/Cmd+C/V: Copy/Paste — handle BEFORE input check so they work with panel focus
   if (currentRoute.view === 'viewer' && pdfDoc && (e.ctrlKey || e.metaKey)) {
-    if (e.key === 'c' && MultiSelect.getSelectionCount() > 0) {
+    const key = String(e.key || '').toLowerCase();
+    if (key === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) redoLastCommand();
+      else undoLastCommand();
+      return;
+    }
+    if (key === 'y') {
+      e.preventDefault();
+      redoLastCommand();
+      return;
+    }
+    if (key === 'c' && MultiSelect.getSelectionCount() > 0) {
       e.preventDefault();
       const n = MultiSelect.copySelected();
       if (n > 0 && typeof showToast === 'function') showToast(`Copied ${n} item${n !== 1 ? 's' : ''}`);
       return;
     }
-    if (e.key === 'v' && MultiSelect.hasClipboard()) {
+    if (key === 'v' && MultiSelect.hasClipboard()) {
       e.preventDefault();
       const n = MultiSelect.pasteClipboard();
       if (n > 0 && typeof showToast === 'function') showToast(`Pasted ${n} item${n !== 1 ? 's' : ''}`);
       return;
     }
   }
+
+  if (currentRoute.view === 'viewer' && pdfDoc && handleActiveTakeoffTab(e)) return;
 
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
     if (e.key === 'Escape') {
@@ -6930,9 +7266,6 @@ function applyCommandRollFieldOverride(command, field, value) {
   } else if (field === 'sizeB' && ['reducer','eccReducer'].includes(command.type)) {
     applyCommandRollSizeToDuctDraw(value, command.shape);
   }
-  if (CommandRoll.isActive()) {
-    CommandRoll.update({ anchor: getCommandRollStartAnchor(), duct: getDuctDrawConfig() });
-  }
   drawMeasureOverlay();
 }
 
@@ -8064,6 +8397,7 @@ async function init() {
   await loadLaborDefaults();
   await loadHangerDefaults();
   await loadConnectorDefaults();
+  setUndoHistoryDepth(getUndoHistoryDepth());
   await loadPriceBook();
   await loadQuickbaseProjects();
   await HVACLibrary.init();

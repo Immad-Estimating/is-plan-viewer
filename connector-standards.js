@@ -12,6 +12,8 @@ export function installConnectorStandards(ctx = {}) {
     refreshCompiler = function() {},
     getCompilerState = function() { return {}; },
     showToast = function() {},
+    beginHistoryCommand = function() {},
+    commitHistoryCommand = function() {},
     escapeHtml = function(str) {
       return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch]);
     },
@@ -207,6 +209,7 @@ export function installConnectorStandards(ctx = {}) {
   }
 
   function saveStandardsAndActive(standards, activeKey) {
+    beginHistoryCommand('Connector standards change');
     const keys = Object.keys(standards || {});
     const safeKey = activeKey && standards[activeKey] ? activeKey : keys[0];
     if (safeKey) activeStandardKey = safeKey;
@@ -214,6 +217,7 @@ export function installConnectorStandards(ctx = {}) {
     saveConnectorDefaultsOverride({ takeoffDefaults: { activeStandard: safeKey } });
     render();
     if (shouldRefreshCompiler()) refreshCompiler();
+    commitHistoryCommand();
   }
 
   function renderLayerLegend(activeLayers, products) {
@@ -542,10 +546,12 @@ export function installConnectorStandards(ctx = {}) {
   }
 
   function saveAndRefresh(patch) {
+    beginHistoryCommand('Connector standards change');
     saveConnectorDefaultsOverride(patch);
     render();
     if (shouldRefreshCompiler()) refreshCompiler();
     showToast('Connector standard updated');
+    commitHistoryCommand();
   }
 
   window.openConnectorStandards = function() {

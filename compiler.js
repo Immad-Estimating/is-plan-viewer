@@ -2093,6 +2093,18 @@ const _COL_MAP = {
 // Keep _COL_TO_FIELD for override indicator check
 const _COL_TO_FIELD = { totalLF: 'lengthFt', materialCost: 'materialCost', laborHrs: 'laborHrs', laborCost: 'laborCost', totalCost: 'totalCost' };
 
+async function _beginCompilerUndo(label, rows) {
+  const drawingIds = [...new Set((rows || []).map(row => row && row._drawingId).filter(Boolean))];
+  if (drawingIds.length === 0 || !window.ISPlanHistory || !window.ISPlanHistory.beginStoredDrawingCommand) return null;
+  return window.ISPlanHistory.beginStoredDrawingCommand(label, drawingIds);
+}
+
+async function _commitCompilerUndo(tx) {
+  if (tx && window.ISPlanHistory && window.ISPlanHistory.commitStoredDrawingCommand) {
+    await window.ISPlanHistory.commitStoredDrawingCommand(tx);
+  }
+}
+
 async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
   // Find the rows matching this group path
   const filteredRows = applyFilters(_rows);
@@ -2109,6 +2121,7 @@ async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
   const rate = getLaborRate();
   const ratio = oldVal > 0 ? newVal / oldVal : 0;
   const even = newVal / targetRows.length;
+  const undoTx = await _beginCompilerUndo('Compiler override', targetRows);
 
   if (isCatEdit) {
     // Category sub-column edit: change specific labor category on each row
@@ -2176,6 +2189,7 @@ async function _cmpApplyOverride(colKey, groupPath, newVal, oldVal) {
   // Reload and re-render
   await loadCompilerData();
   renderCompiler();
+  await _commitCompilerUndo(undoTx);
 }
 
 function _findRowsByPath(node, targetPath) {
@@ -2259,6 +2273,7 @@ window._cmpClearOverrides = async function(groupPath) {
   const tree = buildGroupTree(filteredRows, _activeGroups);
   const targetRows = _findRowsByPath(tree, groupPath);
   if (!targetRows) return;
+  const undoTx = await _beginCompilerUndo('Clear compiler overrides', targetRows);
 
   for (const row of targetRows) {
     row._overrides = {};
@@ -2267,12 +2282,14 @@ window._cmpClearOverrides = async function(groupPath) {
   }
   await loadCompilerData();
   renderCompiler();
+  await _commitCompilerUndo(undoTx);
 };
 
 // ── Reset all overrides ───────────────────────────────────────────────
 window._cmpResetAllOverrides = async function() {
   const targetRows = _rows.filter(r => r._hasOverride);
   if (targetRows.length === 0) return;
+  const undoTx = await _beginCompilerUndo('Reset compiler overrides', targetRows);
 
   for (const row of targetRows) {
     row._overrides = {};
@@ -2285,6 +2302,7 @@ window._cmpResetAllOverrides = async function() {
 
   await loadCompilerData();
   renderCompiler();
+  await _commitCompilerUndo(undoTx);
 };
 
 // ── Compiler radar interactions ──────────────────────────────────────
@@ -2351,6 +2369,7 @@ window._cmpRadarEditCat = async function(catKey, value) {
   // Group-focused or selection-scope radar: distribute override to individual items
   var rows = _radarRows || applyFilters(_rows);
   if (!rows || rows.length === 0) return;
+  var undoTx = await _beginCompilerUndo('Compiler radar override', rows);
   var oldTotal = rows.reduce(function(s, r) { return s + ((r._laborCatHrs && r._laborCatHrs[catKey]) || 0); }, 0);
   var ratio = oldTotal > 0 ? newTotal / oldTotal : 0;
   var even = newTotal / rows.length;
@@ -2373,6 +2392,7 @@ window._cmpRadarEditCat = async function(catKey, value) {
   }
   await loadCompilerData();
   renderCompiler();
+  await _commitCompilerUndo(undoTx);
 };
 
 // ── Grand total contingency editing ────────────────────────────────────
