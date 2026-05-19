@@ -1,0 +1,32 @@
+{
+  "_meta": {
+    "version": "0.1.0",
+    "lastUpdated": "2026-05-18",
+    "description": "Internal acoustic liner for rectangular duct. Round/spiral/oval/flex default to no liner.",
+    "units": {
+      "materialCost": "$ per SF of internal liner surface",
+      "thickness": "inches"
+    }
+  },
+  "takeoffDefaults": {
+    "priceBookIncludeLinerInRectCalc": true,
+    "defaultActiveLinerKey": "liner-1.5",
+    "byDuctType": {
+      "rect": { "enabled": true, "defaultThicknessIn": 1.5 },
+      "oval": { "enabled": false, "defaultThicknessIn": 0 },
+      "round": { "enabled": false, "defaultThicknessIn": 0 },
+      "spiral": { "enabled": false, "defaultThicknessIn": 0 },
+      "flex": { "enabled": false, "defaultThicknessIn": 0 }
+    },
+    "description": "Rectangular duct draw defaults to lined; round duct types default to unlined. Prices live in Price Book → Rectangular → Internal Liner."
+  },
+  "thicknessOptions": [
+    { "value": 0, "label": "None" },
+    { "value": 1, "label": "1\"" },
+    { "value": 1.5, "label": "1.5\"" }
+  ],
+  "materialCostByKey": {
+    "liner-1": 4.1,
+    "liner-1.5": 4.41
+  }
+}

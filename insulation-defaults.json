@@ -1,0 +1,126 @@
+{
+  "_meta": {
+    "version": "0.3.0",
+    "lastUpdated": "2026-05-18",
+    "description": "Externally applied fiberglass duct wrap with optional vapor barrier seam tape.",
+    "units": {
+      "surfaceArea": "SF",
+      "length": "LF",
+      "materialCost": "$ per SF by thickness",
+      "labor": "hrs per SF of insulated surface",
+      "tape": "LF of circumferential seam tape at wrap joints and duct ends"
+    }
+  },
+  "takeoffDefaults": {
+    "enabled": false,
+    "activeStandard": "fiberglass-wrap-fsk-seed",
+    "defaultThicknessIn": 1.5,
+    "defaultProduct": "fiberglass-duct-wrap-fsk",
+    "defaultDisplayColor": "#74c0fc",
+    "defaultOpacity": 0.22,
+    "priceBookLaborKey": "insulation-fiberglass-wrap",
+    "wrapPieceLengthFt": 50,
+    "showInCompiler": true,
+    "description": "When enabled, new duct runs carry external fiberglass wrap and optional seam tape."
+  },
+  "thicknessOptions": [
+    { "value": 1, "label": "1\"" },
+    { "value": 1.5, "label": "1.5\"" },
+    { "value": 2, "label": "2\"" },
+    { "value": 3, "label": "3\"" }
+  ],
+  "products": {
+    "fiberglass-duct-wrap-fsk": {
+      "label": "Fiberglass Duct Wrap - FSK",
+      "family": "fiberglass-wrap",
+      "materialUnit": "SF",
+      "applicationUnit": "SF",
+      "materialCost": 1.65,
+      "materialCostByThickness": {
+        "1": 1.35,
+        "1-5": 1.65,
+        "2": 1.95,
+        "3": 2.55
+      },
+      "coveragePerUnit": 1,
+      "wasteFactor": 1.12,
+      "displayColor": "#74c0fc",
+      "description": "External flexible fiberglass wrap with factory-applied foil-scrim-kraft vapor retarder."
+    },
+    "foil-scrim-vapor-tape": {
+      "label": "Vapor Barrier Seam Tape",
+      "family": "insulation-tape",
+      "materialUnit": "roll",
+      "applicationUnit": "LF",
+      "materialCost": 22,
+      "coveragePerUnit": 150,
+      "wasteFactor": 1.08,
+      "displayColor": "#b197fc",
+      "description": "Circumferential seam tape at each wrap piece joint and both duct run ends."
+    }
+  },
+  "standards": {
+    "fiberglass-wrap-fsk-seed": {
+      "label": "Fiberglass Wrap - FSK Vapor Barrier",
+      "source": "Industry seed default (48\" × 50' wrap rolls; Owens Corning / JM install guides)",
+      "description": "Fiberglass duct wrap with optional seam tape at wrap piece boundaries and duct ends.",
+      "rules": [
+        {
+          "id": "duct-wrap-area",
+          "label": "Fiberglass Duct Wrap",
+          "product": "fiberglass-duct-wrap-fsk",
+          "enabled": true,
+          "appliesToShapes": ["rect", "round", "spiral", "oval"],
+          "quantityFormula": "surfaceAreaSf * wasteFactor"
+        },
+        {
+          "id": "vapor-barrier-seam-tape",
+          "label": "Vapor Barrier Seam Tape",
+          "product": "foil-scrim-vapor-tape",
+          "enabled": true,
+          "appliesToShapes": ["rect", "round", "spiral", "oval"],
+          "wrapPieceLengthFt": 50,
+          "tapeAtDuctEnds": true,
+          "isTapeAddon": true,
+          "description": "Tape only at circumferential wrap joints (every 50 LF of duct) and both duct run ends — not along longitudinal laps."
+        }
+      ]
+    }
+  },
+  "examples": {
+    "rect": { "dims": "24x12", "lengthFt": 10 },
+    "round": { "dims": "14", "lengthFt": 10 },
+    "spiral": { "dims": "14", "lengthFt": 10 },
+    "oval": { "dims": "30x12", "lengthFt": 10 }
+  },
+  "previewExamples": {
+    "rect": {
+      "shape": "rect",
+      "title": "Rectangular",
+      "dims": "24x12",
+      "lengthFt": 10,
+      "sizeLabel": "24\" W × 12\" H"
+    },
+    "spiral": {
+      "shape": "spiral",
+      "title": "Spiral Round",
+      "dims": "14",
+      "lengthFt": 10,
+      "sizeLabel": "14\" diameter"
+    },
+    "snaplock": {
+      "shape": "round",
+      "title": "Snap Lock Round",
+      "dims": "12",
+      "lengthFt": 10,
+      "sizeLabel": "12\" diameter"
+    },
+    "oval": {
+      "shape": "oval",
+      "title": "Oval",
+      "dims": "30x12",
+      "lengthFt": 10,
+      "sizeLabel": "30\" major × 12\" minor"
+    }
+  }
+}

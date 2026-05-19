@@ -461,6 +461,18 @@ export const RECT_PERIM_CLASSES = [
   { label: '145\u2013168\u2033', maxPerim: 168, refPerim: 168 },
 ];
 
+/** Round/spiral insulation labor buckets by nominal diameter (inches). */
+export const INSULATION_ROUND_DIAM_CLASSES = [
+  { label: '\u22648\u2033',    maxDia: 8,  refDia: 8 },
+  { label: '9\u201310\u2033',  maxDia: 10, refDia: 10 },
+  { label: '11\u201312\u2033', maxDia: 12, refDia: 12 },
+  { label: '13\u201314\u2033', maxDia: 14, refDia: 14 },
+  { label: '15\u201316\u2033', maxDia: 16, refDia: 16 },
+  { label: '17\u201318\u2033', maxDia: 18, refDia: 18 },
+  { label: '19\u201320\u2033', maxDia: 20, refDia: 20 },
+  { label: '21\u201324\u2033', maxDia: 24, refDia: 24 },
+];
+
 // \u2500\u2500 Rectangular min-width classes (rect fittings) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 // The narrow dimension drives fabrication difficulty and labor for fittings,
 // so fitting prices are keyed by min(W,H) bucket. repW/repH are representative
@@ -503,25 +515,97 @@ export const SHOP_DEFAULTS = {
 };
 
 // ── Liner thickness options ──────────────────────────────────────
-// Standard rectangular duct liner thicknesses. User enters $/SF per thickness
-// in the Price Book accessories section. Active liner selection is a radio button.
+// Keys map to Price Book → Rectangular → Internal Liner ($/SF rows).
 export const LINER_OPTIONS = [
   { key: 'liner-1', label: '1\u2033 Liner', thickness: 1.0 },
   { key: 'liner-1.5', label: '1.5\u2033 Liner', thickness: 1.5 },
 ];
 
+const LINER_STORAGE_KEY = 'isplan_liner_overrides';
+let _linerLoaded = false;
+
+export const LINER_DEFAULTS = {
+  _meta: {},
+  takeoffDefaults: {
+    priceBookIncludeLinerInRectCalc: true,
+    defaultActiveLinerKey: 'liner-1.5',
+    byDuctType: {
+      rect: { enabled: true, defaultThicknessIn: 1.5 },
+      oval: { enabled: false, defaultThicknessIn: 0 },
+      round: { enabled: false, defaultThicknessIn: 0 },
+      spiral: { enabled: false, defaultThicknessIn: 0 },
+      flex: { enabled: false, defaultThicknessIn: 0 },
+    },
+  },
+  thicknessOptions: [
+    { value: 0, label: 'None' },
+    { value: 1, label: '1"' },
+    { value: 1.5, label: '1.5"' },
+  ],
+  materialCostByKey: {
+    'liner-1': 4.1,
+    'liner-1.5': 4.41,
+  },
+};
+
+export let LINER_SEED_DEFAULTS = null;
+
+export function getLinerOptionByThickness(thicknessIn) {
+  const t = parseFloat(thicknessIn);
+  if (!t || t <= 0) return null;
+  return LINER_OPTIONS.find(o => o.thickness === t) || LINER_OPTIONS[0];
+}
+
+export function getLinerMaterialCostPerSF(linerKey, priceBookCache) {
+  if (!linerKey) return 0;
+  const entry = priceBookCache && priceBookCache[linerKey];
+  if (entry && entry.materialCost != null) return entry.materialCost;
+  const seed = LINER_DEFAULTS.materialCostByKey || {};
+  return seed[linerKey] != null ? seed[linerKey] : 0;
+}
+
+export async function loadLinerDefaults() {
+  if (_linerLoaded) return;
+  try {
+    const resp = await fetch('./liner-defaults.json');
+    if (!resp.ok) return;
+    const lj = await resp.json();
+    LINER_DEFAULTS._meta = lj._meta || {};
+    LINER_DEFAULTS.takeoffDefaults = lj.takeoffDefaults || LINER_DEFAULTS.takeoffDefaults;
+    LINER_DEFAULTS.thicknessOptions = Array.isArray(lj.thicknessOptions) ? lj.thicknessOptions : LINER_DEFAULTS.thicknessOptions;
+    LINER_DEFAULTS.materialCostByKey = lj.materialCostByKey || LINER_DEFAULTS.materialCostByKey;
+    LINER_SEED_DEFAULTS = cloneDefaults(LINER_DEFAULTS);
+    try {
+      const saved = localStorage.getItem(LINER_STORAGE_KEY);
+      if (saved) deepMerge(LINER_DEFAULTS, JSON.parse(saved));
+    } catch (e) { console.warn('Could not load liner overrides:', e); }
+    _linerLoaded = true;
+  } catch (e) { console.warn('Could not load liner-defaults.json:', e); }
+}
+
+export function saveLinerDefaultsOverride(patch) {
+  deepMerge(LINER_DEFAULTS, patch || {});
+  try {
+    const existing = JSON.parse(localStorage.getItem(LINER_STORAGE_KEY) || '{}');
+    deepMerge(existing, patch || {});
+    localStorage.setItem(LINER_STORAGE_KEY, JSON.stringify(existing));
+  } catch (e) { console.warn('Could not save liner overrides:', e); }
+}
+
 // ── Labor categories ─────────────────────────────────────────────────
 export const LABOR_CATEGORIES = [
-  { key: 'rough',       label: 'Rough',        short: 'R',  color: '#4dabf7', applies: ['duct','fitting'] },
+  { key: 'rough',       label: 'Rough',        short: 'R',  color: '#4dabf7', applies: ['duct','fitting','accessory','insulation'] },
   { key: 'air-handler', label: 'Air Handler',   short: 'AH', color: '#69db7c', applies: ['equipment'] },
   { key: 'condenser',   label: 'Condenser',     short: 'CU', color: '#69db7c', applies: ['equipment'] },
   { key: 'lineset',     label: 'Line Set',      short: 'LS', color: '#ffd43b', applies: ['equipment'] },
   { key: 'trim',        label: 'Trim',          short: 'T',  color: '#da77f2', applies: ['duct','fitting','accessory'] },
   { key: 'venting',     label: 'Venting',       short: 'V',  color: '#ff8787', applies: ['duct','fitting'] },
-  { key: 'stocking',    label: 'Stocking',      short: 'SK', color: '#a9e34b', applies: ['duct','fitting','equipment','accessory'] },
+  { key: 'stocking',    label: 'Stocking',      short: 'SK', color: '#a9e34b', applies: ['duct','fitting','equipment','accessory','insulation'] },
   { key: 'startup',     label: 'Startup',       short: 'SU', color: '#ffa94d', applies: ['equipment'] },
-  { key: 'qc',          label: 'Quality Ctrl',  short: 'QC', color: '#74c0fc', applies: ['duct','fitting','equipment','accessory'] },
+  { key: 'qc',          label: 'Quality Ctrl',  short: 'QC', color: '#74c0fc', applies: ['duct','fitting','equipment','accessory','insulation'] },
 ];
+
+export const INSULATION_LABOR_CATEGORY_KEYS = ['rough', 'stocking', 'qc'];
 
 // ── Default labor hours ──────────────────────────────────────────────
 // Keyed by item type. Size-specific overrides use "type-size" keys.
@@ -561,6 +645,17 @@ export const CONNECTOR_DEFAULTS = {
   products: {},
   jointCountDefaults: { fittings: {}, duct: {} },
   standards: {},
+};
+let _insulationLoaded = false;
+const INSULATION_STORAGE_KEY = 'isplan_insulation_defaults_override';
+let INSULATION_SEED_DEFAULTS = null;
+export const INSULATION_DEFAULTS = {
+  _meta: {},
+  takeoffDefaults: {},
+  thicknessOptions: [],
+  products: {},
+  standards: {},
+  examples: {},
 };
 
 function deepMerge(target, source) {
@@ -638,6 +733,7 @@ export async function loadLaborDefaults() {
       if (lj.rates.categoryRates) Object.assign(LABOR_RATES, lj.rates.categoryRates);
       if (lj.rates.defaultRate) LABOR_DEFAULT_RATE = lj.rates.defaultRate;
     }
+    if (_insulationLoaded) seedInsulationLaborDefaults();
     _laborLoaded = true;
   } catch (e) { console.warn('Could not load labor-defaults.json:', e); }
 }
@@ -711,6 +807,73 @@ export function getConnectorDefaultsSnapshot() {
 
 export function getConnectorSeedDefaultsSnapshot() {
   return cloneDefaults(CONNECTOR_SEED_DEFAULTS || CONNECTOR_DEFAULTS);
+}
+
+export async function loadInsulationDefaults() {
+  if (_insulationLoaded) return;
+  try {
+    const resp = await fetch('./insulation-defaults.json');
+    if (!resp.ok) return;
+    const ij = await resp.json();
+    INSULATION_DEFAULTS._meta = ij._meta || {};
+    INSULATION_DEFAULTS.takeoffDefaults = ij.takeoffDefaults || {};
+    INSULATION_DEFAULTS.thicknessOptions = Array.isArray(ij.thicknessOptions) ? ij.thicknessOptions : [];
+    INSULATION_DEFAULTS.products = ij.products || {};
+    INSULATION_DEFAULTS.standards = ij.standards || {};
+    INSULATION_DEFAULTS.examples = ij.examples || {};
+    INSULATION_DEFAULTS.previewExamples = ij.previewExamples || {};
+    INSULATION_SEED_DEFAULTS = cloneDefaults(INSULATION_DEFAULTS);
+    try {
+      const saved = localStorage.getItem(INSULATION_STORAGE_KEY);
+      if (saved) deepMerge(INSULATION_DEFAULTS, JSON.parse(saved));
+    } catch (e) { console.warn('Could not load insulation standards overrides:', e); }
+    seedInsulationLaborDefaults();
+    _insulationLoaded = true;
+  } catch (e) { console.warn('Could not load insulation-defaults.json:', e); }
+}
+
+/** Seed per-perimeter and per-diameter insulation labor keys from the base wrap key. */
+export function seedInsulationLaborDefaults() {
+  const baseKey = (INSULATION_DEFAULTS.takeoffDefaults && INSULATION_DEFAULTS.takeoffDefaults.priceBookLaborKey)
+    || 'insulation-fiberglass-wrap';
+  const seed = LABOR_DEFAULTS[baseKey]
+    ? { ...LABOR_DEFAULTS[baseKey] }
+    : { rough: 0.038, stocking: 0.010, qc: 0.012 };
+  if (!LABOR_DEFAULTS[baseKey]) LABOR_DEFAULTS[baseKey] = { ...seed };
+  for (const pc of RECT_PERIM_CLASSES) {
+    const k = `${baseKey}-perim-${pc.refPerim}`;
+    if (!LABOR_DEFAULTS[k]) LABOR_DEFAULTS[k] = { ...seed };
+  }
+  for (const dc of INSULATION_ROUND_DIAM_CLASSES) {
+    const k = `${baseKey}-dia-${dc.refDia}`;
+    if (!LABOR_DEFAULTS[k]) LABOR_DEFAULTS[k] = { ...seed };
+  }
+}
+
+export function saveInsulationDefaultsOverride(patch) {
+  deepMerge(INSULATION_DEFAULTS, patch || {});
+  try {
+    const existing = JSON.parse(localStorage.getItem(INSULATION_STORAGE_KEY) || '{}');
+    deepMerge(existing, patch || {});
+    localStorage.setItem(INSULATION_STORAGE_KEY, JSON.stringify(existing));
+  } catch (e) { console.warn('Could not save insulation standards overrides:', e); }
+}
+
+export function replaceInsulationDefaultsSection(sectionKey, value) {
+  INSULATION_DEFAULTS[sectionKey] = cloneDefaults(value);
+  try {
+    const existing = JSON.parse(localStorage.getItem(INSULATION_STORAGE_KEY) || '{}');
+    existing[sectionKey] = cloneDefaults(value);
+    localStorage.setItem(INSULATION_STORAGE_KEY, JSON.stringify(existing));
+  } catch (e) { console.warn('Could not replace insulation standards override:', e); }
+}
+
+export function getInsulationDefaultsSnapshot() {
+  return cloneDefaults(INSULATION_DEFAULTS);
+}
+
+export function getInsulationSeedDefaultsSnapshot() {
+  return cloneDefaults(INSULATION_SEED_DEFAULTS || INSULATION_DEFAULTS);
 }
 
 // ── Spiral Saddle Tap pricing (exposed, $/EA by branch×main) ─────────

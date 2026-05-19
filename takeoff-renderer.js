@@ -15,7 +15,9 @@ export function installTakeoffRenderer(ctx = {}) {
     parseDimension,
     getFittingShape,
     getFittingBoundingRadius,
-    getFittingNames = function() { return {}; }
+    getFittingNames = function() { return {}; },
+    getFittingExternalInsulation = function() { return { enabled: false }; },
+    getDuctExternalInsulation = function(duct) { return duct && duct.externalInsulation ? duct.externalInsulation : { enabled: false }; },
   } = ctx;
 
   // --- SMACNA elbow helper functions ---
@@ -44,6 +46,48 @@ export function installTakeoffRenderer(ctx = {}) {
     if (Math.abs(denom) < 0.0001) return null;
     const t = ((p2.x - p1.x) * d2.y - (p2.y - p1.y) * d2.x) / denom;
     return { x: p1.x + d1.x * t, y: p1.y + d1.y * t };
+  }
+
+  function wallPathPoint(path, index) {
+    const cmd = path[index];
+    return { x: cmd.x, y: cmd.y };
+  }
+
+  function appendWallPath(ctx, path) {
+    for (const cmd of path) {
+      if (cmd.type === 'M') ctx.moveTo(cmd.x, cmd.y);
+      else if (cmd.type === 'L') ctx.lineTo(cmd.x, cmd.y);
+      else if (cmd.type === 'Q') ctx.quadraticCurveTo(cmd.cpx, cmd.cpy, cmd.x, cmd.y);
+    }
+  }
+
+  function appendWallPathReversed(ctx, path) {
+    for (let i = path.length - 1; i >= 0; i--) {
+      const cmd = path[i];
+      if (cmd.type === 'Q') {
+        const prev = i > 0 ? wallPathPoint(path, i - 1) : null;
+        if (prev) ctx.quadraticCurveTo(cmd.cpx, cmd.cpy, prev.x, prev.y);
+      } else if (i > 0) {
+        ctx.lineTo(wallPathPoint(path, i - 1).x, wallPathPoint(path, i - 1).y);
+      }
+    }
+  }
+
+  /** Fill insulation tint inside the duct envelope (between wall paths), not as an outward stroke. */
+  function fillExternalInsulation(leftPath, rightPath, externalIns) {
+    const lastL = wallPathPoint(leftPath, leftPath.length - 1);
+    const lastR = wallPathPoint(rightPath, rightPath.length - 1);
+    mCtx.save();
+    mCtx.globalCompositeOperation = 'destination-over';
+    mCtx.fillStyle = externalIns.displayColor || 'rgba(116,192,252,1)';
+    mCtx.globalAlpha = externalIns.opacity != null ? externalIns.opacity : 0.22;
+    mCtx.beginPath();
+    appendWallPath(mCtx, leftPath);
+    mCtx.lineTo(lastR.x, lastR.y);
+    appendWallPathReversed(mCtx, rightPath);
+    mCtx.closePath();
+    mCtx.fill();
+    mCtx.restore();
   }
   
   // Unified duct wall rendering: traces both wall paths as one continuous shape with bezier turns
@@ -308,6 +352,10 @@ export function installTakeoffRenderer(ctx = {}) {
   
     // Step 3: Render wall paths
     mCtx.save();
+    const externalIns = getDuctExternalInsulation(duct);
+    if (externalIns.enabled) {
+      fillExternalInsulation(leftPath, rightPath, externalIns);
+    }
     mCtx.strokeStyle = color;
     mCtx.lineWidth = 2.5;
     mCtx.setLineDash([]);
@@ -640,6 +688,299 @@ export function installTakeoffRenderer(ctx = {}) {
   }
   
 
+  // ---- Fitting insulation fill (inside outline, like duct external insulation) ----
+
+  function setFittingInsulationFillStyle(ins) {
+    mCtx.fillStyle = ins.displayColor || '#74c0fc';
+    mCtx.globalAlpha = ins.opacity != null ? ins.opacity : 0.22;
+  }
+
+  function fillFittingInsulationPath(ins, buildPath) {
+    mCtx.save();
+    setFittingInsulationFillStyle(ins);
+    mCtx.beginPath();
+    buildPath(mCtx);
+    mCtx.closePath();
+    mCtx.fill();
+    mCtx.restore();
+  }
+
+  function fillElbowInsulation(D, sweep, ins) {
+    const halfW = D / 2;
+    const CLR = D * 1.5;
+    const innerR = CLR - halfW;
+    const outerR = CLR + halfW;
+    const stub = D * 0.5;
+    const cx = 0;
+    const cy = CLR;
+    const arcStart = -Math.PI / 2;
+    const arcEnd = -Math.PI / 2 + sweep;
+    const eiX = cx + innerR * Math.cos(arcEnd);
+    const eiY = cy + innerR * Math.sin(arcEnd);
+    const eoX = cx + outerR * Math.cos(arcEnd);
+    const eoY = cy + outerR * Math.sin(arcEnd);
+    const edX = -Math.sin(arcEnd);
+    const edY = Math.cos(arcEnd);
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(-stub, -halfW);
+      ctx.lineTo(0, -halfW);
+      ctx.arc(cx, cy, outerR, arcStart, arcEnd, false);
+      ctx.lineTo(eoX + edX * stub, eoY + edY * stub);
+      ctx.lineTo(eiX + edX * stub, eiY + edY * stub);
+      ctx.arc(cx, cy, innerR, arcEnd, arcStart, true);
+      ctx.lineTo(-stub, halfW);
+    });
+  }
+
+  function fillTeeInsulation(D, branchD, ins) {
+    const halfW = D / 2;
+    const halfB = branchD / 2;
+    const mainLen = D * 1.5;
+    const branchLen = D * 1.5;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(-mainLen, -halfW);
+      ctx.lineTo(mainLen, -halfW);
+      ctx.lineTo(mainLen, halfW);
+      ctx.lineTo(halfB, halfW);
+      ctx.lineTo(halfB, halfW + branchLen);
+      ctx.lineTo(-halfB, halfW + branchLen);
+      ctx.lineTo(-halfB, halfW);
+      ctx.lineTo(-mainLen, halfW);
+    });
+  }
+
+  function fillStraightDuctInsulation(len, halfW, ins) {
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.rect(-len / 2, -halfW, len, halfW * 2);
+    });
+  }
+
+  function fillReducerInsulation(D, D2, eccentric, ins) {
+    const halfW = D / 2;
+    const halfW2 = D2 / 2;
+    const len = Math.abs(D - D2) * 1.5 || D;
+    fillFittingInsulationPath(ins, (ctx) => {
+      if (eccentric) {
+        ctx.moveTo(-len / 2, halfW);
+        ctx.lineTo(len / 2, halfW);
+        ctx.lineTo(len / 2, halfW - halfW2 * 2);
+        ctx.lineTo(-len / 2, -halfW);
+      } else {
+        ctx.moveTo(-len / 2, -halfW);
+        ctx.lineTo(len / 2, -halfW2);
+        ctx.lineTo(len / 2, halfW2);
+        ctx.lineTo(-len / 2, halfW);
+      }
+    });
+  }
+
+  function fillTransitionInsulation(D, D2, ins) {
+    const halfW = D / 2;
+    const halfW2 = D2 / 2;
+    const len = Math.max(D, D2) * 1.5;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(-len / 2, -halfW);
+      ctx.lineTo(len / 2, -halfW2);
+      ctx.lineTo(len / 2, halfW2);
+      ctx.lineTo(-len / 2, halfW);
+    });
+  }
+
+  function fillSquareWingInsulation(D, ins) {
+    const halfW = D / 2;
+    const stub = D * 0.5;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(-halfW - stub, -halfW);
+      ctx.lineTo(halfW, -halfW);
+      ctx.lineTo(halfW, halfW + stub);
+      ctx.lineTo(-halfW, halfW + stub);
+      ctx.lineTo(-halfW, halfW);
+      ctx.lineTo(-halfW - stub, halfW);
+    });
+  }
+
+  function fillBootInsulation(D, D2, ins) {
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.rect(-D / 2, -D2 / 2, D, D2);
+    });
+  }
+
+  function fillEndCapInsulation(D, ins) {
+    const halfW = D / 2;
+    const depth = D * 0.25;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(0, -halfW);
+      ctx.lineTo(0, halfW);
+      ctx.lineTo(depth, halfW);
+      ctx.lineTo(depth, -halfW);
+    });
+  }
+
+  function fillCouplingInsulation(D, ins) {
+    const halfW = D / 2;
+    const len = D * 1.2;
+    const sleeveH = halfW * 1.15;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.rect(-len / 2, -sleeveH, len, sleeveH * 2);
+    });
+  }
+
+  function fillVolumeDamperInsulation(D, ins) {
+    const halfW = D / 2;
+    const len = D * 1.25;
+    fillStraightDuctInsulation(len, halfW, ins);
+  }
+
+  function fillTapIncreasedAreaInsulation(sizeA, fallbackD, ins) {
+    const parts = String(sizeA || '').toLowerCase().split('x').map(v => parseFloat(v)).filter(Number.isFinite);
+    const w = inchesToPx(parts[0] || parseDimension(sizeA) || fallbackD);
+    const h = inchesToPx(parts[1] || parts[0] || parseDimension(sizeA) || fallbackD);
+    const leftX = -w * 0.5;
+    const topRightX = w * 0.55;
+    const throatRightX = w * 0.25;
+    const topY = -h * 0.5;
+    const shoulderY = -h * 0.18;
+    const bottomY = h * 0.5;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(leftX, topY);
+      ctx.lineTo(topRightX, topY);
+      ctx.lineTo(throatRightX, shoulderY);
+      ctx.lineTo(throatRightX, bottomY);
+      ctx.lineTo(leftX, bottomY);
+    });
+  }
+
+  function fillWyeInsulation(D, branchD, ins) {
+    const halfW = D / 2;
+    const halfB = branchD / 2;
+    const entryLen = D * 0.8;
+    const branchLen = D * 1.5;
+    const angle = Math.PI / 6;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(-entryLen, -halfW);
+      ctx.lineTo(0, -halfW);
+      ctx.lineTo(cosA * branchLen, -halfW - sinA * branchLen);
+      ctx.lineTo(cosA * branchLen, -halfW + halfB * 2 * cosA - sinA * branchLen);
+      ctx.lineTo(0, -halfW + halfB * 2 * cosA);
+    });
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(-entryLen, halfW);
+      ctx.lineTo(0, halfW);
+      ctx.lineTo(cosA * branchLen, halfW + sinA * branchLen);
+      ctx.lineTo(cosA * branchLen, halfW - halfB * 2 * cosA + sinA * branchLen);
+      ctx.lineTo(0, halfW - halfB * 2 * cosA);
+    });
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(-entryLen, -halfW);
+      ctx.lineTo(-entryLen, halfW);
+      ctx.lineTo(0, halfW);
+      ctx.lineTo(0, -halfW);
+    });
+  }
+
+  function fillLateralInsulation(D, branchD, ins) {
+    const halfW = D / 2;
+    const halfB = branchD / 2;
+    const mainLen = D * 1.5;
+    const branchLen = D * 1.5;
+    const angle = Math.PI / 4;
+    const bx = Math.cos(angle) * branchLen;
+    const by = Math.sin(angle) * branchLen;
+    const perpX = -Math.sin(angle) * halfB;
+    const perpY = Math.cos(angle) * halfB;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.rect(-mainLen, -halfW, mainLen * 2, halfW * 2);
+    });
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(-perpX, halfW);
+      ctx.lineTo(perpX, halfW);
+      ctx.lineTo(perpX + bx, halfW + by + perpY);
+      ctx.lineTo(-perpX + bx, halfW + by - perpY);
+    });
+  }
+
+  function fillSaddle45YInsulation(D, branchD, ins) {
+    const halfW = D / 2;
+    const bD = (branchD && branchD > 0 && branchD !== D) ? branchD : D;
+    const halfB = bD / 2;
+    const branchLen = bD * 2.0;
+    const mainHalf = D * 1.2;
+    const cos45 = Math.cos(Math.PI / 4);
+    const sin45 = Math.sin(Math.PI / 4);
+    const dirX = sin45;
+    const dirY = -cos45;
+    const perpX = cos45;
+    const perpY = sin45;
+    const lSx = -perpX * halfB;
+    const lSy = -perpY * halfB;
+    const rSx = perpX * halfB;
+    const rSy = perpY * halfB;
+    const lEx = lSx + dirX * branchLen;
+    const lEy = lSy + dirY * branchLen;
+    const rEx = rSx + dirX * branchLen;
+    const rEy = rSy + dirY * branchLen;
+    const lMainX = lSx + (-lSy / dirY) * dirX;
+    const rMainX = rSx + (-rSy / dirY) * dirX;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.rect(-mainHalf, -halfW * 0.32, mainHalf * 2, halfW * 0.64);
+    });
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.moveTo(lMainX, 0);
+      ctx.lineTo(lEx, lEy);
+      ctx.lineTo(rEx, rEy);
+      ctx.lineTo(rMainX, 0);
+    });
+  }
+
+  function fillFittingInsulation(f, D, D2, ins) {
+    if (!ins || !ins.enabled) return;
+    switch (f.type) {
+      case '90el': fillElbowInsulation(D, Math.PI / 2, ins); break;
+      case '45el': fillElbowInsulation(D, Math.PI / 4, ins); break;
+      case '22el': fillElbowInsulation(D, Math.PI / 8, ins); break;
+      case 'tee': fillTeeInsulation(D, D2, ins); break;
+      case 'wye': fillWyeInsulation(D, D2, ins); break;
+      case 'lateral': fillLateralInsulation(D, D2, ins); break;
+      case 'saddle45y': fillSaddle45YInsulation(D, D2, ins); break;
+      case 'reducer': fillReducerInsulation(D, D2, false, ins); break;
+      case 'eccReducer': fillReducerInsulation(D, D2, true, ins); break;
+      case 'endcap': fillEndCapInsulation(D, ins); break;
+      case 'coupling': fillCouplingInsulation(D, ins); break;
+      case 'volume-damper': fillVolumeDamperInsulation(D, ins); break;
+      case 'transition': fillTransitionInsulation(D, D2, ins); break;
+      case 'sqwing': fillSquareWingInsulation(D, ins); break;
+      case 'boot': fillBootInsulation(D, D2, ins); break;
+      case 'tapIncreasedArea': fillTapIncreasedAreaInsulation(f.sizeA, D, ins); break;
+      case 'rectTap': fillRectTapInsulation(D, D2, ins); break;
+      case 'spin-in': fillSpinInInsulation(D, ins); break;
+      case 'flex-conn':
+      case 'plenum': fillBootInsulation(D, D2, ins); break;
+      default: break;
+    }
+  }
+
+  function fillRectTapInsulation(D, branchD, ins) {
+    const bD = (branchD && branchD > 0 && branchD !== D) ? branchD : D * 0.7;
+    const halfB = bD / 2;
+    const gap = bD * 0.3;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.rect(-gap / 2 - 2, -halfB, gap + 4, halfB * 2);
+    });
+  }
+
+  function fillSpinInInsulation(D, ins) {
+    const r = D / 2;
+    fillFittingInsulationPath(ins, (ctx) => {
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+    });
+  }
+
+  const FITTING_TYPES_WITHOUT_INSULATION_FILL = new Set([
+    'hvac_component', 'ductJoint',
+  ]);
+
   // ---- Fitting rendering functions ----
   
   function drawFitting(f, isSelected, isMultiSelected) {
@@ -658,6 +999,12 @@ export function installTakeoffRenderer(ctx = {}) {
     mCtx.setLineDash([]);
     mCtx.lineJoin = 'round';
     mCtx.lineCap = 'round';
+
+    const extIns = getFittingExternalInsulation(f);
+    if (extIns && extIns.enabled && !FITTING_TYPES_WITHOUT_INSULATION_FILL.has(f.type)) {
+      fillFittingInsulation(f, D, D2, extIns);
+    }
+    mCtx.globalAlpha = 1;
   
     switch (f.type) {
       case '90el': drawElbow(D, Math.PI / 2); break;
@@ -670,7 +1017,33 @@ export function installTakeoffRenderer(ctx = {}) {
       case 'reducer': drawReducer(D, D2, false); break;
       case 'eccReducer': drawReducer(D, D2, true); break;
       case 'endcap': drawEndCap(D); break;
-      case 'coupling': drawCoupling(D); break;
+      case 'coupling': {
+        const rt = f.roundType || 'spiral';
+        if (f.autoCoupling && rt === 'snaplock') {
+          mCtx.save();
+          mCtx.strokeStyle = isSelected ? '#e94560' : isMultiSelected ? '#ffd43b' : '#d4a84b';
+          mCtx.lineWidth = 2;
+          drawSnaplockJointMarker(D);
+          mCtx.restore();
+        } else {
+          drawCoupling(D);
+        }
+        break;
+      }
+      case 'ductJoint': {
+        const jointDims = parseRectDimsForJoint(f.sizeA);
+        const spanPx = inchesToPx(jointDims.w);
+        if (f.autoCoupling) {
+          mCtx.save();
+          mCtx.strokeStyle = isSelected ? '#e94560' : isMultiSelected ? '#ffd43b' : '#7eb8da';
+          mCtx.lineWidth = 2;
+          drawDuctJointMarker(spanPx);
+          mCtx.restore();
+        } else {
+          drawDuctJointMarker(spanPx);
+        }
+        break;
+      }
       case 'volume-damper': drawVolumeDamper(D); break;
       case 'transition': drawTransition(D, D2); break;
       case 'sqwing': drawSquareWing(D); break;
@@ -678,6 +1051,13 @@ export function installTakeoffRenderer(ctx = {}) {
       case 'tapIncreasedArea': drawTapIncreasedArea(f.sizeA, D); break;
       case 'spin-in': drawSpinIn(D); break;
       case 'boot': drawBoot(D, D2); break;
+      case 'flex-conn':
+      case 'plenum': {
+        const hw = D / 2;
+        const hh = D2 / 2;
+        mCtx.strokeRect(-hw, -hh, D, D2);
+        break;
+      }
       case 'hvac_component': drawHvacMarker(f); break;
     }
     if (isSpiralFitting) drawSpiralFittingSeams(f.type, D, D2);
@@ -699,7 +1079,7 @@ export function installTakeoffRenderer(ctx = {}) {
     }
   
     // Label (suppressed for fittings inside vertical stacks - they use callout annotations instead)
-    if (!f._noLabel) {
+    if (!f._noLabel && !f.autoCoupling) {
       const roundPrefix = isRoundFitting ? ((f.roundType || 'spiral') === 'spiral' ? 'SPR ' : 'SNP ') : '';
       const labelText = f.label || (roundPrefix + getFittingNames()[f.type] + ' ' + f.sizeA + (f.sizeB ? '/' + f.sizeB : ''));
       const fontSize = Math.max(8, D * 0.3);
@@ -1670,6 +2050,41 @@ export function installTakeoffRenderer(ctx = {}) {
     mCtx.stroke();
   }
   
+  function parseRectDimsForJoint(dimStr) {
+    if (!dimStr || !String(dimStr).includes('x')) return { w: 24, h: 12 };
+    const parts = String(dimStr).split('x').map(s => parseFloat(s.trim()));
+    return { w: parts[0] || 24, h: parts[1] || 12 };
+  }
+
+  /** Slip-and-drive / oval joint: single line across duct width (no cleat ticks or labels). */
+  function drawDuctJointMarker(spanPx) {
+    const half = spanPx / 2;
+    mCtx.beginPath();
+    mCtx.moveTo(0, -half);
+    mCtx.lineTo(0, half);
+    mCtx.stroke();
+  }
+
+  /** Snaplock round joint: center line with staggered ridge ticks. */
+  function drawSnaplockJointMarker(D) {
+    const half = D / 2;
+    mCtx.beginPath();
+    mCtx.moveTo(0, -half);
+    mCtx.lineTo(0, half);
+    mCtx.stroke();
+    const ridgeCount = Math.max(3, Math.round(half / 5));
+    const ridgeLen = Math.max(4, D * 0.16);
+    for (let i = 0; i < ridgeCount; i++) {
+      const y = -half + (i + 0.5) * (D / ridgeCount);
+      const side = i % 2 === 0 ? 1 : -1;
+      mCtx.beginPath();
+      mCtx.moveTo(side * ridgeLen * 0.25, y - ridgeLen * 0.2);
+      mCtx.lineTo(side * ridgeLen, y);
+      mCtx.lineTo(side * ridgeLen * 0.25, y + ridgeLen * 0.2);
+      mCtx.stroke();
+    }
+  }
+
   function drawCoupling(D) {
     const halfW = D / 2;
     const len = D * 1.2;

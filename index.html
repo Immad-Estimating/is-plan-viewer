@@ -777,7 +777,7 @@
         </div>
         <div class="duct-dims" id="ductDimsLiner">
           <label>Liner thickness (inches, 0 = none)</label>
-          <input type="text" id="ductLiner" placeholder="e.g. 1" value="0" />
+          <input type="text" id="ductLiner" placeholder="e.g. 1.5" value="1.5" />
         </div>
         <div class="duct-btns">
           <button class="skip-btn" onclick="finishDuct(false)">Skip</button>
@@ -810,7 +810,8 @@
       <span id="ddFlexColorGroup" style="display:none"><button id="ddFlexColorBtn" onclick="toggleDDFlexColor()" style="background:rgba(60,60,60,0.4);color:#ccc;border:1px solid #888;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600">● Black</button></span>
       <span id="ddDiamGroup"><label>⌀</label><input type="text" id="ddDiam" class="dd-dim" value="14"></span>
       <span id="ddRectGroup" style="display:none"><label>W</label><input type="text" id="ddW" class="dd-dim" value="24"><label>×</label><input type="text" id="ddH" class="dd-dim" value="12"></span>
-      <span id="ddLinerGroup" style="display:none"><label>Liner</label><select id="ddLiner" style="padding:3px 6px;font-size:12px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;border-radius:4px"><option value="0">None</option><option value="1">1"</option><option value="1.5" selected>1.5"</option></select></span>
+      <span id="ddLinerGroup" style="display:none"><label>Liner</label><select id="ddLiner" onchange="onDuctLinerChanged()" style="padding:3px 6px;font-size:12px;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;border-radius:4px"></select></span>
+      <span id="ddInsGroup"><label>Ins</label><button id="ddInsToggle" onclick="toggleDuctInsulation()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">Off</button><select id="ddInsThickness" onchange="syncInsulationSettingsOnTakeoff()" style="padding:3px 6px;font-size:12px"><option value="1">1&quot;</option><option value="1.5" selected>1.5&quot;</option><option value="2">2&quot;</option><option value="3">3&quot;</option></select><select id="ddInsStandard" onchange="syncInsulationSettingsOnTakeoff()" style="padding:3px 6px;font-size:12px;max-width:140px"></select></span>
       <label>Ga</label><select id="ddGauge" style="padding:3px 6px;font-size:12px"><option value="26">26</option><option value="24">24</option><option value="22">22</option></select>
       <span class="dd-hint">Click to draw · Enter to finish</span>
       <button class="tool-pin-btn" id="ddPinBtn" onclick="event.stopPropagation(); togglePinDuctBar()" title="Pin position">📌</button>
@@ -873,6 +874,10 @@
           <input type="text" id="fpSizeA" value="14" placeholder="14">
           <label id="fpSizeBLabel">B:</label>
           <input type="text" id="fpSizeB" value="" placeholder="opt">
+        </div>
+        <div class="fitting-dims" style="margin-top:4px">
+          <label>Ins</label>
+          <button id="fpInsToggle" onclick="toggleDuctInsulation()" style="background:#0f3460;color:#a0a0c0;border:1px solid #1a4080;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:11px">Off</button>
         </div>
         <div class="fitting-dims" style="margin-top:4px">
           <label>Ga:</label>
@@ -1069,13 +1074,14 @@ import MultiSelect from './multiselect.js';
 import ScheduleAI from './schedule-ai.js';
 import HVACLibrary from './hvac-library.js';
 import { installPriceBook } from './price-book.js';
+import { calculateInsulationBundleForItem, getInsulationPriceBookLaborKey } from './insulation-rules.js';
 import { installTakeoffRenderer } from './takeoff-renderer.js';
 import { installInsertPalette } from './insert-palette.js';
 import { installProjectShell } from './project-shell.js';
 import { installBackupRestore } from './backup-restore.js';
 import { installCommandRoll } from './command-roll.js';
 import { installConnectorStandards } from './connector-standards.js?v=flex-image-preview';
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS, LABOR_RATES, LABOR_DEFAULT_RATE, HANGER_DEFAULTS, CONNECTOR_DEFAULTS, loadLaborDefaults, loadHangerDefaults, loadConnectorDefaults } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, LINER_DEFAULTS, getLinerOptionByThickness, getLinerMaterialCostPerSF, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS, LABOR_RATES, LABOR_DEFAULT_RATE, HANGER_DEFAULTS, CONNECTOR_DEFAULTS, INSULATION_DEFAULTS, loadLaborDefaults, loadHangerDefaults, loadConnectorDefaults, loadInsulationDefaults, loadLinerDefaults, saveConnectorDefaultsOverride } from './price-defaults.js';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
 
 // =====================================================
@@ -1447,6 +1453,7 @@ const pageFittings = {};
 // ---- Cost & Labor Engine ----
 const DEFAULT_PHASES = ['rough','trim','air-handler','startup','controls','insulation'];
 let projectRateTable = null; // loaded per project from IDB
+let projectLinerTakeoff = null; // per-project liner on/off + thickness by duct type
 
 function getProjectRateTable() {
   if (projectRateTable) return projectRateTable;
@@ -1541,9 +1548,14 @@ function getDuctCostDefaults(ductConfig) {
     ductKey = 'duct-round';
   }
   const pb = getPriceBookEntry(ductKey, ductConfig ? ductConfig.dims : null);
+  let materialCostPerFt = pb ? pb.materialCost : null;
+  if (shape === 'rect' && ductConfig && ductConfig.liner > 0) {
+    const linerAdd = calcRectDuctLinerPerFt(ductConfig.dims, ductConfig.liner);
+    if (linerAdd > 0) materialCostPerFt = (materialCostPerFt || 0) + linerAdd;
+  }
   return {
     phase: rt.defaultPhase || 'rough',
-    materialCostPerFt: pb ? pb.materialCost : null,
+    materialCostPerFt,
     laborHrsPerFt: pb ? pb.laborHrs : null,
     laborRate: rt.laborRatePerHr || 45,
     costGroup: null,
@@ -1551,18 +1563,39 @@ function getDuctCostDefaults(ductConfig) {
   };
 }
 
-const AUTO_COUPLING_SPACING_FT = {
-  spiral: 10,
-};
+function getDuctJointCountDefaults(ductType) {
+  return CONNECTOR_DEFAULTS.jointCountDefaults?.duct?.[ductType] || null;
+}
 
 function getAutoCouplingSpacingFt(duct) {
-  if (!duct) return 0;
-  if (duct.type === 'spiral') {
-    const spiralDefaults = CONNECTOR_DEFAULTS.jointCountDefaults && CONNECTOR_DEFAULTS.jointCountDefaults.duct && CONNECTOR_DEFAULTS.jointCountDefaults.duct.spiral;
-    const standardLengthFt = spiralDefaults && parseFloat(spiralDefaults.standardLengthFt);
-    return standardLengthFt > 0 ? standardLengthFt : AUTO_COUPLING_SPACING_FT.spiral;
+  if (!duct || duct.type === 'flex') return 0;
+  const jointDefaults = getDuctJointCountDefaults(duct.type);
+  if (!jointDefaults || jointDefaults.jointPolicy === 'none') return 0;
+  const standardLengthFt = parseFloat(jointDefaults.standardLengthFt);
+  return standardLengthFt > 0 ? standardLengthFt : 0;
+}
+
+function isAutoFittingsEnabledForDuct(duct) {
+  if (!duct || duct.type === 'flex') return false;
+  return getAutoCouplingSpacingFt(duct) > 0;
+}
+
+function getAutoFittingSpec(duct) {
+  const ductType = duct?.type || 'spiral';
+  if (ductType === 'rect' || ductType === 'oval') {
+    return {
+      fittingType: 'ductJoint',
+      shape: ductType,
+      roundType: null,
+      label: null,
+    };
   }
-  return 0;
+  return {
+    fittingType: 'coupling',
+    shape: 'round',
+    roundType: getAutoCouplingRoundType(duct),
+    label: null,
+  };
 }
 
 function getAutoCouplingRoundType(duct) {
@@ -1635,7 +1668,12 @@ function removeAutoCouplingsForMeasurement(page, measurementId) {
 
 function refreshAutoCouplingsForMeasurement(m, page) {
   if (!m || !m.id) return;
+  if (!isAutoFittingsEnabledForDuct(m.duct)) {
+    removeAutoCouplingsForMeasurement(page, m.id);
+    return;
+  }
   const placements = buildAutoCouplingPlacements(m);
+  const fitSpec = getAutoFittingSpec(m.duct);
   if (!pageFittings[page]) pageFittings[page] = [];
   const fits = pageFittings[page];
   const existing = fits
@@ -1651,19 +1689,20 @@ function refreshAutoCouplingsForMeasurement(m, page) {
     }
     const defaults = getAutoCouplingCostDefaults(m.duct, m.gauge || '26');
     Object.assign(f, {
-      type: 'coupling',
+      type: fitSpec.fittingType,
       x: placement.x,
       y: placement.y,
       rotation: placement.rotation,
       mirrored: false,
       sizeA: m.duct.dims || '',
       sizeB: '',
-      label: 'Auto Coupling',
-      shape: 'round',
-      roundType: getAutoCouplingRoundType(m.duct),
+      label: null,
+      shape: fitSpec.shape,
+      roundType: fitSpec.roundType,
       gauge: m.gauge || null,
       systemSymbol: m.systemSymbol || null,
       autoCoupling: true,
+      _noLabel: true,
       sourceMeasurementId: m.id,
       autoCouplingIndex: i,
       autoCouplingStationFt: placement.stationFt,
@@ -1702,6 +1741,71 @@ async function loadProjectRateTable(projectId) {
   } else {
     projectRateTable = null; // will use defaults
   }
+  projectLinerTakeoff = (project && project.linerTakeoffDefaults) ? project.linerTakeoffDefaults : null;
+  populateDuctLinerControls();
+}
+
+function getLinerTakeoffForDuctType(ductType) {
+  const global = LINER_DEFAULTS.takeoffDefaults?.byDuctType?.[ductType] || { enabled: false, defaultThicknessIn: 0 };
+  const project = projectLinerTakeoff?.byDuctType?.[ductType];
+  if (!project) return { ...global };
+  return { ...global, ...project };
+}
+
+function getDefaultLinerThicknessForDuctType(ductType) {
+  const cfg = getLinerTakeoffForDuctType(ductType);
+  if (!cfg.enabled) return 0;
+  return parseFloat(cfg.defaultThicknessIn) || 0;
+}
+
+function calcRectDuctLinerPerFt(dims, linerThicknessIn) {
+  const thick = parseFloat(linerThicknessIn);
+  if (!thick || thick <= 0) return 0;
+  const opt = getLinerOptionByThickness(thick);
+  if (!opt) return 0;
+  const parts = String(dims || '').split('x');
+  if (parts.length < 2) return 0;
+  const w = parseFloat(parts[0]) || 0;
+  const h = parseFloat(parts[1]) || 0;
+  if (!w || !h) return 0;
+  const perimFt = (2 * (w + h)) / 12;
+  const linerSF = getLinerMaterialCostPerSF(opt.key, priceBookCache);
+  return perimFt * linerSF;
+}
+
+function populateDuctLinerControls() {
+  const sel = document.getElementById('ddLiner');
+  if (!sel) return;
+  const type = document.getElementById('ddType')?.value || 'rect';
+  const opts = LINER_DEFAULTS.thicknessOptions || [{ value: 0, label: 'None' }];
+  const def = getDefaultLinerThicknessForDuctType(type);
+  sel.innerHTML = opts.map(o =>
+    `<option value="${o.value}"${parseFloat(o.value) === def ? ' selected' : ''}>${escapeHtml(o.label || String(o.value))}</option>`
+  ).join('');
+  const group = document.getElementById('ddLinerGroup');
+  if (group) group.style.display = (type === 'rect') ? '' : 'none';
+}
+
+window.onDuctLinerChanged = function() {
+  const type = document.getElementById('ddType')?.value;
+  if (!type || !activeProjectId) return;
+  const thick = parseFloat(document.getElementById('ddLiner')?.value) || 0;
+  saveProjectLinerTakeoffForType(type, thick);
+};
+
+async function saveProjectLinerTakeoffForType(ductType, thicknessIn) {
+  if (!activeProjectId) return;
+  const project = await idbGet('projects', activeProjectId);
+  if (!project) return;
+  if (!project.linerTakeoffDefaults) project.linerTakeoffDefaults = { byDuctType: {} };
+  if (!project.linerTakeoffDefaults.byDuctType) project.linerTakeoffDefaults.byDuctType = {};
+  project.linerTakeoffDefaults.byDuctType[ductType] = {
+    enabled: thicknessIn > 0,
+    defaultThicknessIn: thicknessIn,
+  };
+  projectLinerTakeoff = project.linerTakeoffDefaults;
+  project.modifiedAt = Date.now();
+  await idbPut('projects', project);
 }
 
 async function saveProjectRateTable(projectId) {
@@ -2363,6 +2467,8 @@ const PriceBook = installPriceBook({
   idbPut,
   showToast,
   refreshCompiler,
+  refreshInsulationControls: populateDuctInsulationControls,
+  refreshMeasurementsPanel: function() { if (typeof updatePanel === 'function') updatePanel(); },
   getCompilerState: () => ({ activePanelTab: _activePanelTab, compilerInited: _compilerInited }),
   escapeHtml,
   calculateSpiralWireLengthEach,
@@ -2410,6 +2516,7 @@ function getMaterialForGauge(key, gauge) { return PriceBook.getMaterialForGauge(
 function getTotalLaborHrs(baseKey, applicableCats) { return PriceBook.getTotalLaborHrs(baseKey, applicableCats); }
 function getShopSettings() { return PriceBook.getShopSettings(); }
 function getActiveLinerPricePerSF() { return PriceBook.getActiveLinerPricePerSF(); }
+function getLinerPricePerSFByThickness(t) { return PriceBook.getLinerPricePerSFByThickness(t); }
 function calcRectDuctRawPerLF(perimeterIn, gauge) { return PriceBook.calcRectDuctRawPerLF(perimeterIn, gauge); }
 function calcRectFittingRawCost(fittingKey, widthIn, heightIn, gauge, branchW, branchH) { return PriceBook.calcRectFittingRawCost(fittingKey, widthIn, heightIn, gauge, branchW, branchH); }
 function lhCatKey(baseKey, cat) { return PriceBook.lhCatKey(baseKey, cat); }
@@ -2635,6 +2742,7 @@ async function savePageDataFromMemory(pageNum = currentPage) {
     stacks,
     hangers,
     ...(existingPageData && existingPageData.connectorOverrides ? { connectorOverrides: existingPageData.connectorOverrides } : {}),
+    ...(existingPageData && existingPageData.insulationOverrides ? { insulationOverrides: existingPageData.insulationOverrides } : {}),
     pageName: pageNames[pageNum] || '',
     annoSize: annoSize,
     annoTextOpacity: annoTextOpacity,
@@ -2710,6 +2818,33 @@ async function loadPageDataForDrawing(drawingId) {
     }
   }
   for (const page in pageMeasurements) refreshAutoCouplingsForPage(page);
+  syncDuctInsulationEnabledFromTakeoff();
+}
+
+function syncDuctInsulationEnabledFromTakeoff() {
+  let anyEnabled = false;
+  for (const page in pageMeasurements) {
+    for (const m of pageMeasurements[page] || []) {
+      if (m.duct && m.duct.externalInsulation && m.duct.externalInsulation.enabled) {
+        anyEnabled = true;
+        break;
+      }
+    }
+    if (anyEnabled) break;
+  }
+  if (!anyEnabled) {
+    for (const page in pageFittings) {
+      for (const f of pageFittings[page] || []) {
+        if (f.externalInsulation && f.externalInsulation.enabled) {
+          anyEnabled = true;
+          break;
+        }
+      }
+      if (anyEnabled) break;
+    }
+  }
+  if (anyEnabled) ductInsulationEnabled = true;
+  syncDuctInsulationUi();
 }
 
 async function loadDrawingIntoViewer(projectId, drawingId) {
@@ -3517,6 +3652,7 @@ function clonePlain(obj) {
 
 const UNDO_SETTINGS_KEY = 'isplan_undo_settings';
 const CONNECTOR_DEFAULTS_STORAGE_KEY = 'isplan_connector_defaults_override';
+const INSULATION_DEFAULTS_STORAGE_KEY = 'isplan_insulation_defaults_override';
 let undoStack = [];
 let redoStack = [];
 let undoBaselineSnapshot = null;
@@ -3557,6 +3693,8 @@ function captureUndoSnapshot() {
     selection: { selectedFittingId, selectedMeasId, selectedHangerMeasId, selectedManualHangerId, selectedEndpointMeasId, selectedEndpointIdx, selectedStackId, selectedStackItemId },
     connectorDefaults: clonePlain(CONNECTOR_DEFAULTS),
     connectorDefaultsOverride: localStorage.getItem(CONNECTOR_DEFAULTS_STORAGE_KEY),
+    insulationDefaults: clonePlain(INSULATION_DEFAULTS),
+    insulationDefaultsOverride: localStorage.getItem(INSULATION_DEFAULTS_STORAGE_KEY),
   };
 }
 
@@ -3586,6 +3724,14 @@ function restoreConnectorDefaultsFromSnapshot(snapshot) {
   Object.assign(CONNECTOR_DEFAULTS, clonePlain(snapshot.connectorDefaults || {}));
   if (snapshot.connectorDefaultsOverride == null) localStorage.removeItem(CONNECTOR_DEFAULTS_STORAGE_KEY);
   else localStorage.setItem(CONNECTOR_DEFAULTS_STORAGE_KEY, snapshot.connectorDefaultsOverride);
+}
+
+function restoreInsulationDefaultsFromSnapshot(snapshot) {
+  for (const key of Object.keys(INSULATION_DEFAULTS)) delete INSULATION_DEFAULTS[key];
+  Object.assign(INSULATION_DEFAULTS, clonePlain(snapshot.insulationDefaults || {}));
+  if (snapshot.insulationDefaultsOverride == null) localStorage.removeItem(INSULATION_DEFAULTS_STORAGE_KEY);
+  else localStorage.setItem(INSULATION_DEFAULTS_STORAGE_KEY, snapshot.insulationDefaultsOverride);
+  populateDuctInsulationControls();
 }
 
 async function persistLoadedPageDataFromMemory(snapshot) {
@@ -3633,6 +3779,7 @@ async function restoreUndoSnapshot(snapshot) {
     selectedStackId = snapshot.selection?.selectedStackId || null;
     selectedStackItemId = snapshot.selection?.selectedStackItemId || null;
     restoreConnectorDefaultsFromSnapshot(snapshot);
+    restoreInsulationDefaultsFromSnapshot(snapshot);
     for (const page of getSnapshotPages(snapshot)) refreshAutoCouplingsForPage(page);
     if (needsPdfRender) await renderPage();
     drawMeasureOverlay();
@@ -4851,6 +4998,95 @@ function cycleDuctDrawType() {
 }
 
 var _ddFlexColor = 'black';
+let ductInsulationEnabled = false;
+
+function populateDuctInsulationControls() {
+  const stdSel = document.getElementById('ddInsStandard');
+  const thickSel = document.getElementById('ddInsThickness');
+  if (stdSel) {
+    const active = INSULATION_DEFAULTS.takeoffDefaults?.activeStandard || '';
+    stdSel.innerHTML = Object.entries(INSULATION_DEFAULTS.standards || {}).map(([key, std]) =>
+      `<option value="${escapeHtml(key)}"${key === active ? ' selected' : ''}>${escapeHtml(std.label || key)}</option>`
+    ).join('');
+  }
+  if (thickSel && INSULATION_DEFAULTS.thicknessOptions?.length) {
+    const activeThickness = INSULATION_DEFAULTS.takeoffDefaults?.defaultThicknessIn || 1.5;
+    thickSel.innerHTML = INSULATION_DEFAULTS.thicknessOptions.map(opt =>
+      `<option value="${opt.value}"${parseFloat(opt.value) === parseFloat(activeThickness) ? ' selected' : ''}>${escapeHtml(opt.label || (opt.value + '"'))}</option>`
+    ).join('');
+  }
+  ductInsulationEnabled = !!INSULATION_DEFAULTS.takeoffDefaults?.enabled;
+  syncDuctInsulationUi();
+}
+
+function syncDuctInsulationUi() {
+  const btn = document.getElementById('ddInsToggle');
+  const fpBtn = document.getElementById('fpInsToggle');
+  const thickSel = document.getElementById('ddInsThickness');
+  const stdSel = document.getElementById('ddInsStandard');
+  const insOn = ductInsulationEnabled;
+  const insStyle = insOn
+    ? { text: 'On', bg: '#74c0fc', color: '#101828' }
+    : { text: 'Off', bg: '#0f3460', color: '#a0a0c0' };
+  for (const el of [btn, fpBtn]) {
+    if (!el) continue;
+    el.textContent = insStyle.text;
+    el.style.background = insStyle.bg;
+    el.style.color = insStyle.color;
+  }
+  if (thickSel) thickSel.disabled = !ductInsulationEnabled;
+  if (stdSel) stdSel.disabled = !ductInsulationEnabled;
+  if (CommandRoll.isActive()) CommandRoll.update({ anchor: getCommandRollStartAnchor(), duct: getDuctDrawConfig() });
+  drawMeasureOverlay();
+}
+
+window.syncInsulationSettingsOnTakeoff = function() {
+  syncDuctInsulationUi();
+};
+
+window.toggleDuctInsulation = function() {
+  ductInsulationEnabled = !ductInsulationEnabled;
+  syncDuctInsulationUi();
+  updatePanel();
+};
+
+/** Insulation snapshot stored on each duct/fitting when drawn (toggle affects new items only). */
+function resolveExternalInsulationForCanvas(stored) {
+  if (!stored || stored.enabled === false) return { enabled: false };
+  return {
+    enabled: true,
+    standardKey: stored.standardKey,
+    productKey: stored.productKey,
+    thicknessIn: stored.thicknessIn,
+    displayColor: stored.displayColor || INSULATION_DEFAULTS.takeoffDefaults?.defaultDisplayColor || '#74c0fc',
+    opacity: stored.opacity != null ? stored.opacity : (INSULATION_DEFAULTS.takeoffDefaults?.defaultOpacity ?? 0.22),
+  };
+}
+
+function resolveExternalInsulationForPersistedItem(stored) {
+  return resolveExternalInsulationForCanvas(stored);
+}
+
+function getExternalInsulationForNewFitting() {
+  return getActiveExternalInsulationConfig();
+}
+
+function getActiveExternalInsulationConfig() {
+  if (!ductInsulationEnabled) return { enabled: false };
+  const standardKey = document.getElementById('ddInsStandard')?.value || INSULATION_DEFAULTS.takeoffDefaults?.activeStandard || '';
+  const thicknessIn = parseFloat(document.getElementById('ddInsThickness')?.value || INSULATION_DEFAULTS.takeoffDefaults?.defaultThicknessIn || 1.5);
+  const standard = INSULATION_DEFAULTS.standards?.[standardKey] || {};
+  const firstRule = (standard.rules || []).find(rule => rule.enabled !== false && rule.product);
+  return {
+    enabled: true,
+    standardKey,
+    productKey: firstRule?.product || INSULATION_DEFAULTS.takeoffDefaults?.defaultProduct || '',
+    thicknessIn,
+    displayColor: INSULATION_DEFAULTS.takeoffDefaults?.defaultDisplayColor || '#74c0fc',
+    opacity: INSULATION_DEFAULTS.takeoffDefaults?.defaultOpacity || 0.22,
+  };
+}
+
 window.ddTypeChanged = function() {
   const t = document.getElementById('ddType').value;
   const isRect = (t === 'rect' || t === 'oval');
@@ -4865,6 +5101,9 @@ window.ddTypeChanged = function() {
   var gaugeLabel = gaugeEl ? gaugeEl.previousElementSibling : null;
   if (gaugeEl) gaugeEl.style.display = isFlex ? 'none' : '';
   if (gaugeLabel && gaugeLabel.tagName === 'LABEL') gaugeLabel.style.display = isFlex ? 'none' : '';
+  const insGroup = document.getElementById('ddInsGroup');
+  if (insGroup) insGroup.style.display = isFlex ? 'none' : '';
+  populateDuctLinerControls();
 };
 window.toggleDDFlexColor = function() {
   _ddFlexColor = _ddFlexColor === 'black' ? 'silver' : 'black';
@@ -4892,11 +5131,11 @@ function getDuctDrawConfig() {
   if (type === 'rect' || type === 'oval') {
     const w = document.getElementById('ddW').value.trim() || '24';
     const h = document.getElementById('ddH').value.trim() || '12';
-    const liner = (type === 'rect') ? (parseFloat(document.getElementById('ddLiner').value) || 0) : 0;
-    return { type, dims: w + 'x' + h, symbol: symbols[type], liner };
+    const liner = (type === 'rect') ? (parseFloat(document.getElementById('ddLiner')?.value) || getDefaultLinerThicknessForDuctType(type)) : 0;
+    return { type, dims: w + 'x' + h, symbol: symbols[type], liner, externalInsulation: getActiveExternalInsulationConfig() };
   }
   const d = document.getElementById('ddDiam').value.trim() || '14';
-  return { type, dims: d, symbol: symbols[type], liner: 0 };
+  return { type, dims: d, symbol: symbols[type], liner: 0, externalInsulation: getActiveExternalInsulationConfig() };
 };
 
 
@@ -5013,8 +5252,9 @@ window.finishDuct = function(save) {
           dims = document.getElementById('ductRoundDiam').value.trim();
         }
         const symbols = { rect: '▬', oval: '⬭', round: '●', spiral: '◎' };
-        const liner = (type === 'rect') ? (parseFloat(document.getElementById('ductLiner').value) || 0) : 0;
-        meas.duct = { type, dims, symbol: symbols[type], liner };
+        const liner = (type === 'rect') ? (parseFloat(document.getElementById('ductLiner').value) || getDefaultLinerThicknessForDuctType('rect')) : 0;
+        meas.duct = { type, dims, symbol: symbols[type], liner, externalInsulation: getActiveExternalInsulationConfig() };
+        meas.lined = liner > 0;
       }
     }
   }
@@ -5627,7 +5867,8 @@ function drawMeasureOverlay() {
       shape: ghostShape,
       roundType: ghostShape === 'round' ? roundDuctType : null,
       sizeA: document.getElementById('fpSizeA').value || '14',
-      sizeB: selectedFittingType === 'tapIncreasedArea' ? '' : (document.getElementById('fpSizeB').value || '')
+      sizeB: selectedFittingType === 'tapIncreasedArea' ? '' : (document.getElementById('fpSizeB').value || ''),
+      externalInsulation: getExternalInsulationForNewFitting(),
     };
     mCtx.globalAlpha = 0.5;
     drawFitting(ghost, false);
@@ -5743,6 +5984,14 @@ const TakeoffRenderer = installTakeoffRenderer({
   getFittingShape,
   getFittingBoundingRadius,
   getFittingNames: () => FITTING_NAMES,
+  getFittingExternalInsulation: (f) => {
+    if (f.autoCoupling || f.type === 'hvac_component') return { enabled: false };
+    return resolveExternalInsulationForCanvas(f.externalInsulation);
+  },
+  getDuctExternalInsulation: (duct) => {
+    if (!duct || duct.type === 'flex') return { enabled: false };
+    return resolveExternalInsulationForCanvas(duct.externalInsulation);
+  },
 });
 
 function getDuctHalfWidthPx(duct) { return TakeoffRenderer.getDuctHalfWidthPx(duct); }
@@ -6181,12 +6430,22 @@ window.editMeasCost = function(id) {
   var totalMat = (mcFt * lenFt).toFixed(2);
   var totalHrs = (lhFt * lenFt).toFixed(1);
   var totalLabor = (lhFt * lenFt * lr).toFixed(2);
-  var total = (mcFt * lenFt + lhFt * lenFt * lr).toFixed(2);
+  var ins = getMeasurementInsulationSummary(m);
+  var insTotal = ins ? ins.totalCost : 0;
+  var total = (parseFloat(mcFt * lenFt) + parseFloat(lhFt * lenFt * lr) + insTotal).toFixed(2);
   var h = '<div class="meas-edit-inline" id="mc-edit-' + id + '" style="font-size:11px">';
-  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Material</span><span style="color:#00ff88">$' + totalMat + '</span></div>';
-  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor</span><span style="color:#ffaa00">' + totalHrs + ' hrs</span></div>';
-  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Labor Cost</span><span style="color:#ffaa00">$' + totalLabor + '</span></div>';
-  h += '<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #0f3460;font-weight:600"><span style="color:#e0e0e0">Total</span><span style="color:#e0e0e0">$' + total + '</span></div>';
+  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Duct material</span><span style="color:#00ff88">$' + totalMat + '</span></div>';
+  h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Duct labor</span><span style="color:#ffaa00">$' + totalLabor + '</span></div>';
+  if (ins) {
+    h += '<div style="margin-top:6px;padding:6px 8px;background:rgba(116,192,252,0.1);border-left:3px solid #74c0fc;border-radius:4px">';
+    h += '<div style="color:#74c0fc;font-weight:700;font-size:11px">Insulation add-on (' + ins.thicknessIn + '")</div>';
+    h += '<div style="display:flex;justify-content:space-between;padding:2px 0;margin-top:4px"><span style="color:#a0a0c0">Wrap</span><span style="color:#00ff88">$' + ins.wrapCost.toFixed(2) + '</span></div>';
+    if (ins.tapeIncluded) h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Tape (' + ins.seamCount + ' seams)</span><span style="color:#b197fc">$' + ins.tapeCost.toFixed(2) + '</span></div>';
+    h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#a0a0c0">Insulation labor</span><span style="color:#ffaa00">$' + ins.laborCost.toFixed(2) + '</span></div>';
+    h += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span style="color:#74c0fc">+$' + ins.costPerLf.toFixed(2) + '/LF duct</span><span style="color:#74c0fc;font-weight:600">$' + insTotal.toFixed(2) + '</span></div>';
+    h += '</div>';
+  }
+  h += '<div style="display:flex;justify-content:space-between;padding:4px 0 0;border-top:1px solid #0f3460;font-weight:600;margin-top:4px"><span style="color:#e0e0e0">Total (duct + insulation)</span><span style="color:#e0e0e0">$' + total + '</span></div>';
   h += '</div>';
   item.insertAdjacentHTML('beforeend', h);
 };
@@ -6605,6 +6864,37 @@ function formatLaborSummary(hrs, cost) {
   return `${h.toFixed(2)} hrs • $${c.toFixed(2)} labor`;
 }
 
+function getMeasurementInsulationSummary(m) {
+  const ext = resolveExternalInsulationForPersistedItem(m.duct && m.duct.externalInsulation);
+  if (!ext.enabled || !m.duct || m.duct.type === 'flex') return null;
+  const lenFt = m.distance && m.distance.value ? m.distance.value : 0;
+  if (!lenFt) return null;
+  const bundle = calculateInsulationBundleForItem(
+    { duct: m.duct, lengthFt: lenFt, distance: m.distance },
+    INSULATION_DEFAULTS,
+    { priceBookCache: priceBookCache, externalInsulation: ext }
+  );
+  if (!bundle) return null;
+  const pbKey = bundle.priceBookLaborKey || getInsulationPriceBookLaborKey(INSULATION_DEFAULTS);
+  const laborPerSf = getTotalLaborHrs(pbKey);
+  const laborHrs = laborPerSf * (bundle.surfaceAreaSf || 0);
+  const rate = m.laborRate != null ? m.laborRate : ((getProjectRateTable() || {}).laborRatePerHr || 45);
+  const laborCost = laborHrs * rate;
+  return {
+    thicknessIn: bundle.thicknessIn,
+    wrapCost: bundle.wrap.materialCost,
+    tapeCost: bundle.tapeIncluded && bundle.tape ? bundle.tape.materialCost : 0,
+    materialCost: bundle.totalMaterialCost,
+    costPerLf: bundle.costPerLf,
+    laborHrs,
+    laborCost,
+    totalCost: bundle.totalMaterialCost + laborCost,
+    tapeIncluded: bundle.tapeIncluded,
+    seamCount: bundle.tape && bundle.tape.seamCount,
+    tapeLf: bundle.tape && bundle.tape.basisQty,
+  };
+}
+
 function getMeasurementLaborSummary(m) {
   const lenFt = (m.distance && m.distance.unit === 'ft') ? (m.distance.value || 0) : 0;
   let lhFt = m.laborHrsPerFt;
@@ -6717,7 +7007,8 @@ function updatePanel() {
     html += `<div class="meas-group-title">Page ${page}</div>`;
 
     for (const m of measurements) {
-      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}${m.duct.flexColor ? ' ' + m.duct.flexColor : ''}${m.duct.dropInches ? ' ↓' + m.duct.dropInches + '"' : ''}</div>` : '';
+      const insInfo = m.duct && m.duct.externalInsulation && m.duct.externalInsulation.enabled ? ` Ins ${m.duct.externalInsulation.thicknessIn || ''}"` : '';
+      const ductInfo = m.duct ? `<div class="meas-duct">${m.duct.symbol} ${m.duct.dims}${m.duct.liner ? ' L' + m.duct.liner + '"' : ''}${insInfo}${m.duct.flexColor ? ' ' + m.duct.flexColor : ''}${m.duct.dropInches ? ' ↓' + m.duct.dropInches + '"' : ''}</div>` : '';
       const flexDropInput = (m.duct && m.duct.type === 'flex') ? `<div style="display:flex;align-items:center;gap:4px;margin-top:3px;cursor:pointer" onclick="showFlexDropPopup(${m.id})" title="Click to set drop distance"><span style="font-size:11px;color:#00bfff">↓ ${m.duct.dropInches ? (m.duct.dropInches/12).toFixed(1) + ' ft drop' : 'Set drop'}</span></div>` : '';
       const hangerPreview = m.duct ? getAutoHangerPreview(m) : null;
       const hangerDetail = hangerPreview
@@ -6738,12 +7029,14 @@ function updatePanel() {
 
       const customLabel = m.labelText ? `<div class="meas-duct" style="color:#e94560;font-style:italic">"${escapeHtml(m.labelText)}"</div>` : '';
       const labor = getMeasurementLaborSummary(m);
+      const ins = getMeasurementInsulationSummary(m);
       const selectedClass = (m.id === selectedMeasId || m.id === selectedHangerMeasId || m.id === selectedEndpointMeasId) ? ' selected' : '';
       html += `<div class="meas-item${selectedClass}" data-id="${m.id}" onclick="selectAnalysisMeasurement(${m.id})">
         <div class="meas-info">
           <div class="meas-length">${m.distance.formatted}</div>
           ${ductInfo}
           <div class="meas-labor">${formatLaborSummary(labor.hrs, labor.cost)}</div>
+          ${ins ? `<div class="meas-insulation-add" style="margin-top:6px;padding:6px 8px;background:rgba(116,192,252,0.12);border-left:3px solid #74c0fc;border-radius:4px;font-size:11px"><div style="color:#74c0fc;font-weight:700">+ $${ins.totalCost.toFixed(2)} insulation (${ins.thicknessIn}")</div><div style="color:#a0a0c0;font-size:10px;margin-top:2px">Wrap $${ins.wrapCost.toFixed(2)}${ins.tapeIncluded ? ' · Tape $' + ins.tapeCost.toFixed(2) + ' (' + ins.seamCount + ' seams)' : ''} · Labor $${ins.laborCost.toFixed(2)} · <span style="color:#00ff88">+$${ins.costPerLf.toFixed(2)}/LF</span></div></div>` : ''}
           ${flexDropInput}
           ${hangerInfo}
           ${elevInfo}
@@ -7089,7 +7382,7 @@ const FITTING_NAMES = {
   '90el': '90° Elbow', '45el': '45° Elbow', '22el': '22.5° Elbow',
   'tee': 'Tee-Wye', 'saddle45y': 'Saddle 45Y', 'lateral': '45° Lateral', 'boot': 'Boot',
   'wye': 'Wye', 'reducer': 'Reducer', 'eccReducer': 'Ecc Reducer',
-  'endcap': 'End Cap', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
+  'endcap': 'End Cap', 'coupling': 'Coupling', 'ductJoint': 'Duct Joint', 'transition': 'Transition', 'sqwing': 'Sq Wing EL',
   'rectTap': 'Rect Tap', 'tapIncreasedArea': 'Tap Increased Area', 'spin-in': 'Spin-In', 'volume-damper': 'Volume Damper', 'flex-conn': 'Flex Connector', 'plenum': 'Plenum',
   'hvac_component': 'HVAC Component'
 };
@@ -7110,6 +7403,12 @@ function parseDimension(dimStr) {
     return Math.max(...dimStr.split('x').map(Number).filter(n => !isNaN(n))) || 14;
   }
   return parseFloat(dimStr) || 14;
+}
+
+function parseRectDims(dimStr) {
+  if (!dimStr || !String(dimStr).includes('x')) return { w: 24, h: 12 };
+  const parts = String(dimStr).split('x').map(s => parseFloat(s.trim()));
+  return { w: parts[0] || 24, h: parts[1] || 12 };
 }
 
 function getFittingShape(f) {
@@ -7365,7 +7664,8 @@ function drawCommandRollGhost() {
       shape: command.shape || 'round',
       roundType: command.roundType || null,
       sizeA: command.sizeA || getCommandRollSizeA(getDuctDrawConfig()),
-      sizeB: command.sizeB || ''
+      sizeB: command.sizeB || '',
+      externalInsulation: getExternalInsulationForNewFitting(),
     };
     mCtx.save();
     mCtx.globalAlpha = 0.46;
@@ -7451,7 +7751,8 @@ function placeFittingAtPoint(pt, opts = {}) {
     costGroup: null,
     costOverride: false,
     gauge: opts.gauge || (document.getElementById('fpGauge') ? document.getElementById('fpGauge').value : '26'),
-    systemSymbol: activeSystemSymbol || null
+    systemSymbol: activeSystemSymbol || null,
+    externalInsulation: opts.externalInsulation || getExternalInsulationForNewFitting(),
   };
   pageFittings[currentPage].push(f);
   selectedFittingId = null;
@@ -7543,6 +7844,10 @@ function handleFittingClick(e) {
 }
 
 function getFittingBoundingRadius(f) {
+  if (f.type === 'ductJoint') {
+    const dims = parseRectDims(f.sizeA);
+    return inchesToPx(dims.w) / 2 + 8;
+  }
   const D = inchesToPx(parseDimension(f.sizeA));
   if (f.type === 'boot') {
     const D2 = f.sizeB ? inchesToPx(parseDimension(f.sizeB)) : D;
@@ -8397,6 +8702,10 @@ async function init() {
   await loadLaborDefaults();
   await loadHangerDefaults();
   await loadConnectorDefaults();
+  await loadLinerDefaults();
+  await loadInsulationDefaults();
+  populateDuctInsulationControls();
+  populateDuctLinerControls();
   setUndoHistoryDepth(getUndoHistoryDepth());
   await loadPriceBook();
   await loadQuickbaseProjects();

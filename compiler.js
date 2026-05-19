@@ -6,8 +6,9 @@
 // Zero dependency on index.html internals — reads from IndexedDB.
 // =====================================================
 
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_DEFAULTS, HANGER_DEFAULTS, CONNECTOR_DEFAULTS, loadConnectorDefaults } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_SA, calcRectFittingSA, RECT_MIN_WIDTH_CLASSES, RECT_PERIM_CLASSES, SHOP_DEFAULTS, DUCT_WEIGHT_PER_LF, LINER_OPTIONS, getLinerMaterialCostPerSF, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_DEFAULTS, HANGER_DEFAULTS, CONNECTOR_DEFAULTS, INSULATION_DEFAULTS, INSULATION_LABOR_CATEGORY_KEYS, loadConnectorDefaults, loadInsulationDefaults, loadLinerDefaults } from './price-defaults.js';
 import { calculateConnectorApplicationsForItem } from './connector-rules.js';
+import { calculateInsulationBundleForItem, getInsulationPriceBookLaborKey } from './insulation-rules.js';
 
 function getGaugeWeightPerSF(gauge) {
   if (gauge === '22') return 1.406;
@@ -509,13 +510,16 @@ function buildHangerRow(h, page, drawingId, drawingName, labRate, source) {
 }
 
 function getAutoCouplingSpacingFtForDuct(duct) {
-  if (!duct) return 0;
-  if (duct.type === 'spiral') {
-    const spiralDefaults = CONNECTOR_DEFAULTS.jointCountDefaults && CONNECTOR_DEFAULTS.jointCountDefaults.duct && CONNECTOR_DEFAULTS.jointCountDefaults.duct.spiral;
-    const standardLengthFt = spiralDefaults && parseFloat(spiralDefaults.standardLengthFt);
-    return standardLengthFt > 0 ? standardLengthFt : 10;
-  }
-  return 0;
+  if (!duct || duct.type === 'flex') return 0;
+  const jointDefaults = CONNECTOR_DEFAULTS.jointCountDefaults?.duct?.[duct.type];
+  if (!jointDefaults || jointDefaults.jointPolicy === 'none') return 0;
+  const standardLengthFt = parseFloat(jointDefaults.standardLengthFt);
+  return standardLengthFt > 0 ? standardLengthFt : 0;
+}
+
+function isAutoFittingsEnabledForDuctCompiler(duct) {
+  if (!duct || duct.type === 'flex') return false;
+  return getAutoCouplingSpacingFtForDuct(duct) > 0;
 }
 
 function getAutoCouplingRoundTypeForDuct(duct) {
@@ -523,6 +527,9 @@ function getAutoCouplingRoundTypeForDuct(duct) {
 }
 
 function buildAutoCouplingRowsForMeasurement(m, page, drawingId, drawingName, labRate) {
+  if (!isAutoFittingsEnabledForDuctCompiler(m.duct)) return [];
+  const ductType = m.duct?.type;
+  if (ductType === 'rect' || ductType === 'oval') return [];
   const spacingFt = getAutoCouplingSpacingFtForDuct(m.duct);
   const lengthFt = m && m.distance ? (m.distance.value || 0) : 0;
   if (!spacingFt || lengthFt <= spacingFt) return [];
@@ -658,6 +665,88 @@ function addConnectorRows(rows, item, context, labRate, options) {
   if (!CONNECTOR_DEFAULTS.takeoffDefaults || CONNECTOR_DEFAULTS.takeoffDefaults.showInCompiler === false) return;
   const apps = calculateConnectorApplicationsForItem(item, CONNECTOR_DEFAULTS, options || {});
   if (apps.length > 0) rows.push(...buildConnectorRows(apps, context, labRate));
+}
+
+function buildInsulationRow(bundle, context, labRate) {
+  const insulationKey = `${context.sourceType}:${context.sourceId}:insulation`;
+  const ovr = (context.insulationOverrides && context.insulationOverrides[insulationKey]) || {};
+  const hasOverride = Object.keys(ovr).length > 0;
+  const pbKey = bundle.priceBookLaborKey || getInsulationPriceBookLaborKey(INSULATION_DEFAULTS);
+  const surfaceAreaSf = bundle.surfaceAreaSf || 0;
+  let materialCost = bundle.totalMaterialCost || 0;
+
+  const laborCatHrs = {};
+  const laborCatCost = {};
+  const pbBd = getPriceBookLaborBreakdown(pbKey);
+  const insLaborCats = pbKey.indexOf('insulation-fiberglass-wrap') === 0
+    ? LABOR_CATEGORIES.filter(c => INSULATION_LABOR_CATEGORY_KEYS.includes(c.key))
+    : LABOR_CATEGORIES;
+  let assignedCat = 'unassigned';
+  for (const cat of insLaborCats) {
+    const hrsPerSf = pbBd[cat.key] || 0;
+    const catHrs = hrsPerSf * surfaceAreaSf;
+    laborCatHrs[cat.key] = catHrs;
+    laborCatCost[cat.key] = catHrs * labRate;
+    if (catHrs > 0 && assignedCat === 'unassigned') assignedCat = cat.label;
+  }
+  let laborHrs = Object.values(laborCatHrs).reduce((s, v) => s + v, 0);
+
+  const origLaborHrs = laborHrs;
+  const origMaterialCost = materialCost;
+  const origLaborCost = laborHrs * labRate;
+  const origTotalCost = materialCost + origLaborCost;
+  const origLaborCatHrs = { ...laborCatHrs };
+
+  if (ovr.laborHrs != null) laborHrs = ovr.laborHrs;
+  if (ovr.materialCost != null) materialCost = ovr.materialCost;
+  for (const cat of LABOR_CATEGORIES) {
+    if (ovr['laborCat_' + cat.key] != null) {
+      laborCatHrs[cat.key] = ovr['laborCat_' + cat.key];
+      laborCatCost[cat.key] = ovr['laborCat_' + cat.key] * labRate;
+    }
+  }
+  const finalLaborCost = ovr.laborCost != null ? ovr.laborCost : laborHrs * labRate;
+  const finalTotalCost = ovr.totalCost != null ? ovr.totalCost : materialCost + finalLaborCost;
+
+  const tapeNote = bundle.tapeIncluded && bundle.tape
+    ? ` + tape (${(bundle.tape.seamCount || 0)} seams, ${(bundle.tape.basisQty || 0).toFixed(1)} LF)`
+    : '';
+  const wrapLabel = bundle.wrap && bundle.wrap.productLabel ? bundle.wrap.productLabel : 'Fiberglass Wrap';
+
+  return {
+    _itemType: 'Duct Insulation',
+    _size: `${bundle.thicknessIn || ''}" @ $${(bundle.wrap?.materialCostRate || 0).toFixed(2)}/SF · ${surfaceAreaSf.toFixed(2)} SF · $${(bundle.costPerLf || 0).toFixed(2)}/LF`,
+    _shape: `${capitalize(bundle.shape || '')} - ${wrapLabel}${tapeNote}`,
+    _page: context.page, _drawingId: context.drawingId, _drawingName: context.drawingName,
+    _lengthFt: bundle.lengthFt || 0, _matCost: materialCost, _laborHrs: laborHrs,
+    _laborCost: finalLaborCost, _totalCost: finalTotalCost,
+    _laborCatHrs: laborCatHrs, _laborCatCost: laborCatCost, _laborCatLabel: assignedCat,
+    _hasOverride: hasOverride, _overrides: ovr,
+    _orig_laborHrs: origLaborHrs, _orig_materialCost: origMaterialCost,
+    _orig_laborCost: origLaborCost, _orig_totalCost: origTotalCost, _orig_lengthFt: bundle.lengthFt || 0,
+    _orig_laborCatHrs: origLaborCatHrs,
+    phase: context.phase || null, costGroup: context.costGroup || 'insulation', gauge: context.gauge || null,
+    systemSymbol: context.systemSymbol || null,
+    _sourceType: 'insulation',
+    _sourceId: insulationKey,
+    _insulationKey: insulationKey,
+    _insulationSourceType: context.sourceType,
+    _insulationSourceId: context.sourceId,
+    _insulationSurfaceAreaSf: surfaceAreaSf,
+    _insulationPerimeterFt: bundle.perimeterFt || 0,
+    _insulationThicknessIn: bundle.thicknessIn || null,
+    _insulationStandardLabel: bundle.standardLabel || '',
+    _insulationTapeIncluded: !!bundle.tapeIncluded,
+  };
+}
+
+function addInsulationRows(rows, item, context, labRate, options) {
+  if (!INSULATION_DEFAULTS.takeoffDefaults || INSULATION_DEFAULTS.takeoffDefaults.showInCompiler === false) return;
+  const bundle = calculateInsulationBundleForItem(item, INSULATION_DEFAULTS, {
+    ...(options || {}),
+    priceBookCache: _priceBookCache,
+  });
+  if (bundle) rows.push(buildInsulationRow(bundle, context, labRate));
 }
 
 function getStrapDefaults() {
@@ -880,8 +969,7 @@ function normalizeRows(allPageData, drawingNames) {
         // Find matching liner option by thickness
         const linerThick = m.duct.liner;
         const linerOpt = LINER_OPTIONS.find(o => o.thickness === linerThick) || LINER_OPTIONS[0];
-        const linerEntry = _priceBookCache ? _priceBookCache[linerOpt.key] : null;
-        const linerSF = (linerEntry && linerEntry.materialCost != null) ? linerEntry.materialCost : 0;
+        const linerSF = getLinerMaterialCostPerSF(linerOpt.key, _priceBookCache);
         linerPerFt = perimFt * linerSF;
       }
       const rate = m.laborRate || labRate;
@@ -954,6 +1042,21 @@ function normalizeRows(allPageData, drawingNames) {
         _sourceType: 'measurement', _sourceId: m.id,
         _lined: m.lined || false, _linerPerFt: linerPerFt,
       });
+
+      addInsulationRows(rows, {
+        ...m,
+        kind: 'duct',
+        lengthFt,
+      }, {
+        page, drawingId, drawingName,
+        sourceType: 'measurement',
+        sourceId: m.id,
+        phase: m.phase,
+        costGroup: m.costGroup,
+        gauge: m.gauge,
+        systemSymbol: m.systemSymbol,
+        insulationOverrides: pd.insulationOverrides || {},
+      }, labRate);
 
       const hangerShape = isFlex ? 'flex' : shape;
       const autoHanger = buildAutoHangerForMeasurement(m, lengthFt, hangerShape);
@@ -1107,8 +1210,7 @@ function normalizeRows(allPageData, drawingNames) {
             const _linerOpt = (f.lined && f.linerThickness)
               ? (LINER_OPTIONS.find(o => o.thickness === f.linerThickness) || LINER_OPTIONS[0])
               : LINER_OPTIONS[LINER_OPTIONS.length - 1]; // default to largest (1.5")
-            const _linerEntry = _priceBookCache ? _priceBookCache[_linerOpt.key] : null;
-            const _linerSF = (_linerEntry && _linerEntry.materialCost != null) ? _linerEntry.materialCost : 0;
+            const _linerSF = getLinerMaterialCostPerSF(_linerOpt.key, _priceBookCache);
             if (_linerSF > 0) {
               matCost += sa * _linerSF;
             }
@@ -1945,6 +2047,8 @@ function _saveGrandAdj() {
 async function loadCompilerData() {
   if (!_projectId) { _rows = []; return; }
   await loadConnectorDefaults();
+  await loadLinerDefaults();
+  await loadInsulationDefaults();
   await loadPriceBook();
   await loadProjectRate(_projectId);
   _loadGrandAdj();
@@ -2257,6 +2361,15 @@ async function _writeOverrideToSource(row) {
         if (isEmpty) delete pd.connectorOverrides[key];
         else pd.connectorOverrides[key] = { ...ovr };
         if (Object.keys(pd.connectorOverrides).length === 0) delete pd.connectorOverrides;
+        changed = true;
+      }
+    } else if (row._sourceType === 'insulation') {
+      const key = row._insulationKey || row._sourceId;
+      if (key && String(pd.pageNum || 0) === String(row._page || 0)) {
+        if (!pd.insulationOverrides) pd.insulationOverrides = {};
+        if (isEmpty) delete pd.insulationOverrides[key];
+        else pd.insulationOverrides[key] = { ...ovr };
+        if (Object.keys(pd.insulationOverrides).length === 0) delete pd.insulationOverrides;
         changed = true;
       }
     }

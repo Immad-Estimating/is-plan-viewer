@@ -12,6 +12,13 @@
   },
   "takeoffDefaults": {
     "activeStandard": "smacna-seal-class-c-seed",
+    "autoFittingsDefaults": {
+      "spiral": true,
+      "round": false,
+      "rect": false,
+      "oval": false,
+      "flex": false
+    },
     "defaultWasteFactor": 1.1,
     "roundJointLengthFormula": "circumferenceFt",
     "rectJointLengthFormula": "perimeterFt",

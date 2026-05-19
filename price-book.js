@@ -1,4 +1,21 @@
-import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS, HANGER_DEFAULTS } from './price-defaults.js';
+import { SPIRAL_DEFAULTS, SNAPLOCK_DEFAULTS, SPIRAL_TAP_DEFAULTS, SNAPLOCK_TAP_DEFAULTS, RECT_FITTING_REF, RECT_FITTING_SA, calcRectFittingSA, RECT_PERIM_CLASSES, RECT_MIN_WIDTH_CLASSES, INSULATION_ROUND_DIAM_CLASSES, INSULATION_LABOR_CATEGORY_KEYS, DUCT_WEIGHT_PER_LF, SHOP_DEFAULTS, LINER_OPTIONS, LINER_DEFAULTS, getLinerMaterialCostPerSF, RECT_DUCT_SHOP_DEFAULTS, RECT_FLEX_CONN_DEFAULTS, RECT_PLENUM_DEFAULT, RECT_REDUCER_SHOP_DEFAULTS, RECT_ENDCAP_SHOP_DEFAULTS, RECT_TRANSITION_SHOP_DEFAULTS, RECT_TAP_SHOP_DEFAULTS, RECT_45EL_SHOP_DEFAULTS, LABOR_CATEGORIES, LABOR_DEFAULTS, HANGER_DEFAULTS, CONNECTOR_DEFAULTS, INSULATION_DEFAULTS, seedInsulationLaborDefaults, saveConnectorDefaultsOverride, saveInsulationDefaultsOverride } from './price-defaults.js';
+import {
+  calculateInsulationExample,
+  getInsulationPriceBookLaborKey,
+  getInsulationPerimeterFt,
+  classifyInsulationSize,
+  resolveInsulationLaborPriceBookKey,
+  insulationThicknessKey,
+  insulationWrapPriceBookKey,
+  getWrapMaterialCostPerSf,
+  TAPE_RULE_ID,
+} from './insulation-rules.js';
+
+const INSULATION_PREVIEW_KEYS = ['rect', 'spiral', 'snaplock', 'oval'];
+
+const INSULATION_WRAP_PB_KEY = 'insulation-fiberglass-wrap';
+const INSULATION_WRAP_PRODUCT = 'fiberglass-duct-wrap-fsk';
+const INSULATION_TAPE_PRODUCT = 'foil-scrim-vapor-tape';
 
 export function installPriceBook(ctx = {}) {
   const {
@@ -6,6 +23,8 @@ export function installPriceBook(ctx = {}) {
     idbPut,
     showToast = function() {},
     refreshCompiler = function() {},
+    refreshInsulationControls = function() {},
+    refreshMeasurementsPanel = function() {},
     getCompilerState = function() { return {}; },
     escapeHtml = function(str) { return String(str == null ? '' : str).replace(/[&<>"']/g, function(ch) { return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[ch]; }); },
     calculateSpiralWireLengthEach = function() { return 0; },
@@ -28,6 +47,19 @@ export function installPriceBook(ctx = {}) {
     } catch(e) {
       console.warn('[PriceBook] Could not load:', e);
       priceBookCache = {};
+    }
+    await seedLinerPriceBookEntries();
+  }
+
+  async function seedLinerPriceBookEntries() {
+    const costs = LINER_DEFAULTS.materialCostByKey || {};
+    for (var i = 0; i < LINER_OPTIONS.length; i++) {
+      var opt = LINER_OPTIONS[i];
+      var existing = priceBookCache ? priceBookCache[opt.key] : null;
+      if (existing && existing.materialCost != null) continue;
+      var mc = costs[opt.key];
+      if (mc == null) continue;
+      await savePriceBookEntry(opt.key, { key: opt.key, materialCost: mc });
     }
   }
   
@@ -103,10 +135,11 @@ export function installPriceBook(ctx = {}) {
         { id: 'rect-duct', hasGauge: true, title: 'Ductwork (Auto-Calc)', isRectDuctCalc: true, items: [
           { key: 'duct-rect', label: 'Rect Duct (per ft)' },
         ]},
-        { id: 'rect-acc', hasGauge: false, title: 'Accessories & Add-Ons', hasShopAdder: true, items: [
+        { id: 'rect-liner', hasGauge: false, title: 'Internal Liner', items: [
           { key: 'liner-1', label: '1\u2033 Liner ($/SF)', isLiner: true },
           { key: 'liner-1.5', label: '1.5\u2033 Liner ($/SF)', isLiner: true },
-          { key: 'rect-wrap', label: 'Wrap Insulation ($/SF)' },
+        ]},
+        { id: 'rect-acc', hasGauge: false, title: 'Accessories', hasShopAdder: true, items: [
           { key: 'rect-nosing', label: 'Nosing / Edging ($/LF)' },
           { key: 'rect-turning-vanes', label: 'Turning Vanes ($/Ea)' },
           { key: 'rect-access-door', label: 'Access Door ($/Ea)' },
@@ -212,6 +245,12 @@ export function installPriceBook(ctx = {}) {
         { id: 'hanger-main', hasGauge: false, title: 'Hanger Supports', isHangerCatalog: true, items: [] },
         { id: 'hanger-hardware', hasGauge: false, title: 'Hanger Hardware', isHangerCatalog: true, family: 'hardware', items: [] },
       ]
+    },
+    insulation: {
+      label: 'Insulation',
+      sections: [
+        { id: 'insulation-wrap', title: 'Fiberglass Duct Wrap', isInsulationCatalog: true, items: [] },
+      ]
     }
   };
   
@@ -224,8 +263,13 @@ export function installPriceBook(ctx = {}) {
   var pbExpandedAssemblies = {}; // tracks expanded hanger assembly pricing details
   var pbPerimClass = { 'rect-fit': 0 }; // active perimeter class index per section (rect duct)
   var pbMinWidthClass = { 'rect-fit': 0 }; // active min-width class index per section (rect fittings)
-  var pbLinerActive = false; // when true, rect duct/fit prices include liner adder
-  var pbActiveLiner = null;  // active liner key (e.g. 'liner-1') — null = no liner selected
+  var pbLinerActive = LINER_DEFAULTS.takeoffDefaults?.priceBookIncludeLinerInRectCalc !== false;
+  var pbActiveLiner = LINER_DEFAULTS.takeoffDefaults?.defaultActiveLinerKey || 'liner-1.5';
+  var pbInsulationLaborMode = 'perim'; // 'perim' = rect/oval perimeter ranges, 'dia' = round diameter ranges
+  var pbInsulationPerimClassIdx = 2;
+  var pbInsulationDiaClassIdx = 3;
+  var pbInsulationPanels = { settings: false, labor: false, previews: false }; // false = expanded
+  var pbInsulationPreviewOpen = { rect: true, spiral: true, snaplock: true, oval: true };
   
   // SMACNA galvanized sheet metal weights (lbs per SF) by gauge
   var SHEET_METAL_WEIGHT = {
@@ -293,8 +337,13 @@ export function installPriceBook(ctx = {}) {
   // Get active liner $/SF from Price Book (0 if no liner selected or liner toggle off)
   function getActiveLinerPricePerSF() {
     if (!pbLinerActive || !pbActiveLiner) return 0;
-    var entry = priceBookCache ? priceBookCache[pbActiveLiner] : null;
-    return (entry && entry.materialCost != null) ? entry.materialCost : 0;
+    return getLinerMaterialCostPerSF(pbActiveLiner, priceBookCache);
+  }
+
+  function getLinerPricePerSFByThickness(thicknessIn) {
+    var opt = LINER_OPTIONS.find(function(o) { return o.thickness === parseFloat(thicknessIn); });
+    if (!opt) return 0;
+    return getLinerMaterialCostPerSF(opt.key, priceBookCache);
   }
   
   function getShopSettings() {
@@ -323,6 +372,7 @@ export function installPriceBook(ctx = {}) {
   
   function getGaugesForSection(sectionId) {
     if (sectionId && sectionId.indexOf('hanger-') === 0) return null;
+    if (sectionId && sectionId.indexOf('insulation-') === 0) return null;
     if (sectionId === 'round-flex') return null;
     return ['26', '24', '22'];
   }
@@ -374,7 +424,12 @@ export function installPriceBook(ctx = {}) {
       laborCat: activeLaborCat,
       tab: activePBTab,
       linerActive: pbLinerActive,
-      activeLiner: pbActiveLiner
+      activeLiner: pbActiveLiner,
+      insulationPanels: pbInsulationPanels,
+      insulationPreviewOpen: pbInsulationPreviewOpen,
+      insulationLaborMode: pbInsulationLaborMode,
+      insulationPerimClassIdx: pbInsulationPerimClassIdx,
+      insulationDiaClassIdx: pbInsulationDiaClassIdx
     };
     localStorage.setItem('pbLayout', JSON.stringify(layout));
   }
@@ -414,12 +469,21 @@ export function installPriceBook(ctx = {}) {
       if (layout.linerActive != null) pbLinerActive = layout.linerActive;
       if (layout.activeLiner) pbActiveLiner = layout.activeLiner;
       if (layout.laborCat) activeLaborCat = layout.laborCat;
-      if (layout.tab) activePBTab = layout.tab;
+      if (layout.tab) activePBTab = layout.tab === 'addons' ? 'insulation' : layout.tab;
+      if (layout.insulationPanels) pbInsulationPanels = Object.assign({ settings: false, labor: false, previews: false }, layout.insulationPanels);
+      if (layout.insulationPreviewOpen) pbInsulationPreviewOpen = Object.assign({ rect: true, spiral: true, snaplock: true, oval: true }, layout.insulationPreviewOpen);
+      if (layout.insulationLaborMode) pbInsulationLaborMode = layout.insulationLaborMode;
+      if (layout.insulationPerimClassIdx != null) pbInsulationPerimClassIdx = layout.insulationPerimClassIdx;
+      if (layout.insulationDiaClassIdx != null) pbInsulationDiaClassIdx = layout.insulationDiaClassIdx;
     } else {
       panel.style.width = '480px';
       panel.style.height = '520px';
       panel.style.left = (window.innerWidth - 480) / 2 + 'px';
       panel.style.top = (window.innerHeight - 520) / 2 + 'px';
+      if (LINER_DEFAULTS.takeoffDefaults?.priceBookIncludeLinerInRectCalc !== false) {
+        pbLinerActive = true;
+        pbActiveLiner = LINER_DEFAULTS.takeoffDefaults?.defaultActiveLinerKey || 'liner-1.5';
+      }
     }
   }
   
@@ -538,6 +602,10 @@ export function installPriceBook(ctx = {}) {
     return baseKey + '-lc-' + (cat || activeLaborCat);
   }
   
+  function _insulationLaborRootKey(baseKey) {
+    return baseKey.replace(/-(perim|dia)-\d+$/, '');
+  }
+
   // Resolve labor default: check size-specific key first, then base key
   function _laborDefault(baseKey, catKey) {
     // 1. Company-wide defaults (localStorage) — user's saved overrides for all projects
@@ -547,30 +615,50 @@ export function installPriceBook(ctx = {}) {
     // Try base key fallback in company defaults
     var cdBase = baseKey.replace(/-(mw)?\d+(x\d+)?$/, '') + '-lc-' + catKey;
     if (cdBase !== cdKey && cd[cdBase] && cd[cdBase].laborHrs) return cd[cdBase].laborHrs;
+    var insRoot = _insulationLaborRootKey(baseKey);
+    if (insRoot !== baseKey) {
+      var cdIns = insRoot + '-lc-' + catKey;
+      if (cd[cdIns] && cd[cdIns].laborHrs) return cd[cdIns].laborHrs;
+    }
     // 2. JSON defaults (labor-defaults.json) — seeded starting values
     if (!LABOR_DEFAULTS) return 0;
     if (LABOR_DEFAULTS[baseKey] && LABOR_DEFAULTS[baseKey][catKey]) return LABOR_DEFAULTS[baseKey][catKey];
     var baseOnly = baseKey.replace(/-(mw)?\d+(x\d+)?$/, '');
     if (baseOnly !== baseKey && LABOR_DEFAULTS[baseOnly] && LABOR_DEFAULTS[baseOnly][catKey]) return LABOR_DEFAULTS[baseOnly][catKey];
+    if (insRoot !== baseKey && LABOR_DEFAULTS[insRoot] && LABOR_DEFAULTS[insRoot][catKey]) {
+      return LABOR_DEFAULTS[insRoot][catKey];
+    }
     return 0;
   }
   
-  // Get total labor hours across all categories for an item
-  function getTotalLaborHrs(baseKey, applicableCats) {
+  function getInsulationLaborCategories() {
+    return LABOR_CATEGORIES.filter(function(c) {
+      return INSULATION_LABOR_CATEGORY_KEYS.indexOf(c.key) !== -1;
+    });
+  }
+
+  function resolveLaborCategories(baseKey, itemType, applicableCats) {
+    if (applicableCats) return applicableCats;
+    if (itemType === 'insulation' || isInsulationLaborKey(baseKey)) return getInsulationLaborCategories();
+    return LABOR_CATEGORIES;
+  }
+
+  // Get total labor hours across applicable categories for an item
+  function getTotalLaborHrs(baseKey, applicableCats, itemType) {
     var total = 0;
-    var cats = applicableCats || LABOR_CATEGORIES;
+    var cats = resolveLaborCategories(baseKey, itemType, applicableCats);
     for (var i = 0; i < cats.length; i++) {
       var k = lhCatKey(baseKey, cats[i].key);
       var entry = priceBookCache ? priceBookCache[k] : null;
-      if (entry && entry.laborHrs) { total += entry.laborHrs; }
+      if (entry && entry.laborHrs != null) { total += entry.laborHrs; }
       else { total += _laborDefault(baseKey, cats[i].key); }
     }
     return total;
   }
   
   // Get labor hours per category for an item (for radar chart)
-  function getLaborBreakdown(baseKey, applicableCats) {
-    var cats = applicableCats || LABOR_CATEGORIES;
+  function getLaborBreakdown(baseKey, applicableCats, itemType) {
+    var cats = resolveLaborCategories(baseKey, itemType, applicableCats);
     var result = [];
     for (var i = 0; i < cats.length; i++) {
       var k = lhCatKey(baseKey, cats[i].key);
@@ -579,6 +667,13 @@ export function installPriceBook(ctx = {}) {
       result.push({ cat: cats[i], hrs: hrs });
     }
     return result;
+  }
+
+  function getLaborHrsFromBreakdown(breakdown, catKey) {
+    for (var i = 0; i < breakdown.length; i++) {
+      if (breakdown[i].cat.key === catKey) return breakdown[i].hrs;
+    }
+    return 0;
   }
   
   // Active radar chart state
@@ -589,13 +684,17 @@ export function installPriceBook(ctx = {}) {
   // Render a radar chart as SVG for a given item
   function renderRadarChart(baseKey, itemType, subType) {
     // subType: 'spiral', 'snaplock', or null
+    var isInsulation = itemType === 'insulation' || isInsulationLaborKey(baseKey);
+    var applicableCats = resolveLaborCategories(baseKey, itemType, null);
     var allCats = LABOR_CATEGORIES;
-    var breakdown = getLaborBreakdown(baseKey, allCats);
+    var breakdown = getLaborBreakdown(baseKey, applicableCats, itemType);
     var n = allCats.length;
     var isSheetMetal = (itemType === 'duct' || itemType === 'fitting');
     var isSnapLock = subType === 'snaplock';
+    var totalLh = getTotalLaborHrs(baseKey, applicableCats, itemType);
     // Determine which categories are enabled per item
     function isCatEnabled(cat) {
+      if (isInsulation) return INSULATION_LABOR_CATEGORY_KEYS.indexOf(cat.key) !== -1;
       if (!isSheetMetal) return cat.applies.indexOf(itemType) !== -1;
       // Sheet metal: rough always on, stocking always on, trim only for snap lock
       if (cat.key === 'rough') return true;
@@ -604,13 +703,23 @@ export function installPriceBook(ctx = {}) {
       return false;
     }
     var cx = 100, cy = 100, r = 80;
-    var maxVal = 2;
-    for (var i = 0; i < breakdown.length; i++) {
-      if (breakdown[i].hrs > maxVal) maxVal = Math.ceil(breakdown[i].hrs);
+    var maxVal = 0.01;
+    for (var i = 0; i < n; i++) {
+      var catForMax = allCats[i];
+      if (!isCatEnabled(catForMax)) continue;
+      var hrsForMax = getLaborHrsFromBreakdown(breakdown, catForMax.key);
+      if (hrsForMax > maxVal) maxVal = Math.ceil(hrsForMax);
     }
+    if (maxVal < 0.01) maxVal = 0.06;
   
     // --- Layout: flex row with radar on left, sliders on right ---
-    var html = '<div style="display:flex;gap:16px;align-items:flex-start">';
+    var html = '';
+    if (isInsulation) {
+      html += '<div style="width:100%;margin-bottom:8px;padding:6px 8px;background:rgba(116,192,252,0.12);border:1px solid rgba(116,192,252,0.25);border-radius:6px;font-size:11px;color:#a0a0c0">';
+      html += '<span style="color:#ffaa00;font-weight:700">' + totalLh.toFixed(4) + ' h/SF total</span>';
+      html += ' <span style="color:#666">(R + SK + QC for this ' + (pbInsulationLaborMode === 'dia' ? 'diameter' : 'perimeter') + ' range)</span></div>';
+    }
+    html += '<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">';
   
     // --- LEFT: Radar chart SVG ---
     html += '<div style="flex-shrink:0">';
@@ -642,7 +751,7 @@ export function installPriceBook(ctx = {}) {
     var dataPts = [];
     for (var j = 0; j < n; j++) {
       var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
-      var val = breakdown[j].hrs / maxVal;
+      var val = getLaborHrsFromBreakdown(breakdown, allCats[j].key) / maxVal;
       if (val > 1) val = 1;
       dataPts.push((cx + r * val * Math.cos(angle)).toFixed(1) + ',' + (cy + r * val * Math.sin(angle)).toFixed(1));
     }
@@ -652,7 +761,7 @@ export function installPriceBook(ctx = {}) {
       var cat = allCats[j];
       var enabled = isCatEnabled(cat);
       var angle = -Math.PI / 2 + (2 * Math.PI * j / n);
-      var val = breakdown[j].hrs / maxVal;
+      var val = getLaborHrsFromBreakdown(breakdown, cat.key) / maxVal;
       if (val > 1) val = 1;
       var dx = cx + r * val * Math.cos(angle);
       var dy = cy + r * val * Math.sin(angle);
@@ -677,13 +786,14 @@ export function installPriceBook(ctx = {}) {
       var cd = _loadCompanyDefaults();
       var hasCo = cd[catKey] && cd[catKey].laborHrs;
       var hasJson = _laborDefault(baseKey, cat.key) > 0;
+      var catHrs = getLaborHrsFromBreakdown(breakdown, cat.key);
       var srcDot = '', srcTitle = '';
       if (hasProjVal) { srcDot = '#e94560'; srcTitle = 'Project override'; }
       else if (hasCo) { srcDot = '#00ff88'; srcTitle = 'Company default'; }
-      else if (hasJson && breakdown[j].hrs > 0) { srcDot = '#555'; srcTitle = 'JSON seed default'; }
+      else if (hasJson && catHrs > 0) { srcDot = '#555'; srcTitle = 'JSON seed default'; }
       html += '<div style="display:flex;align-items:center;gap:4px;opacity:' + (enabled ? '1' : '0.3') + '">';
       html += '<span style="color:' + cat.color + ';font-size:11px;font-weight:700;width:24px">' + cat.short + '</span>';
-      html += '<input type="text" value="' + (breakdown[j].hrs || '') + '" placeholder="0" ';
+      html += '<input type="text" value="' + (catHrs || '') + '" placeholder="0" ';
       html += (enabled ? '' : 'disabled ') + 'style="width:44px;background:#1a1a2e;border:1px solid ' + (enabled ? '#0f3460' : '#0a1a30') + ';color:' + (enabled ? cat.color : '#333') + ';padding:3px 4px;border-radius:3px;font-size:12px;text-align:right" ';
       html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onchange="updateRadarHrs(\'' + catKey + '\',this.value)">';
       if (srcDot) html += '<span style="color:' + srcDot + ';font-size:8px" title="' + srcTitle + '">●</span>';
@@ -727,6 +837,33 @@ export function installPriceBook(ctx = {}) {
         html += 'onchange="radarSlideRd(1,this.value,\'' + baseKey + '\')">';
         html += '<span id="' + uid + 'bl" style="color:#da77f2;font-size:14px;font-weight:700">' + secSz + '\u2033</span>';
       }
+    } else if (itemType === 'insulation') {
+      var perimActive = pbInsulationLaborMode === 'perim';
+      html += '<div style="display:flex;flex-direction:column;gap:6px;align-items:center">';
+      html += '<div style="display:flex;flex-direction:column;gap:4px;width:100%">';
+      html += '<button type="button" onclick="event.stopPropagation();setInsulationLaborRadarMode(\'perim\')" style="padding:4px 6px;border-radius:5px;cursor:pointer;font-size:9px;font-weight:700;' + (perimActive ? 'background:#74c0fc;color:#101828;border:1px solid #74c0fc' : 'background:#1a1a2e;color:#a0a0c0;border:1px solid #0f3460') + '">Perimeter<br><span style="font-weight:400;opacity:0.85">Rect &amp; Oval</span></button>';
+      html += '<button type="button" onclick="event.stopPropagation();setInsulationLaborRadarMode(\'dia\')" style="padding:4px 6px;border-radius:5px;cursor:pointer;font-size:9px;font-weight:700;' + (!perimActive ? 'background:#00c8ff;color:#101828;border:1px solid #00c8ff' : 'background:#1a1a2e;color:#a0a0c0;border:1px solid #0f3460') + '">Diameter<br><span style="font-weight:400;opacity:0.85">Round</span></button>';
+      html += '</div>';
+      if (perimActive) {
+        var pIdx = pbInsulationPerimClassIdx;
+        var pClass = RECT_PERIM_CLASSES[pIdx] || RECT_PERIM_CLASSES[0];
+        html += '<span style="color:#74c0fc;font-size:11px;font-weight:700;margin-top:4px">PERIM</span>';
+        html += '<input type="range" min="0" max="' + (RECT_PERIM_CLASSES.length - 1) + '" value="' + pIdx + '" ';
+        html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:120px;accent-color:#74c0fc" ';
+        html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+        html += 'onchange="radarSliderInsulationClass(this.value)">';
+        html += '<span style="color:#74c0fc;font-size:11px;font-weight:700;text-align:center;max-width:72px;line-height:1.2">' + escapeHtml(pClass.label) + '</span>';
+      } else {
+        var dIdx = pbInsulationDiaClassIdx;
+        var dClass = INSULATION_ROUND_DIAM_CLASSES[dIdx] || INSULATION_ROUND_DIAM_CLASSES[0];
+        html += '<span style="color:#00c8ff;font-size:11px;font-weight:700;margin-top:4px">DIA</span>';
+        html += '<input type="range" min="0" max="' + (INSULATION_ROUND_DIAM_CLASSES.length - 1) + '" value="' + dIdx + '" ';
+        html += 'orient="vertical" style="writing-mode:bt-lr;-webkit-appearance:slider-vertical;width:24px;height:120px;accent-color:#00c8ff" ';
+        html += 'onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" ';
+        html += 'onchange="radarSliderInsulationClass(this.value)">';
+        html += '<span style="color:#00c8ff;font-size:11px;font-weight:700;text-align:center;max-width:72px;line-height:1.2">' + escapeHtml(dClass.label) + '</span>';
+      }
+      html += '</div>';
     } else {
       var currentMWIdx = pbMinWidthClass['rect-fit'] || 0;
       html += '<span style="color:#a0a0c0;font-size:12px;font-weight:700">MIN</span>';
@@ -825,10 +962,11 @@ export function installPriceBook(ctx = {}) {
   window.saveAsCompanyDefault = function(baseKey) {
     var cd = _loadCompanyDefaults();
     var saved = 0;
-    for (var i = 0; i < LABOR_CATEGORIES.length; i++) {
-      var catKey = baseKey + '-lc-' + LABOR_CATEGORIES[i].key;
+    var cats = isInsulationLaborKey(baseKey) ? getInsulationLaborCategories() : LABOR_CATEGORIES;
+    for (var i = 0; i < cats.length; i++) {
+      var catKey = baseKey + '-lc-' + cats[i].key;
       var entry = priceBookCache ? priceBookCache[catKey] : null;
-      var hrs = (entry && entry.laborHrs) ? entry.laborHrs : _laborDefault(baseKey, LABOR_CATEGORIES[i].key);
+      var hrs = (entry && entry.laborHrs) ? entry.laborHrs : _laborDefault(baseKey, cats[i].key);
       if (hrs > 0) { cd[catKey] = { laborHrs: hrs }; saved++; }
     }
     localStorage.setItem('isplan_labor_company', JSON.stringify(cd));
@@ -863,7 +1001,85 @@ export function installPriceBook(ctx = {}) {
     renderPriceBook();
   };
   
+  function isInsulationLaborKey(key) {
+    if (!key) return false;
+    var base = getInsulationPriceBookLaborKey(INSULATION_DEFAULTS);
+    return key === base || key.indexOf(base + '-perim-') === 0 || key.indexOf(base + '-dia-') === 0;
+  }
+
+  function syncInsulationRadarFromKey(key) {
+    if (!isInsulationLaborKey(key)) return;
+    var base = getInsulationPriceBookLaborKey(INSULATION_DEFAULTS);
+    var perimM = key.match(new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-perim-(\\d+)$'));
+    if (perimM) {
+      pbInsulationLaborMode = 'perim';
+      var refP = parseInt(perimM[1], 10);
+      for (var pi = 0; pi < RECT_PERIM_CLASSES.length; pi++) {
+        if (RECT_PERIM_CLASSES[pi].refPerim === refP) { pbInsulationPerimClassIdx = pi; break; }
+      }
+      return;
+    }
+    var diaM = key.match(new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '-dia-(\\d+)$'));
+    if (diaM) {
+      pbInsulationLaborMode = 'dia';
+      var refD = parseInt(diaM[1], 10);
+      for (var di = 0; di < INSULATION_ROUND_DIAM_CLASSES.length; di++) {
+        if (INSULATION_ROUND_DIAM_CLASSES[di].refDia === refD) { pbInsulationDiaClassIdx = di; break; }
+      }
+    }
+  }
+
+  function getActiveInsulationLaborKey() {
+    var base = getInsulationPriceBookLaborKey(INSULATION_DEFAULTS);
+    if (pbInsulationLaborMode === 'dia') {
+      var dc = INSULATION_ROUND_DIAM_CLASSES[pbInsulationDiaClassIdx] || INSULATION_ROUND_DIAM_CLASSES[0];
+      return base + '-dia-' + dc.refDia;
+    }
+    var pc = RECT_PERIM_CLASSES[pbInsulationPerimClassIdx] || RECT_PERIM_CLASSES[0];
+    return base + '-perim-' + pc.refPerim;
+  }
+
+  window.toggleInsulationLaborRadar = function() {
+    var key = getActiveInsulationLaborKey();
+    if (radarChartTarget && isInsulationLaborKey(radarChartTarget) && isInsulationPanelExpanded('labor')) {
+      radarChartTarget = null;
+      radarChartItemType = null;
+      radarChartSubType = null;
+      pbInsulationPanels.labor = true;
+    } else {
+      radarChartTarget = key;
+      radarChartItemType = 'insulation';
+      radarChartSubType = null;
+      pbInsulationPanels.labor = false;
+    }
+    renderPriceBook();
+    pbSaveLayout();
+  };
+
+  window.setInsulationLaborRadarMode = function(mode) {
+    pbInsulationLaborMode = mode === 'dia' ? 'dia' : 'perim';
+    radarChartTarget = getActiveInsulationLaborKey();
+    radarChartItemType = 'insulation';
+    renderPriceBook();
+  };
+
+  window.radarSliderInsulationClass = function(idx) {
+    var i = parseInt(idx, 10) || 0;
+    if (pbInsulationLaborMode === 'dia') {
+      pbInsulationDiaClassIdx = Math.max(0, Math.min(i, INSULATION_ROUND_DIAM_CLASSES.length - 1));
+    } else {
+      pbInsulationPerimClassIdx = Math.max(0, Math.min(i, RECT_PERIM_CLASSES.length - 1));
+    }
+    radarChartTarget = getActiveInsulationLaborKey();
+    radarChartItemType = 'insulation';
+    renderPriceBook();
+  };
+
   window.toggleRadarChart = function(baseKey, itemType, subType) {
+    if (isInsulationLaborKey(baseKey)) {
+      window.toggleInsulationLaborRadar();
+      return;
+    }
     if (radarChartTarget === baseKey) {
       radarChartTarget = null;
       radarChartItemType = null;
@@ -1494,6 +1710,315 @@ export function installPriceBook(ctx = {}) {
     renderPriceBook(); // re-render to update auto-calc previews
   };
   
+  function getActiveInsulationStandard() {
+    var key = INSULATION_DEFAULTS.takeoffDefaults && INSULATION_DEFAULTS.takeoffDefaults.activeStandard;
+    return (INSULATION_DEFAULTS.standards && INSULATION_DEFAULTS.standards[key]) || null;
+  }
+
+  function getInsulationTapeRule() {
+    var std = getActiveInsulationStandard();
+    if (!std || !std.rules) return null;
+    for (var i = 0; i < std.rules.length; i++) {
+      if (std.rules[i].id === TAPE_RULE_ID || std.rules[i].isTapeAddon) return std.rules[i];
+    }
+    return null;
+  }
+
+  function getInsulationThicknessOptions() {
+    return INSULATION_DEFAULTS.thicknessOptions || [
+      { value: 1, label: '1"' },
+      { value: 1.5, label: '1.5"' },
+      { value: 2, label: '2"' },
+      { value: 3, label: '3"' },
+    ];
+  }
+
+  function isInsulationPanelExpanded(panelKey) {
+    return !pbInsulationPanels[panelKey];
+  }
+
+  function renderInsulationPanelHeader(panelKey, title, hint) {
+    var open = isInsulationPanelExpanded(panelKey);
+    var arrow = open ? '\u25bc' : '\u25b6';
+    var html = '<tr style="cursor:pointer" onclick="toggleInsulationPanel(\'' + panelKey + '\')">';
+    html += '<td colspan="3" style="padding:10px 4px 6px;background:rgba(15,52,96,0.28);border-top:1px solid rgba(116,192,252,0.15)">';
+    html += '<span style="color:#888;font-size:10px;margin-right:8px">' + arrow + '</span>';
+    html += '<span style="color:#74c0fc;font-size:11px;font-weight:700;letter-spacing:0.3px">' + title + '</span>';
+    if (hint) html += '<span style="color:#666;font-size:10px;margin-left:8px;font-weight:400">' + hint + '</span>';
+    html += '</td></tr>';
+    return html;
+  }
+
+  window.toggleInsulationPanel = function(panelKey) {
+    pbInsulationPanels[panelKey] = !pbInsulationPanels[panelKey];
+    renderPriceBook();
+    pbSaveLayout();
+  };
+
+  window.toggleInsulationPreviewCard = function(previewKey) {
+    pbInsulationPreviewOpen[previewKey] = !pbInsulationPreviewOpen[previewKey];
+    renderPriceBook();
+    pbSaveLayout();
+  };
+
+  function renderInsulationThicknessPriceInputs() {
+    var opts = getInsulationThicknessOptions();
+    var html = '<div style="display:grid;grid-template-columns:repeat(2,minmax(88px,1fr));gap:6px;color:#a0a0c0;font-size:10px">';
+    for (var i = 0; i < opts.length; i++) {
+      var opt = opts[i];
+      var pbKey = insulationWrapPriceBookKey(opt.value, INSULATION_DEFAULTS);
+      var mc = getWrapMaterialCostPerSf(opt.value, INSULATION_DEFAULTS, priceBookCache);
+      html += '<label style="display:block">' + escapeHtml(opt.label || opt.value + '"') + ' $/SF<br>';
+      html += pbInput(pbKey, 'materialCost', mc);
+      html += '</label>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderInsulationPriceBookSection() {
+    seedInsulationLaborDefaults();
+    if (radarChartTarget && isInsulationLaborKey(radarChartTarget)) {
+      syncInsulationRadarFromKey(radarChartTarget);
+    }
+    var laborKey = (radarChartTarget && isInsulationLaborKey(radarChartTarget))
+      ? radarChartTarget
+      : getActiveInsulationLaborKey();
+    var laborClassLabel = pbInsulationLaborMode === 'dia'
+      ? (INSULATION_ROUND_DIAM_CLASSES[pbInsulationDiaClassIdx] || INSULATION_ROUND_DIAM_CLASSES[0]).label
+      : (RECT_PERIM_CLASSES[pbInsulationPerimClassIdx] || RECT_PERIM_CLASSES[0]).label;
+    var wrap = INSULATION_DEFAULTS.products && INSULATION_DEFAULTS.products[INSULATION_WRAP_PRODUCT];
+    var tape = INSULATION_DEFAULTS.products && INSULATION_DEFAULTS.products[INSULATION_TAPE_PRODUCT];
+    var tapeRule = getInsulationTapeRule();
+    var tapeOn = tapeRule && tapeRule.enabled !== false;
+    var wrapPieceLen = (tapeRule && tapeRule.wrapPieceLengthFt != null)
+      ? tapeRule.wrapPieceLengthFt
+      : (INSULATION_DEFAULTS.takeoffDefaults && INSULATION_DEFAULTS.takeoffDefaults.wrapPieceLengthFt) || 50;
+
+    var totalLh = getTotalLaborHrs(laborKey, null, 'insulation');
+    var radarOpen = isInsulationPanelExpanded('labor') || (radarChartTarget && isInsulationLaborKey(radarChartTarget));
+
+    var html = '<tr><td colspan="3" style="padding:7px 4px;color:#a0a0c0;font-size:11px;line-height:1.35">Configure fiberglass wrap ($/SF by thickness), labor by perimeter/diameter range, and optional seam tape. Tape at each <b>48&quot; &times; ' + wrapPieceLen + ' ft</b> joint plus both duct ends.</td></tr>';
+    html += renderInsulationPanelHeader('settings', 'Takeoff defaults &amp; settings', 'thickness, standard, default on');
+    if (isInsulationPanelExpanded('settings')) {
+      html += renderInsulationTakeoffDefaults();
+    }
+    html += '<tr style="color:#666;font-size:10px;text-transform:uppercase"><th style="text-align:left;padding:4px">Item</th><th style="text-align:left;padding:4px">$/SF or unit</th><th style="text-align:left;padding:4px">Labor (hrs/SF)</th></tr>';
+
+    html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.3)">';
+    html += '<td style="padding:8px 4px;color:#e0e0e0;font-size:12px"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + (wrap && wrap.displayColor ? wrap.displayColor : '#74c0fc') + ';margin-right:6px"></span><b>' + escapeHtml(wrap ? wrap.label : 'Fiberglass Duct Wrap') + '</b><div style="color:#666;font-size:10px;margin-top:3px">Primary insulation · separate $/SF for each thickness</div></td>';
+    html += '<td style="padding:8px 4px;vertical-align:top">' + renderInsulationThicknessPriceInputs() + '</td>';
+    html += '<td style="padding:8px 4px;text-align:center;cursor:pointer;vertical-align:top" onclick="toggleInsulationLaborRadar()" title="Edit labor hours per SF by perimeter (rect/oval) or diameter (round) range">';
+    html += '<span style="color:#ffaa00;font-size:11px;font-weight:700">' + totalLh.toFixed(4) + ' h/SF</span>';
+    html += '<div style="color:#666;font-size:9px;margin-top:2px">' + escapeHtml(laborClassLabel) + '</div>';
+    html += '<span style="color:#555;font-size:9px">\u25BC</span></td>';
+    html += '</tr>';
+
+    html += renderInsulationPanelHeader('labor', 'Labor by size range (radar)', escapeHtml(laborClassLabel) + ' · ' + totalLh.toFixed(4) + ' h/SF');
+    if (radarOpen) {
+      html += '<tr onclick="event.stopPropagation()"><td colspan="3" style="padding:8px;background:rgba(15,52,96,0.2);border-bottom:1px solid #0f3460">';
+      html += '<div style="color:#a0a0c0;font-size:10px;margin-bottom:6px">Set <b>Rough</b>, <b>Stocking</b>, and <b>QC</b> hrs/SF. Total = sum of those three. Use <b>Perimeter</b> (rect/oval) or <b>Diameter</b> (round).</div>';
+      html += renderRadarChart(laborKey, 'insulation');
+      html += '</td></tr>';
+    }
+
+    if (tape) {
+      html += '<tr style="border-bottom:1px solid rgba(15,52,96,0.2);background:rgba(116,192,252,0.04)">';
+      html += '<td style="padding:8px 4px 8px 22px;color:#e0e0e0;font-size:11px">';
+      html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" ' + (tapeOn ? 'checked' : '') + ' onchange="toggleInsulationTapeRule(this.checked)" style="width:auto">';
+      html += '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (tape.displayColor || '#b197fc') + '"></span>';
+      html += escapeHtml(tape.label) + '</label>';
+      html += '<div style="color:#666;font-size:10px;margin-top:4px;margin-left:22px">Circumferential tape at wrap joints + duct ends (not longitudinal laps)</div></td>';
+      html += '<td style="padding:8px 4px;vertical-align:top"><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;color:#a0a0c0;font-size:10px">';
+      html += '<label>$/roll<input type="number" step="0.01" value="' + (tape.materialCost ?? 0) + '" onchange="updateInsulationProduct(\'' + INSULATION_TAPE_PRODUCT + '\',\'materialCost\',this.value)" style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#00ff88;padding:3px 5px;border-radius:3px;font-size:11px"></label>';
+      html += '<label>LF/roll<input type="number" step="1" value="' + (tape.coveragePerUnit ?? 150) + '" onchange="updateInsulationProduct(\'' + INSULATION_TAPE_PRODUCT + '\',\'coveragePerUnit\',this.value)" style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 5px;border-radius:3px;font-size:11px"></label>';
+      html += '<label>Wrap piece (LF)<input type="number" step="1" value="' + wrapPieceLen + '" onchange="updateInsulationTapeRuleSetting(\'wrapPieceLengthFt\',this.value)" style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 5px;border-radius:3px;font-size:11px" title="Roll length along duct (48 in. wide; typically 50 or 100 ft)"></label>';
+      html += '<label>Waste<input type="number" step="0.01" value="' + (tape.wasteFactor ?? 1) + '" onchange="updateInsulationProduct(\'' + INSULATION_TAPE_PRODUCT + '\',\'wasteFactor\',this.value)" style="width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:3px 5px;border-radius:3px;font-size:11px"></label>';
+      html += '</div></td>';
+      html += '<td style="padding:8px 4px;color:#666;font-size:10px;vertical-align:middle">Included in wrap labor</td></tr>';
+    }
+
+    html += renderInsulationExampleSummary();
+    return html;
+  }
+
+  function renderInsulationTakeoffDefaults() {
+    var defaults = INSULATION_DEFAULTS.takeoffDefaults || {};
+    var thickness = INSULATION_DEFAULTS.thicknessOptions || [];
+    var standards = INSULATION_DEFAULTS.standards || {};
+    var html = '<tr><td colspan="3" style="padding:8px 4px;background:rgba(116,192,252,0.08);border:1px solid rgba(116,192,252,0.18);border-radius:8px">';
+    html += '<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;color:#a0a0c0;font-size:10px">';
+    html += '<label style="display:flex;align-items:center;gap:5px;margin-right:4px"><input type="checkbox" ' + (defaults.enabled ? 'checked' : '') + ' onchange="updateInsulationDefault(\'enabled\',this.checked)" style="width:auto"> Default on for new duct</label>';
+    html += '<label>Default thickness<br><select onchange="updateInsulationDefault(\'defaultThicknessIn\',this.value)" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:11px">';
+    for (var i = 0; i < thickness.length; i++) {
+      var opt = thickness[i];
+      html += '<option value="' + opt.value + '"' + (parseFloat(opt.value) === parseFloat(defaults.defaultThicknessIn) ? ' selected' : '') + '>' + escapeHtml(opt.label || opt.value) + '</option>';
+    }
+    html += '</select></label>';
+    html += '<label>Active standard<br><select onchange="updateInsulationDefault(\'activeStandard\',this.value)" style="background:#1a1a2e;border:1px solid #0f3460;color:#e0e0e0;padding:4px 6px;border-radius:4px;font-size:11px;min-width:190px">';
+    for (var key in standards) {
+      html += '<option value="' + key + '"' + (key === defaults.activeStandard ? ' selected' : '') + '>' + escapeHtml(standards[key].label || key) + '</option>';
+    }
+    html += '</select></label>';
+    html += '</div></td></tr>';
+    return html;
+  }
+
+  function getInsulationPreviewConfigs() {
+    var previews = INSULATION_DEFAULTS.previewExamples || {};
+    var fallback = INSULATION_DEFAULTS.examples || {};
+    return INSULATION_PREVIEW_KEYS.map(function(key) {
+      var cfg = previews[key] || {};
+      var ex = fallback[cfg.shape || key] || fallback.rect || {};
+      return {
+        key: key,
+        shape: cfg.shape || (key === 'snaplock' ? 'round' : key),
+        title: cfg.title || key,
+        dims: cfg.dims || ex.dims || '24x12',
+        lengthFt: cfg.lengthFt != null ? cfg.lengthFt : (ex.lengthFt || 10),
+        sizeLabel: cfg.sizeLabel || cfg.dims || '',
+      };
+    });
+  }
+
+  function renderInsulationPreviewCard(cfg, exThick, tapeOn, rate) {
+    var bundle = calculateInsulationExample(cfg.shape, INSULATION_DEFAULTS, {
+      dims: cfg.dims,
+      lengthFt: cfg.lengthFt,
+      thicknessIn: exThick,
+      priceBookCache: priceBookCache,
+    });
+    if (!bundle) return '';
+
+    var laborPbKey = bundle.priceBookLaborKey || resolveInsulationLaborPriceBookKey({
+      duct: { type: cfg.shape, dims: cfg.dims },
+    }, INSULATION_DEFAULTS);
+    var sizeCls = bundle.insulationSizeClass || classifyInsulationSize(cfg.shape, cfg.dims);
+    var laborPerSf = getTotalLaborHrs(laborPbKey, null, 'insulation');
+    var laborBd = getLaborBreakdown(laborPbKey, null, 'insulation');
+    var laborTotal = laborPerSf * (bundle.surfaceAreaSf || 0);
+    var laborCost = laborTotal * rate;
+    var grandTotal = (bundle.totalMaterialCost || 0) + laborCost;
+    var perimeterFt = bundle.perimeterFt || getInsulationPerimeterFt({
+      duct: { type: cfg.shape, dims: cfg.dims },
+    }, cfg.shape);
+
+    var laborCatBits = [];
+    for (var li = 0; li < laborBd.length; li++) {
+      if (INSULATION_LABOR_CATEGORY_KEYS.indexOf(laborBd[li].cat.key) === -1) continue;
+      if (laborBd[li].hrs > 0) laborCatBits.push(laborBd[li].cat.short + ' ' + laborBd[li].hrs.toFixed(3));
+    }
+    if (laborCatBits.length) {
+      laborCatBits.push('= ' + laborPerSf.toFixed(4) + ' h/SF');
+    }
+
+    var html = '<div style="background:linear-gradient(135deg,rgba(116,192,252,0.14),rgba(15,52,96,0.35));border:1px solid rgba(116,192,252,0.28);border-radius:10px;padding:10px 12px;margin-bottom:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">';
+    html += '<div><div style="color:#74c0fc;font-size:11px;font-weight:700">' + escapeHtml(cfg.title) + '</div>';
+    html += '<div style="color:#a0a0c0;font-size:10px;margin-top:2px">' + escapeHtml(cfg.sizeLabel) + ' · ' + cfg.lengthFt + ' LF run · ' + bundle.thicknessIn + '" wrap</div>';
+    html += '<div style="color:#666;font-size:9px;margin-top:2px">' + (sizeCls.mode === 'dia' ? 'Dia' : 'Perim') + ' ' + escapeHtml(sizeCls.label) + ' · ' + perimeterFt.toFixed(2) + ' LF wrap · ' + (bundle.surfaceAreaSf || 0).toFixed(1) + ' SF</div></div>';
+    html += '<div style="text-align:right"><div style="color:#00ff88;font-size:17px;font-weight:800">$' + grandTotal.toFixed(2) + '</div>';
+    html += '<div style="color:#74c0fc;font-size:10px;font-weight:600">+$' + (bundle.costPerLf || 0).toFixed(2) + '/LF duct</div></div>';
+    html += '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;margin-top:8px;font-size:10px">';
+    html += '<div style="background:rgba(0,0,0,0.22);border-radius:5px;padding:6px"><div style="color:#888;font-size:8px;text-transform:uppercase">Wrap</div>';
+    html += '<div style="color:#00ff88;font-weight:700">$' + (bundle.wrap.materialCost || 0).toFixed(2) + '</div></div>';
+    if (tapeOn) {
+      html += '<div style="background:rgba(177,151,252,0.12);border-radius:5px;padding:6px;border:1px solid rgba(177,151,252,0.2)"><div style="color:#b197fc;font-size:8px;text-transform:uppercase">Tape</div>';
+      html += '<div style="color:#00ff88;font-weight:700">$' + (bundle.tapeIncluded && bundle.tape ? bundle.tape.materialCost : 0).toFixed(2) + '</div>';
+      if (bundle.tapeIncluded && bundle.tape) {
+        html += '<div style="color:#666;font-size:9px">' + (bundle.tape.seamCount || 0) + ' seams</div>';
+      }
+      html += '</div>';
+    }
+    html += '<div style="background:rgba(0,0,0,0.22);border-radius:5px;padding:6px"><div style="color:#888;font-size:8px;text-transform:uppercase">Labor</div>';
+    html += '<div style="color:#ffaa00;font-weight:700">$' + laborCost.toFixed(2) + '</div>';
+    html += '<div style="color:#666;font-size:9px">' + laborTotal.toFixed(2) + ' hrs</div></div>';
+    html += '</div>';
+    if (laborCatBits.length) {
+      html += '<div style="color:#555;font-size:9px;margin-top:6px">Labor/SF: ' + laborCatBits.join(' · ') + '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderInsulationExampleSummary() {
+    var exThick = INSULATION_DEFAULTS.takeoffDefaults?.defaultThicknessIn || 1.5;
+    var tapeRule = getInsulationTapeRule();
+    var tapeOn = tapeRule && tapeRule.enabled !== false;
+    var rate = 45;
+    var configs = getInsulationPreviewConfigs();
+    if (!configs.length) return '';
+
+    var html = '';
+    html += renderInsulationPanelHeader('previews', 'Live cost previews by duct type', configs.length + ' examples');
+    if (isInsulationPanelExpanded('previews')) {
+      html += '<tr><td colspan="3" style="padding:4px 4px 12px">';
+      for (var pi = 0; pi < configs.length; pi++) {
+        html += renderInsulationPreviewCard(configs[pi], exThick, tapeOn, rate);
+      }
+      html += '</td></tr>';
+    }
+    return html;
+  }
+
+  window.updateInsulationProduct = function(productKey, prop, value) {
+    var numeric = value === '' ? null : (parseFloat(value) || 0);
+    var patch = { products: {} };
+    patch.products[productKey] = {};
+    patch.products[productKey][prop] = numeric;
+    saveInsulationDefaultsOverride(patch);
+    if (shouldRefreshCompiler()) refreshCompiler();
+    refreshMeasurementsPanel();
+    renderPriceBook();
+  };
+
+  function patchInsulationTapeRules(mutator, takeoffPatch) {
+    var stdKey = INSULATION_DEFAULTS.takeoffDefaults && INSULATION_DEFAULTS.takeoffDefaults.activeStandard;
+    var standard = INSULATION_DEFAULTS.standards && INSULATION_DEFAULTS.standards[stdKey];
+    if (!standard) return;
+    var rules = (standard.rules || []).map(function(rule) {
+      if (rule.id === TAPE_RULE_ID || rule.isTapeAddon) return mutator(Object.assign({}, rule));
+      return rule;
+    });
+    var patch = { standards: {} };
+    patch.standards[stdKey] = { rules: rules };
+    if (takeoffPatch) patch.takeoffDefaults = takeoffPatch;
+    saveInsulationDefaultsOverride(patch);
+    if (shouldRefreshCompiler()) refreshCompiler();
+    refreshMeasurementsPanel();
+    renderPriceBook();
+  }
+
+  window.toggleInsulationTapeRule = function(enabled) {
+    patchInsulationTapeRules(function(rule) {
+      rule.enabled = !!enabled;
+      return rule;
+    });
+  };
+
+  window.updateInsulationTapeRuleSetting = function(prop, value) {
+    if (prop !== 'wrapPieceLengthFt') return;
+    var numeric = parseFloat(value);
+    var v = Number.isFinite(numeric) && numeric > 0 ? numeric : 50;
+    patchInsulationTapeRules(function(rule) {
+      rule.wrapPieceLengthFt = v;
+      return rule;
+    }, { wrapPieceLengthFt: v });
+  };
+
+
+  window.updateInsulationDefault = function(prop, value) {
+    var v = prop === 'enabled' ? !!value : (prop === 'defaultThicknessIn' ? (parseFloat(value) || 1.5) : value);
+    var patch = { takeoffDefaults: {} };
+    patch.takeoffDefaults[prop] = v;
+    saveInsulationDefaultsOverride(patch);
+    refreshInsulationControls();
+    if (shouldRefreshCompiler()) refreshCompiler();
+    refreshMeasurementsPanel();
+    renderPriceBook();
+  };
+
   
   
   function renderPriceBook() {
@@ -1516,7 +2041,7 @@ export function installPriceBook(ctx = {}) {
       var sec = tab.sections[si];
       var collapsed = !!pbCollapsed[sec.id];
       var arrow = collapsed ? '\u25b6' : '\u25bc';
-      var count = sec.isHangerCatalog ? getHangerPriceBookItems(sec.family).length : sec.items.length;
+      var count = sec.isHangerCatalog ? getHangerPriceBookItems(sec.family).length : (sec.isInsulationCatalog ? 1 : sec.items.length);
       var gauges = getGaugesForSection(sec.id);
   
       // Section header row
@@ -1560,7 +2085,7 @@ export function installPriceBook(ctx = {}) {
           html += '<button onclick="event.stopPropagation();setPBGauge(\'' + sec.id + '\',\'' + g + '\')" style="padding:2px 6px;border-radius:3px;cursor:pointer;font-size:10px;font-weight:600;border:1px solid;margin-left:3px;' + gStyle + '">' + g + 'ga</button>';
         }
       }
-      // LINER toggle button for rect-fit and rect-duct sections
+      // LINER toggle: include active liner $/SF in rect duct/fitting auto-calc columns
       if (sec.id === 'rect-fit' || sec.id === 'rect-duct') {
         var lnStyle = pbLinerActive
           ? 'background:#ff6b6b;color:#fff;border-color:#ff6b6b'
@@ -1586,6 +2111,9 @@ export function installPriceBook(ctx = {}) {
         else if (sec.isHangerCatalog) {
           html += renderHangerPriceBookSection(sec);
         }
+        else if (sec.isInsulationCatalog) {
+          html += renderInsulationPriceBookSection();
+        }
         else {
           var hasGauge = !!sec.hasGauge;
           html += pbColumnHeader(!hasGauge, sec.id);
@@ -1608,8 +2136,20 @@ export function installPriceBook(ctx = {}) {
     var existing = (priceBookCache && priceBookCache[key]) || { key: key };
     existing[prop] = value === '' ? null : parseFloat(value) || null;
     await savePriceBookEntry(key, existing);
+    var wrapPrefix = INSULATION_WRAP_PB_KEY + '-t';
+    if (prop === 'materialCost' && key.indexOf(wrapPrefix) === 0) {
+      var tKey = key.slice(wrapPrefix.length);
+      var patch = { products: {} };
+      patch.products[INSULATION_WRAP_PRODUCT] = { materialCostByThickness: {} };
+      patch.products[INSULATION_WRAP_PRODUCT].materialCostByThickness[tKey] = existing.materialCost;
+      if (tKey === insulationThicknessKey(INSULATION_DEFAULTS.takeoffDefaults?.defaultThicknessIn || 1.5)) {
+        patch.products[INSULATION_WRAP_PRODUCT].materialCost = existing.materialCost;
+      }
+      saveInsulationDefaultsOverride(patch);
+    }
     renderPriceBook();
     if (shouldRefreshCompiler()) refreshCompiler();
+    refreshMeasurementsPanel();
   };
   
 
@@ -1622,6 +2162,7 @@ export function installPriceBook(ctx = {}) {
     getTotalLaborHrs,
     getShopSettings,
     getActiveLinerPricePerSF,
+    getLinerPricePerSFByThickness,
     calcRectDuctRawPerLF,
     calcRectFittingRawCost,
     lhCatKey,
